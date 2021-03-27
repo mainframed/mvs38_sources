@@ -1,0 +1,1846 @@
+         TITLE 'IFCMES01 - CONTROL FOR MEDIA ERROR STATISTICS PROCESSIN*00001000
+               NG       '                                               00002000
+IFCMES01 CSECT ,                                                   0001 00003000
+@MAINENT DS    0H                                                  0001 00004000
+         USING *,@15                                               0001 00005000
+         B     @PROLOG                                             0001 00006000
+         DC    AL1(16)                                             0001 00007000
+         DC    C'IFCMES01  78.017'                                 0001 00008000
+         DROP  @15                                                      00009000
+@PROLOG  ST    @14,12(,@13)                                        0001 00010000
+         STM   @00,@12,20(@13)                                     0001 00011000
+         BALR  @12,0                                               0001 00012000
+@PSTART  DS    0H                                                  0001 00013000
+         USING @PSTART,@12                                         0001 00014000
+         ST    @13,@SA00001+4                                      0001 00015000
+         LA    @14,@SA00001                                        0001 00016000
+         ST    @14,8(,@13)                                         0001 00017000
+         LR    @13,@14                                             0001 00018000
+         B     @PB00002                                            0073 00019000
+SORT     STM   @14,@12,@SA00002                                    0073 00020000
+*SRTCONT =((RECCOUNT-1)* 11) + CURRPTR;                    /*@Z427VLS*/ 00021000
+         LH    @03,RECCOUNT                                        0076 00022000
+         BCTR  @03,0                                               0076 00023000
+         MH    @03,@CH00575                                        0076 00024000
+         ALR   @03,CURRPTR                                         0076 00025000
+         ST    @03,SRTCONT                                         0076 00026000
+*/* THIS SORT IS DONE IN BAL IN ORDER TO GET MIN PROCESSING TIME    */  00027000
+*/* SOME 35 INSTRUCTIONS WERE CUT FROM THE BEST THAT PLS WOULD DO   */  00028000
+*/* THIS CUT THE RUN TIME DOWN BY APP. 50 PERCENT            @Z427VLS*/ 00029000
+*         GENERATE REFS(CONTRTAB);                         /*@Z427VLS*/ 00030000
+          LA     R15,11              LOAD THE INCREMENT VALUE           00031000
+          LR     R7,CURRPTR          LOAD THE START OF THE TABLE        00032000
+          L      R4,SRTCONT          LOAD THE MAX LIMIT                 00033000
+          LR     R1,R7               SET UP THE STOP LIMIT ON BACK UP   00034000
+          B      DOIT                GO AROUND THIS CODE FIRST TIME     00035000
+LOOPBCK1  ALR    R7,R15              MOVE THE POINTER TO NEXT ENTRY     00036000
+          CR     R7,R4               ARE WE POINTING TO LAST ENTRY      00037000
+          BNL    DONE                FINISHED WITH THE SORT SO EXIT     00038000
+DOIT      CLC    CONTRTAB(11,R7),CONTRTAB+11(R7)                        00039000
+         BNH   LOOPBCK1            DONT NEED TO SORT ITEM               00040000
+          XC     CONTRTAB(11,R7),CONTRTAB+11(R7)                        00041000
+          XC     CONTRTAB+11(11,R7),CONTRTAB(R7)                        00042000
+          XC     CONTRTAB(11,R7),CONTRTAB+11(R7)                        00043000
+          LR     R6,R7               SET NEW POINTER(BACKWARD)          00044000
+LOOPBCK2  SR     R6,R15              POINT TO LAST ENTRY                00045000
+          CR     R6,R1               DONT BACK OUT OF THE TABLE         00046000
+          BL     LOOPBCK1            START WITH NEXT ENTRY              00047000
+          CLC    CONTRTAB(11,R6),CONTRTAB+11(R6)                        00048000
+          BNH    LOOPBCK1            NO FUTHER SHUFFEL THIS SAMPLE      00049000
+          XC     CONTRTAB+11(11,R6),CONTRTAB(R6)                        00050000
+          XC     CONTRTAB(11,R6),CONTRTAB+11(R6)                        00051000
+          XC     CONTRTAB+11(11,R6),CONTRTAB(R6)                        00052000
+          B      LOOPBCK2            DOES IT NEED TO BE MOVED AGAIN     00053000
+DONE      EQU    *                                                      00054000
+*      RESPECIFY (R6) UNRESTRICTED;                        /*@Z427VLS*/ 00055000
+*END;                                                      /*@Z427VLS*/ 00056000
+@EL00002 DS    0H                                                  0079 00057000
+@EF00002 DS    0H                                                  0079 00058000
+@ER00002 LM    @14,@12,@SA00002                                    0079 00059000
+         BR    @14                                                 0079 00060000
+*/*                                                          @Z427VLS*/ 00061000
+*/* OUTPUT ALL OF THE SUMMARY COUNTERS THAT HAVE BEEN BUILT UP TO THIS* 00062000
+*/* POINT.  CNTAREA CONTAINS THE ADDRESS OF THE FIRST COUNTER AREA.   * 00063000
+*/*                                                          @Z427VLS*/ 00064000
+*OUTSUM: PROC;                                             /*@Z427VLS*/ 00065000
+OUTSUM   STM   @14,@12,@SA00003                                    0080 00066000
+*        CURRCNTS = CNTAREA;              /* GET ADDRESS OF FIRST AREA* 00067000
+         L     @06,CNTAREA                                         0081 00068000
+         ST    @06,CURRCNTS                                        0081 00069000
+*        DO WHILE (CURRCNTS ^= ZERO);                      /*@Z427VLS*/ 00070000
+         B     @DE00082                                            0082 00071000
+@DL00082 DS    0H                                                  0083 00072000
+*          RESPECIFY (R7,R9) RESTRICTED;                   /*@Z427VLS*/ 00073000
+*          R9 = SUMEDIT;                  /* SUMMARY OUTPUT EDITS     * 00074000
+         L     @06,SUMTAB                                          0084 00075000
+         L     R9,SUMEDIT(,@06)                                    0084 00076000
+*          R7 = CURRCNTS;                 /* ADDRESS OF COUNTERS      * 00077000
+         L     R7,CURRCNTS                                         0085 00078000
+*          CALL IFCEEDIT;                 /* GO TO EDIT TABLE         * 00079000
+         L     @15,@CV00534                                        0086 00080000
+         BALR  @14,@15                                             0086 00081000
+*          R9 = 22 + (2 * CNTSIZE);       /* SIZE OF COUNTER AREA     * 00082000
+         L     @06,SUMTAB                                          0087 00083000
+         LH    R9,CNTSIZE(,@06)                                    0087 00084000
+         ALR   R9,R9                                               0087 00085000
+         AL    R9,@CF00610                                         0087 00086000
+*          CURRCNTS = NEXTTAB;            /* ADDRESS OF NEXT AREA.    * 00087000
+         L     @08,CURRCNTS                                        0088 00088000
+         L     @08,NEXTTAB(,@08)                                   0088 00089000
+         ST    @08,CURRCNTS                                        0088 00090000
+*          GEN(FREEMAIN R,LV=(R9),A=(R7));                 /*@Z427VLS*/ 00091000
+         FREEMAIN R,LV=(R9),A=(R7)                                      00092000
+*          RESPECIFY (R7,R9) UNRESTRICTED;                 /*@Z427VLS*/ 00093000
+*        END;                                              /*@Z427VLS*/ 00094000
+@DE00082 SLR   @06,@06                                             0091 00095000
+         C     @06,CURRCNTS                                        0091 00096000
+         BNE   @DL00082                                            0091 00097000
+*        CNTAREA = ZERO;                  /* INITIALIZE FIRST AREA ADD* 00098000
+         ST    @06,CNTAREA                                         0092 00099000
+*        LASTDATE = LASTDATE && LASTDATE;  /* CLEAR LAST DATE         * 00100000
+         XC    LASTDATE(4),LASTDATE                                0093 00101000
+*END;                                                      /*@Z427VLS*/ 00102000
+@EL00003 DS    0H                                                  0094 00103000
+@EF00003 DS    0H                                                  0094 00104000
+@ER00003 LM    @14,@12,@SA00003                                    0094 00105000
+         BR    @14                                                 0094 00106000
+*/*                                                          @Z427VLS*/ 00107000
+*/* THE NEXT CODE WILL INITIALIZE THE REGISTERS FOR EXITING TO        * 00108000
+*/* AN EDIT MODULE.  THE EXPECTED PARAMETERS TO IFCEEDIT ARE:         * 00109000
+*/*      REG2 - POINTING TO THE RECORD TO BE EDITTED.        @Z427VLS*/ 00110000
+*/*      REG9 - POINTING TO THE BASE OF THE EDIT TABLE.      @Z427VLS*/ 00111000
+*/*      REG15 - POINTING TO THE BASE OF IFCEEDIT.           @Z427VLS*/ 00112000
+*/*                                                          @Z427VLS*/ 00113000
+*OUTEDIT: PROC (RECFLAG);                                  /*@Z427VLS*/ 00114000
+OUTEDIT  STM   @14,@12,@SA00004                                    0095 00115000
+         MVC   @PC00004(4),0(@01)                                  0095 00116000
+*      DCL RECFLAG CHAR(1);                                /*@Z427VLS*/ 00117000
+*      DCL 1 THRSHRC CHAR(8) BASED(R7),/* DUMMY AREA FOR ADDRESSING   * 00118000
+*           2 *       CHAR(4),                                     0097 00119000
+*           2 THRSHFLG CHAR(1);        /* RECORD FLAG FOR THRSH PROC  * 00120000
+*      RESPECIFY (R9) RESTRICTED;                          /*@Z427VLS*/ 00121000
+*      R9 = EDITTAB;                   /* GET BASE OF EDIT TABLE      * 00122000
+         L     R9,EDITTAB                                          0099 00123000
+*      IF PARMTHR = ON THEN                                        0100 00124000
+         TM    PARMTHR(R2),B'00001000'                             0100 00125000
+         BNO   @RF00100                                            0100 00126000
+*        DO;                                               /*@Z427VLS*/ 00127000
+*          ERTHRE = RDTHRSH;           /* READ THRESHOLD     @Z427VLS*/ 00128000
+         MVC   ERTHRE(3,R9),RDTHRSH(R2)                            0102 00129000
+*          EWTHRE = WRTHRSH;           /* WRITE THRESHOLD    @Z427VLS*/ 00130000
+         MVC   EWTHRE(3,R9),WRTHRSH(R2)                            0103 00131000
+*        END;                                              /*@Z427VLS*/ 00132000
+*      THRSHFLG = RECFLAG;             /* FLAG FOR THRESHOLD PROCESS  * 00133000
+@RF00100 L     @08,@PC00004                                        0105 00134000
+         MVC   THRSHFLG(1,R7),RECFLAG(@08)                         0105 00135000
+*      CALL IFCEEDIT;                  /* GO TO IFCEEDIT     @Z427VLS*/ 00136000
+         L     @15,@CV00534                                        0106 00137000
+         BALR  @14,@15                                             0106 00138000
+*      THRSHFLG = HEXZERO;             /* RESTORE PLACE IN RECORD     * 00139000
+         MVI   THRSHFLG(R7),X'00'                                  0107 00140000
+*      RETURN;                                             /*@Z427VLS*/ 00141000
+@EL00004 DS    0H                                                  0108 00142000
+@EF00004 DS    0H                                                  0108 00143000
+@ER00004 LM    @14,@12,@SA00004                                    0108 00144000
+         BR    @14                                                 0108 00145000
+*      RESPECIFY (R9) UNRESTRICTED;                        /*@Z427VLS*/ 00146000
+*END;                                                      /*@Z427VLS*/ 00147000
+*/*                                                          @Z427VLS*/ 00148000
+*/* IN EVERY SUMMARY TABLE AT OFFSET 12 THERE IS A HALFWORK WITH THE  * 00149000
+*/* NUMBER OF TWO BYTE COUNTERS NEEDED FOR THIS SERVICE.  AT THE      * 00150000
+*/* BEGINNING OF EVERY COUNT AREA THERE ARE 22 BYTES OF CONTROL       * 00151000
+*/* INFORMATION ADDED TO THE COUNT AREA.  THIS CODE ISSUES A GETMAIN  * 00152000
+*/* FOR THIS AREA AND SETS IT TO ZERO.                       @Z427VLS*/ 00153000
+*/*                                                          @Z427VLS*/ 00154000
+*GETSPACE: PROC;                                           /*@Z427VLS*/ 00155000
+GETSPACE STM   @14,@12,@SA00005                                    0111 00156000
+*          RESPECIFY (R0,R1,R7) RESTRICTED;                /*@Z427VLS*/ 00157000
+*          R0 = 22 + (CNTSIZE * 2);       /* DETERMINE SIZE OF AREA   * 00158000
+         L     @06,SUMTAB                                          0113 00159000
+         LH    R0,CNTSIZE(,@06)                                    0113 00160000
+         ALR   R0,R0                                               0113 00161000
+         AL    R0,@CF00610                                         0113 00162000
+*          GEN(GETMAIN R,LV=(0));                          /*@Z427VLS*/ 00163000
+         GETMAIN R,LV=(0)                                               00164000
+*          IF CNTAREA = ZERO THEN                                  0115 00165000
+         L     @06,CNTAREA                                         0115 00166000
+         LTR   @06,@06                                             0115 00167000
+         BNZ   @RF00115                                            0115 00168000
+*            CNTAREA = R1;                /* 1ST COUNTER AREA         * 00169000
+         ST    R1,CNTAREA                                          0116 00170000
+*          ELSE                                                    0117 00171000
+*            DO CURRCNTS = CNTAREA;                        /*@Z427VLS*/ 00172000
+         B     @RC00115                                            0117 00173000
+@RF00115 L     @06,CNTAREA                                         0117 00174000
+         ST    @06,CURRCNTS                                        0117 00175000
+*              DO WHILE (CURRCNTS -> NEXTTAB ^= ZERO); /* FIND END    * 00176000
+         B     @DE00118                                            0118 00177000
+@DL00118 DS    0H                                                  0119 00178000
+*                CURRCNTS = NEXTTAB;                       /*@Z427VLS*/ 00179000
+         L     @06,CURRCNTS                                        0119 00180000
+         L     @06,NEXTTAB(,@06)                                   0119 00181000
+         ST    @06,CURRCNTS                                        0119 00182000
+*              END;                                        /*@Z427VLS*/ 00183000
+@DE00118 L     @06,CURRCNTS                                        0120 00184000
+         L     @05,NEXTTAB(,@06)                                   0120 00185000
+         LTR   @05,@05                                             0120 00186000
+         BNZ   @DL00118                                            0120 00187000
+*              NEXTTAB = R1;              /* ADD TO END OF CHAIN      * 00188000
+         ST    R1,NEXTTAB(,@06)                                    0121 00189000
+*            END;                                          /*@Z427VLS*/ 00190000
+*          CURRCNTS = R1;                 /* SET POINTER TO AREA      * 00191000
+@RC00115 ST    R1,CURRCNTS                                         0123 00192000
+*          RESPECIFY (R0,R1) UNRESTRICTED;                 /*@Z427VLS*/ 00193000
+*          DO R7 = CNTSIZE TO 1 BY -1;    /* CLEAR SUM AREA  @Z427VLS*/ 00194000
+         L     @05,SUMTAB                                          0125 00195000
+         LH    R7,CNTSIZE(,@05)                                    0125 00196000
+         B     @DE00125                                            0125 00197000
+@DL00125 DS    0H                                                  0126 00198000
+*            COUNTERS(R7) = ZERO;                          /*@Z427VLS*/ 00199000
+         LR    @06,R7                                              0126 00200000
+         ALR   @06,@06                                             0126 00201000
+         SLR   @05,@05                                             0126 00202000
+         L     @03,CURRCNTS                                        0126 00203000
+         STH   @05,COUNTERS-2(@06,@03)                             0126 00204000
+*          END;                                            /*@Z427VLS*/ 00205000
+         BCTR  R7,0                                                0127 00206000
+@DE00125 LTR   R7,R7                                               0127 00207000
+         BP    @DL00125                                            0127 00208000
+*          /*                                                @Z427VLS*/ 00209000
+*          /* THIS CODE INITIALIZED THE HEADER AREA OF THE SUM AREA.  * 00210000
+*          /* IT MARKS THIS AS THE LAST SUM AREA AND PUTS IN OTHER    * 00211000
+*          /* IDENTIFYING INFORMATION.                       @Z427VLS*/ 00212000
+*          /*                                                @Z427VLS*/ 00213000
+*          NEXTTAB = ZERO;             /* INITIALIZE HEADER OF AREA   * 00214000
+         L     @06,CURRCNTS                                        0128 00215000
+         SLR   @05,@05                                             0128 00216000
+         ST    @05,NEXTTAB(,@06)                                   0128 00217000
+*          SUMIDENT = CUACPU;          /* CPU/CUA OR VOLID   @Z427VLS*/ 00218000
+         MVC   SUMIDENT(8,@06),CUACPU                              0129 00219000
+*          MODNAME = STABNAME;         /* MODULE NAME TO EDIT AREA    * 00220000
+         MVC   MODNAME(8,@06),STABNAME                             0130 00221000
+*          CURRDEV = SAVEDEV;          /* DEVICE CODE        @Z427VLS*/ 00222000
+         MVC   CURRDEV(2,@06),SAVEDEV                              0131 00223000
+*          RETURN;                                         /*@Z427VLS*/ 00224000
+@EL00005 DS    0H                                                  0132 00225000
+@EF00005 DS    0H                                                  0132 00226000
+@ER00005 LM    @14,@12,@SA00005                                    0132 00227000
+         BR    @14                                                 0132 00228000
+*          RESPECIFY (R7) UNRESTRICTED;                    /*@Z427VLS*/ 00229000
+*END;                                                      /*@Z427VLS*/ 00230000
+*/*                                                          @Z427VLS*/ 00231000
+*/* THE NEXT CODE SUMMARIZES THE INDIVIDUAL RECORDS INTO THE COUNTER  * 00232000
+*/* AREA.  A'FF'X ENTRY SIGNIFIES THE END OF THE TABLE AND WHEN IT IS * 00233000
+*/* FOUND A BRANCH IS TAKEN TO CHECK WHAT PASS WE ARE IN.    @Z427VLS*/ 00234000
+*/*                                                          @Z427VLS*/ 00235000
+*SUMIT: PROC;                                              /*@Z427VLS*/ 00236000
+SUMIT    STM   @14,@12,@SA00006                                    0135 00237000
+*       RESPECIFY (R3,R9) RESTRICTED;                      /*@Z427VLS*/ 00238000
+*       /*                                                   @Z427VLS*/ 00239000
+*       /* SUMSPEC1 IS LOADED WITH THE ADDRESS OF THE ENTRY FOR THE   * 00240000
+*       /* SPECIAL ROUTINE WITHIN THE SUMMARY MODULE.  SPECIAL WILL   * 00241000
+*       /* CAUSE THE NECESSARY LINKAGE TO BE GENERATED BY THE COMPILER* 00242000
+*       /*                                                   @Z427VLS*/ 00243000
+*       DCL SUMSPEC1 PTR(31);                              /*@Z427VLS*/ 00244000
+*       DCL SPECIAL ENTRY BASED(SUMSPEC1);                 /*@Z427VLS*/ 00245000
+*       NEXTENT = SUMPTR;              /* GET POINTER TO SUM ENTRIES  * 00246000
+         L     @08,SUMTAB                                          0139 00247000
+         L     @06,SUMPTR(,@08)                                    0139 00248000
+         ST    @06,NEXTENT(,@08)                                   0139 00249000
+*       R9 = SUMTAB;                  /* ADDRESS OF SUMMARY TABLE     * 00250000
+         LR    R9,@08                                              0140 00251000
+*       DO UNTIL (SUMFLAG = FOXFOX);                       /*@Z427VLS*/ 00252000
+@DL00141 DS    0H                                                  0142 00253000
+*         /*                                                 @Z427VLS*/ 00254000
+*         /* GET THE ADDRESS OF THE COUNTER TO BE UPDATED.   @Z427VLS*/ 00255000
+*         /*                                                 @Z427VLS*/ 00256000
+*         R3 = CURRCNTS + 22 + (2 * CNTOFSET);             /*@Z427VLS*/ 00257000
+         LA    R3,22                                               0142 00258000
+         AL    R3,CURRCNTS                                         0142 00259000
+         L     @08,SUMTAB                                          0142 00260000
+         L     @08,NEXTENT(,@08)                                   0142 00261000
+         LH    @06,CNTOFSET(,@08)                                  0142 00262000
+         ALR   @06,@06                                             0142 00263000
+         ALR   R3,@06                                              0142 00264000
+*         /*                                                 @Z427VLS*/ 00265000
+*         /* A '00'X ENTRY MEANS THAT A GIVEN BIT IN THE RECORD MUST  * 00266000
+*         /* BE TESTED AND THE COUNTER UPDATED IF THE BIT IS ON.  AN  * 00267000
+*         /* '80'X ENTRY MEANS THAT CONTROL IS TO BE GIVEN TO SPECIAL * 00268000
+*         /* ROUTINE WITH REG3 POINTING TO THE COUNTER TO BE UPDATED*/  00269000
+*         /* AND REG9 HAVING THE BASE OF THE SUM TABLE.      @Z427VLS*/ 00270000
+*         /*                                                 @Z427VLS*/ 00271000
+*         IF SUMFLAG = HEXZERO THEN    /* IS THIS A NORMAL SUMMARY    * 00272000
+         CLI   SUMFLAG(@08),X'00'                                  0143 00273000
+         BNE   @RF00143                                            0143 00274000
+*           DO;                                            /*@Z427VLS*/ 00275000
+*             IF (SUMMARY & SUMMASK) = SUMMASK THEN                0145 00276000
+         LR    @06,BUFFPTR                                         0145 00277000
+         AH    @06,OFFSET(,@08)                                    0145 00278000
+         MVC   @TS00001(1),SUMMARY(@06)                            0145 00279000
+         NC    @TS00001(1),SUMMASK(@08)                            0145 00280000
+         CLC   @TS00001(1),SUMMASK(@08)                            0145 00281000
+         BNE   @RF00145                                            0145 00282000
+*                COUNTER = COUNTER + 1;  /* IF ON-INCREMENT CTR       * 00283000
+         LA    @08,1                                               0146 00284000
+         AH    @08,COUNTER(,R3)                                    0146 00285000
+         STH   @08,COUNTER(,R3)                                    0146 00286000
+*           END;                                           /*@Z427VLS*/ 00287000
+*         ELSE                                                     0148 00288000
+*           DO;                                            /*@Z427VLS*/ 00289000
+         B     @RC00143                                            0148 00290000
+@RF00143 DS    0H                                                  0149 00291000
+*             R2 = BUFFPTR;            /* GET POINTER TO RECORD       * 00292000
+         LR    R2,BUFFPTR                                          0149 00293000
+*             SUMSPEC1 = SUMSPEC + SUMTAB;                 /*@Z427VLS*/ 00294000
+         L     @08,SUMTAB                                          0150 00295000
+         L     @06,NEXTENT(,@08)                                   0150 00296000
+         AH    @08,SUMSPEC(,@06)                                   0150 00297000
+         LR    SUMSPEC1,@08                                        0150 00298000
+*             CALL SPECIAL;            /* GO TO ROUTINE IN SUM TABLE  * 00299000
+         LR    @15,SUMSPEC1                                        0151 00300000
+         BALR  @14,@15                                             0151 00301000
+*           END;                                           /*@Z427VLS*/ 00302000
+*         NEXTENT = NEXTENT + 6;       /* UPDATE SUMMARY ENTRY        * 00303000
+@RC00143 L     @08,SUMTAB                                          0153 00304000
+         LA    @06,6                                               0153 00305000
+         AL    @06,NEXTENT(,@08)                                   0153 00306000
+         ST    @06,NEXTENT(,@08)                                   0153 00307000
+*       END;                                               /*@Z427VLS*/ 00308000
+@DE00141 L     @08,SUMTAB                                          0154 00309000
+         L     @08,NEXTENT(,@08)                                   0154 00310000
+         CLI   SUMFLAG(@08),X'FF'                                  0154 00311000
+         BNE   @DL00141                                            0154 00312000
+*       LASTDATE = DATE;               /* SAVE THE DATE OF THIS RECORD* 00313000
+         MVC   LASTDATE(4),DATE(BUFFPTR)                           0155 00314000
+*       LASTCUA = SAVECUA;             /* SAVE THE CUA OF THIS RECORD * 00315000
+         MVC   LASTCUA(3),SAVECUA                                  0156 00316000
+*       LASTCPU = SAVECPU;             /* SAVE THE CPU OF THIS RECORD * 00317000
+         MVC   LASTCPU(5),SAVECPU                                  0157 00318000
+*       RETURN;                                            /*@Z427VLS*/ 00319000
+@EL00006 DS    0H                                                  0158 00320000
+@EF00006 DS    0H                                                  0158 00321000
+@ER00006 LM    @14,@12,@SA00006                                    0158 00322000
+         BR    @14                                                 0158 00323000
+*       RESPECIFY (R3,R9) UNRESTRICTED;                    /*@Z427VLS*/ 00324000
+*END;                                                      /*@Z427VLS*/ 00325000
+*/*                                                          @Z427VLS*/ 00326000
+*/* LOOK UP THE CUA IN THE SHARE TABLE FOR THE CONVERTED SHARE VALUE. * 00327000
+*/* IF IT IS FOUND, RETURN THE CONVERTED VALUE IN NEW CUA. IF NOT,    * 00328000
+*/* RETURN THE ORIGINAL VALUE IN NEWCUA.                     @Z427VLS*/ 00329000
+*/*                                                          @Z427VLS*/ 00330000
+*CUASHARE: PROC;                                           /*@Z427VLS*/ 00331000
+CUASHARE STM   @14,@12,12(@13)                                     0161 00332000
+*    VALIDSHR = OFF;                          /* TURN OFF FOR SEARCH  * 00333000
+         NI    VALIDSHR,B'11101111'                                0162 00334000
+*    SHR74CUA = OCUA2;                        /* CUA FOR COMPARISON   * 00335000
+         MVC   SHR74CUA(2),OCUA2(BUFFPTR)                          0163 00336000
+*    SHR74CPU = CPUIDENT;                     /* CPU FOR COMPARISON   * 00337000
+         MVC   SHR74CPU(3),CPUIDENT(BUFFPTR)                       0164 00338000
+*    SHR74XXD = SHR74XXX;                     /* FOR CONTROLLER COMPR * 00339000
+         MVC   SHR74XXD(5),SHR74XXX                                0165 00340000
+*    SHR74CUX = SHR74CUX & FOXZERO;                        /*@Z427VLS*/ 00341000
+         NI    SHR74CUX,X'F0'                                      0166 00342000
+*    SHR74XDD = ON;                                        /*@Z427VLS*/ 00343000
+         OI    SHR74XDD,B'10000000'                                0167 00344000
+*    DO I = 1 TO SHARENUM BY 1 WHILE(VALIDSHR = OFF);      /*@Z427VLS*/ 00345000
+         LA    @06,1                                               0168 00346000
+         STH   @06,I                                               0168 00347000
+         B     @DE00168                                            0168 00348000
+@DL00168 TM    VALIDSHR,B'00010000'                                0168 00349000
+         BNZ   @DC00168                                            0168 00350000
+*      IF SHAREDX(I) = ON THEN                                     0169 00351000
+         MH    @06,@CH00575                                        0169 00352000
+         L     @05,SHAREPTR(,R2)                                   0169 00353000
+         ST    @06,@TF00001                                        0169 00354000
+         ALR   @06,@05                                             0169 00355000
+         AL    @06,@CF00650                                        0169 00356000
+         TM    SHAREDX-2(@06),B'10000000'                          0169 00357000
+         BNO   @RF00169                                            0169 00358000
+*        DO;                                  /* CHECK FOR CONTROLLER * 00359000
+*          IF SHR74XXD = SHRCUCPU(I) THEN                          0171 00360000
+         LR    @06,@05                                             0171 00361000
+         AL    @06,@TF00001                                        0171 00362000
+         AL    @06,@CF00650                                        0171 00363000
+         CLC   SHR74XXD(5),SHRCUCPU-2(@06)                         0171 00364000
+         BNE   @RF00171                                            0171 00365000
+*            DO;                                           /*@Z427VLS*/ 00366000
+*              /*                                            @Z427VLS*/ 00367000
+*              /* PUT IN CUA FROM SHARE TABLE WITH UNITS ADDR FROM REC* 00368000
+*              /*                                            @Z427VLS*/ 00369000
+*              SHR74CUA = SHARECUB(I);                     /*@Z427VLS*/ 00370000
+         LR    @06,@05                                             0173 00371000
+         AL    @06,@TF00001                                        0173 00372000
+         AL    @06,@CF00651                                        0173 00373000
+         MVC   SHR74CUA(2),SHARECUB-7(@06)                         0173 00374000
+*              SHR74CUA = SHR74CUA & ZFFF;                 /*@Z427VLS*/ 00375000
+         NC    SHR74CUA(2),@CB00460                                0174 00376000
+*              RECCUA = OCUA2 & ZZZF;                      /*@0001VLS*/ 00377000
+         MVC   RECCUA(2),OCUA2(BUFFPTR)                            0175 00378000
+         NC    RECCUA(2),@CB00462                                  0175 00379000
+*              RECCUA = RECCUA | SHR74CUA;                 /*@0001VLS*/ 00380000
+         OC    RECCUA(2),SHR74CUA                                  0176 00381000
+*              RECCPU = SHARSERB(I);                       /*@0001VLS*/ 00382000
+         AL    @05,@TF00001                                        0177 00383000
+         BCTR  @05,0                                               0177 00384000
+         BCTR  @05,0                                               0177 00385000
+         MVC   RECCPU(3),SHARSERB-9(@05)                           0177 00386000
+*              VALIDSHR = ON;                              /*@Z427VLS*/ 00387000
+         OI    VALIDSHR,B'00010000'                                0178 00388000
+*            END;                                          /*@Z427VLS*/ 00389000
+*        END;                                              /*@Z427VLS*/ 00390000
+*      ELSE                                                        0181 00391000
+*        IF SHR74XXX = SHRCUCPU(I) THEN                            0181 00392000
+         B     @RC00169                                            0181 00393000
+@RF00169 LH    @06,I                                               0181 00394000
+         MH    @06,@CH00575                                        0181 00395000
+         L     @05,SHAREPTR(,R2)                                   0181 00396000
+         ST    @06,@TF00001                                        0181 00397000
+         ALR   @06,@05                                             0181 00398000
+         AL    @06,@CF00650                                        0181 00399000
+         CLC   SHR74XXX(5),SHRCUCPU-2(@06)                         0181 00400000
+         BNE   @RF00181                                            0181 00401000
+*          DO;                                /* CUA ONLY.   @Z427VLS*/ 00402000
+*            RECCUA = SHARECUB(I);                         /*@0001VLS*/ 00403000
+         LR    @06,@05                                             0183 00404000
+         AL    @06,@TF00001                                        0183 00405000
+         AL    @06,@CF00651                                        0183 00406000
+         MVC   RECCUA(2),SHARECUB-7(@06)                           0183 00407000
+*            RECCPU = SHARSERB(I);                         /*@0001VLS*/ 00408000
+         AL    @05,@TF00001                                        0184 00409000
+         BCTR  @05,0                                               0184 00410000
+         BCTR  @05,0                                               0184 00411000
+         MVC   RECCPU(3),SHARSERB-9(@05)                           0184 00412000
+*            VALIDSHR = ON;                                /*@Z427VLS*/ 00413000
+         OI    VALIDSHR,B'00010000'                                0185 00414000
+*          END;                                            /*@Z427VLS*/ 00415000
+*    END;                                                  /*@Z427VLS*/ 00416000
+@RF00181 DS    0H                                                  0187 00417000
+@RC00169 LA    @06,1                                               0187 00418000
+         AH    @06,I                                               0187 00419000
+         STH   @06,I                                               0187 00420000
+@DE00168 L     @05,SHAREPTR(,R2)                                   0187 00421000
+         CH    @06,SHARENUM(,@05)                                  0187 00422000
+         BNH   @DL00168                                            0187 00423000
+@DC00168 DS    0H                                                  0188 00424000
+*    RETURN;                                               /*@Z427VLS*/ 00425000
+@EL00007 DS    0H                                                  0188 00426000
+@EF00007 DS    0H                                                  0188 00427000
+@ER00007 LM    @14,@12,12(@13)                                     0188 00428000
+         BR    @14                                                 0188 00429000
+* END;                                                     /*@Z427VLS*/ 00430000
+@PB00007 DS    0H                                                  0190 00431000
+*/*                                                          @Z427VLS*/ 00432000
+*/* INITIALLY THE ADDRESS OF THE PARAMETER LIST IS SAVED.  NEXT AN    * 00433000
+*/* AREA OF CORE IS GOTTEN FOR THE CONTROL TABLE.            @Z427VLS*/ 00434000
+*/*                                                          @Z427VLS*/ 00435000
+*        SAVEPARM = R2;                /* SAVE ADDR TO PARM TABLE     * 00436000
+         LR    SAVEPARM,R2                                         0190 00437000
+*        IF DEBUG4 = ON THEN                                       0191 00438000
+         TM    DEBUG4(R2),B'00001000'                              0191 00439000
+         BNO   @RF00191                                            0191 00440000
+*          DO;                                             /*@Z427VLS*/ 00441000
+*            R15 = R12 - 27;                               /*@Z427VLS*/ 00442000
+         LR    R15,R12                                             0193 00443000
+         SL    R15,@CF00635                                        0193 00444000
+*            GEN(MVC  MSGADDR(16),0(R15));                 /*@Z427VLS*/ 00445000
+         MVC  MSGADDR(16),0(R15)                                        00446000
+*            PRINTADR = ADDR(MESSAGE);                     /*@Z427VLS*/ 00447000
+         LA    @06,MESSAGE                                         0195 00448000
+         ST    @06,PRINTADR(,R2)                                   0195 00449000
+*            CURRPTR = ADDR(IFCEEDIT);                     /*@Z427VLS*/ 00450000
+         L     CURRPTR,@CV00534                                    0196 00451000
+*            GEN(MVC MSGADDR+20(16),5(CURRPTR));           /*@Z427VLS*/ 00452000
+         MVC MSGADDR+20(16),5(CURRPTR)                                  00453000
+*            PRINTADR = ADDR(MESSAGE);                     /*@Z427VLS*/ 00454000
+         LA    @06,MESSAGE                                         0198 00455000
+         ST    @06,PRINTADR(,R2)                                   0198 00456000
+*            CALL IOHND(RITEPRTR);                         /*@Z427VLS*/ 00457000
+         L     @15,ADIOHND(,R2)                                    0199 00458000
+         LA    @01,@AL00199                                        0199 00459000
+         BALR  @14,@15                                             0199 00460000
+*          END;                                            /*@Z427VLS*/ 00461000
+*        RESPECIFY (R0,R1) RESTRICTED;                     /*@Z427VLS*/ 00462000
+@RF00191 DS    0H                                                  0202 00463000
+*        R0 = TABSIZE;                                     /*@Z427VLS*/ 00464000
+         L     R0,TABSIZE(,R2)                                     0202 00465000
+*  GEN(GETMAIN EC,LV=(0),A=TABPTR);                        /*@0001VLS*/ 00466000
+         GETMAIN EC,LV=(0),A=TABPTR                                     00467000
+*    IF R15 = ZERO THEN                                            0204 00468000
+         LTR   R15,R15                                             0204 00469000
+         BNZ   @RF00204                                            0204 00470000
+*    DO;                                                   /*@GZZDGVS*/ 00471000
+*        RESPECIFY (R0,R1) UNRESTRICTED;                   /*@Z427VLS*/ 00472000
+*        CURRPTR = TABPTR + TABSIZE - 2;                   /*@Z427VLS*/ 00473000
+         L     CURRPTR,TABPTR                                      0207 00474000
+         AL    CURRPTR,TABSIZE(,R2)                                0207 00475000
+         BCTR  CURRPTR,0                                           0207 00476000
+         BCTR  CURRPTR,0                                           0207 00477000
+*        EOTABLE = EOT;                /* PUT IN END OF TABLE INDICAT * 00478000
+         MVC   EOTABLE(2,CURRPTR),@CB00259                         0208 00479000
+*        CURRPTR = CURRPTR - 11;                           /*@Z427VLS*/ 00480000
+         SL    CURRPTR,@CF00575                                    0209 00481000
+*        RESPECIFY (R15) RESTRICTED;                       /*@Z427VLS*/ 00482000
+*        CALL IOHND(READSEQ);          /* GET AN INPUT RECORD         * 00483000
+         L     @15,ADIOHND(,R2)                                    0211 00484000
+         LA    @01,@AL00211                                        0211 00485000
+         BALR  @14,@15                                             0211 00486000
+*        RETCODE = R15;                                    /*@Z427VLS*/ 00487000
+         ST    R15,RETCODE                                         0212 00488000
+*        RESPECIFY (R15) UNRESTRICTED;                     /*@Z427VLS*/ 00489000
+*        DO WHILE (CURRPTR >= TABPTR & RETCODE = ZERO);    /*@Z427VLS*/ 00490000
+         B     @DE00214                                            0214 00491000
+@DL00214 DS    0H                                                  0215 00492000
+*          /*                                                @Z427VLS*/ 00493000
+*          /* THIS NEXT CODE WILL GET THE DEVICE TYPE AND CUA FROM THE* 00494000
+*          /* PROPER OFFSET IN THE RECORD.  WITH A LONG OBR RECORD,   * 00495000
+*          /* THE INFORMATION WILL BE RETRIEVED FROM THE NORMAL       * 00496000
+*          /* OFFSETS.                                       @Z427VLS*/ 00497000
+*          /*                                                @Z427VLS*/ 00498000
+*          IF (RECTYP & FOXZERO) = OBRREC &                        0215 00499000
+*              SHORT = OFF & DEV2 = SAVEDEV &                      0215 00500000
+*              DATE >= STDATE & DATE <= ENDDATE &                  0215 00501000
+*              ((SHIFT3RD = OFF & TIME >= STTIME1 & TIME <= ENDTIME1) | 00502000
+*               (SHIFT3RD = ON &                                   0215 00503000
+*                ((TIME >= STTIME1 & DATE ^= ENDDATE) |            0215 00504000
+*                 (TIME <= ENDTIME2 & DATE ^= STDATE)))) THEN      0215 00505000
+         MVC   @TS00001(1),RECTYP(BUFFPTR)                         0215 00506000
+         NI    @TS00001,X'F0'                                      0215 00507000
+         CLI   @TS00001,X'30'                                      0215 00508000
+         BNE   @RF00215                                            0215 00509000
+         TM    SHORT(BUFFPTR),B'00100000'                          0215 00510000
+         BNZ   @RF00215                                            0215 00511000
+         CLC   DEV2(2,BUFFPTR),SAVEDEV                             0215 00512000
+         BNE   @RF00215                                            0215 00513000
+         CLC   DATE(4,BUFFPTR),STDATE(R2)                          0215 00514000
+         BL    @RF00215                                            0215 00515000
+         CLC   DATE(4,BUFFPTR),ENDDATE(R2)                         0215 00516000
+         BH    @RF00215                                            0215 00517000
+         TM    SHIFT3RD(R2),B'00010000'                            0215 00518000
+         BNZ   @GL00006                                            0215 00519000
+         CLC   TIME(4,BUFFPTR),STTIME1(R2)                         0215 00520000
+         BL    @GL00006                                            0215 00521000
+         CLC   TIME(4,BUFFPTR),ENDTIME1(R2)                        0215 00522000
+         BNH   @RT00215                                            0215 00523000
+@GL00006 TM    SHIFT3RD(R2),B'00010000'                            0215 00524000
+         BNO   @RF00215                                            0215 00525000
+         CLC   TIME(4,BUFFPTR),STTIME1(R2)                         0215 00526000
+         BL    @GL00010                                            0215 00527000
+         CLC   DATE(4,BUFFPTR),ENDDATE(R2)                         0215 00528000
+         BNE   @RT00215                                            0215 00529000
+@GL00010 CLC   TIME(4,BUFFPTR),ENDTIME2(R2)                        0215 00530000
+         BH    @RF00215                                            0215 00531000
+         CLC   DATE(4,BUFFPTR),STDATE(R2)                          0215 00532000
+         BE    @RF00215                                            0215 00533000
+@RT00215 DS    0H                                                  0216 00534000
+*            DO;                                           /*@Z427VLS*/ 00535000
+*              /*                                            @Z427VLS*/ 00536000
+*              /* THIS NEXT SECTION OF CODE COMPARES THE OBR JUST READ* 00537000
+*              /* IN WITH THE PARAMETERS SPECIFIED ON THE EXEC CARD   * 00538000
+*              /* AND PUT IN A LIST BY PARAMETER PROCESSOR.  @Z427VLS*/ 00539000
+*              /* IF NO CUA WAS SPECIFIED, THE POINTER TO THE CUA     * 00540000
+*              /* TABLE WILL BE ZERO.  IF IT IS NOT, THEN A MAXIMUM   * 00541000
+*              /* OF SIXTEEN INDIVIDUAL OR RANGE CUAS MUST BE COMPARED* 00542000
+*              /* TO THE CUA IN THE RECORD.                  @Z427VLS*/ 00543000
+*              /*                                            @Z427VLS*/ 00544000
+*              VALIDCUA = OFF;                             /*@Z427VLS*/ 00545000
+*              VALIDCPU = OFF;                             /*@Z427VLS*/ 00546000
+*              VALIDSER = OFF;                             /*@Z427VLS*/ 00547000
+*              VALIDVOL = OFF;                             /*@Z427VLS*/ 00548000
+         NI    VALIDCUA,B'10010011'                                0220 00549000
+*              IF CUAPTR ^= ZERO THEN        /* ARE ALL CUA'S WANTED  * 00550000
+         L     @06,CUAPTR(,R2)                                     0221 00551000
+         LTR   @06,@06                                             0221 00552000
+         BZ    @RF00221                                            0221 00553000
+*                DO I = 1 TO CUANUM BY 1 WHILE (VALIDCUA = OFF);   0222 00554000
+         LA    @06,1                                               0222 00555000
+         STH   @06,I                                               0222 00556000
+         B     @DE00222                                            0222 00557000
+@DL00222 TM    VALIDCUA,B'00001000'                                0222 00558000
+         BNZ   @DC00222                                            0222 00559000
+*                  IF OCUA2 >= CUA1(I) &     /* DOES THE CUA LIE IN   * 00560000
+*                     OCUA2 <= CUA2(I) THEN  /* RANGE SPECIFIED       * 00561000
+         SLA   @06,2                                               0223 00562000
+         L     @03,CUAPTR(,R2)                                     0223 00563000
+         ST    @06,@TF00001                                        0223 00564000
+         ALR   @06,@03                                             0223 00565000
+         BCTR  @06,0                                               0223 00566000
+         BCTR  @06,0                                               0223 00567000
+         CLC   OCUA2(2,BUFFPTR),CUA1-2(@06)                        0223 00568000
+         BL    @RF00223                                            0223 00569000
+         AL    @03,@TF00001                                        0223 00570000
+         CLC   OCUA2(2,BUFFPTR),CUA2-4(@03)                        0223 00571000
+         BH    @RF00223                                            0223 00572000
+*                       VALIDCUA = ON;       /* ACCEPT RECORD         * 00573000
+         OI    VALIDCUA,B'00001000'                                0224 00574000
+*                END;                                      /*@Z427VLS*/ 00575000
+@RF00223 LA    @06,1                                               0225 00576000
+         AH    @06,I                                               0225 00577000
+         STH   @06,I                                               0225 00578000
+@DE00222 L     @03,CUAPTR(,R2)                                     0225 00579000
+         CH    @06,CUANUM(,@03)                                    0225 00580000
+         BNH   @DL00222                                            0225 00581000
+@DC00222 DS    0H                                                  0226 00582000
+*              ELSE                                                0226 00583000
+*                VALIDCUA = ON;              /* ACCEPT RECORD         * 00584000
+         B     @RC00221                                            0226 00585000
+@RF00221 OI    VALIDCUA,B'00001000'                                0226 00586000
+*              /*                                            @Z427VLS*/ 00587000
+*              /* A CHECK IS MADE TO SEE IF A LIST OF VOLID'S WAS     * 00588000
+*              /* PASSED IN THE PARAMETER LIST.  IF IT WAS, THE VOLID * 00589000
+*              /* IN THE RECORD IS COMPARED TO THE VOLIDS IN THE LIST * 00590000
+*              /* TO SEE IF THE RECORD SHOULD BE INCLUDED IN THE      * 00591000
+*              /* REPORTS.                                   @Z427VLS*/ 00592000
+*              /*                                            @Z427VLS*/ 00593000
+*              IF VOLPTR ^= ZERO THEN        /* WAS A VOLID SPECIFIED * 00594000
+@RC00221 L     @06,VOLPTR(,R2)                                     0227 00595000
+         LTR   @06,@06                                             0227 00596000
+         BZ    @RF00227                                            0227 00597000
+*                DO I = 1 TO VOLNUM BY 1 WHILE(VALIDVOL = OFF);    0228 00598000
+         LA    @06,1                                               0228 00599000
+         STH   @06,I                                               0228 00600000
+         B     @DE00228                                            0228 00601000
+@DL00228 TM    VALIDVOL,B'00000100'                                0228 00602000
+         BNZ   @DC00228                                            0228 00603000
+*                  IF VOLVAL(I) = VOLID THEN /* VOLUME IN LIST        * 00604000
+         MH    @06,@CH00078                                        0229 00605000
+         L     @03,VOLPTR(,R2)                                     0229 00606000
+         ALR   @03,@06                                             0229 00607000
+         AL    @03,@CF00651                                        0229 00608000
+         CLC   VOLVAL-2(6,@03),VOLID(BUFFPTR)                      0229 00609000
+         BNE   @RF00229                                            0229 00610000
+*                    VALIDVOL = ON;          /* ACCEPT RECORD         * 00611000
+         OI    VALIDVOL,B'00000100'                                0230 00612000
+*                END;                                      /*@Z427VLS*/ 00613000
+@RF00229 LA    @06,1                                               0231 00614000
+         AH    @06,I                                               0231 00615000
+         STH   @06,I                                               0231 00616000
+@DE00228 L     @03,VOLPTR(,R2)                                     0231 00617000
+         CH    @06,VOLNUM(,@03)                                    0231 00618000
+         BNH   @DL00228                                            0231 00619000
+@DC00228 DS    0H                                                  0232 00620000
+*              ELSE                                                0232 00621000
+*                VALIDVOL = ON;              /* ACCEPT RECORD         * 00622000
+         B     @RC00227                                            0232 00623000
+@RF00227 OI    VALIDVOL,B'00000100'                                0232 00624000
+*              /*                                            @Z427VLS*/ 00625000
+*              /* A CHECK IS MADE AGAINST ANY CPU WERE SPECIFIED      * 00626000
+*              /*                                            @Z427VLS*/ 00627000
+*              IF CPUPTR ^= ZERO THEN                              0233 00628000
+@RC00227 L     @06,CPUPTR(,R2)                                     0233 00629000
+         LTR   @06,@06                                             0233 00630000
+         BZ    @RF00233                                            0233 00631000
+*                DO I = 1 TO CPUNUM BY 1 WHILE(VALIDCPU = OFF);    0234 00632000
+         LA    @06,1                                               0234 00633000
+         STH   @06,I                                               0234 00634000
+         B     @DE00234                                            0234 00635000
+@DL00234 TM    VALIDCPU,B'00100000'                                0234 00636000
+         BNZ   @DC00234                                            0234 00637000
+*                  IF CPUIDENT = CPUVAL(I) THEN                    0235 00638000
+         MH    @06,@CH00076                                        0235 00639000
+         L     @03,CPUPTR(,R2)                                     0235 00640000
+         ALR   @03,@06                                             0235 00641000
+         AL    @03,@CF00655                                        0235 00642000
+         CLC   CPUIDENT(5,BUFFPTR),CPUVAL-2(@03)                   0235 00643000
+         BNE   @RF00235                                            0235 00644000
+*                    VALIDCPU = ON;                        /*@Z427VLS*/ 00645000
+         OI    VALIDCPU,B'00100000'                                0236 00646000
+*                END;                                      /*@Z427VLS*/ 00647000
+@RF00235 LA    @06,1                                               0237 00648000
+         AH    @06,I                                               0237 00649000
+         STH   @06,I                                               0237 00650000
+@DE00234 L     @03,CPUPTR(,R2)                                     0237 00651000
+         CH    @06,CPUNUM(,@03)                                    0237 00652000
+         BNH   @DL00234                                            0237 00653000
+@DC00234 DS    0H                                                  0238 00654000
+*              ELSE                                                0238 00655000
+*                VALIDCPU = ON;                            /*@Z427VLS*/ 00656000
+         B     @RC00233                                            0238 00657000
+@RF00233 OI    VALIDCPU,B'00100000'                                0238 00658000
+*              /*                                            @Z427VLS*/ 00659000
+*              /* A CHECK IS MADE AGAINST ANY DEVSER THAT WERE SPECIFD* 00660000
+*              /*                                            @Z427VLS*/ 00661000
+*              IF SERPTR ^= ZERO THEN                              0239 00662000
+@RC00233 L     @06,SERPTR(,R2)                                     0239 00663000
+         LTR   @06,@06                                             0239 00664000
+         BZ    @RF00239                                            0239 00665000
+*                DO I = 1 TO SERNUM BY 1 WHILE(VALIDSER = OFF);    0240 00666000
+         LA    @06,1                                               0240 00667000
+         STH   @06,I                                               0240 00668000
+         B     @DE00240                                            0240 00669000
+@DL00240 TM    VALIDSER,B'01000000'                                0240 00670000
+         BNZ   @DC00240                                            0240 00671000
+*                  IF OSER74XX = SERVAL(I) THEN                    0241 00672000
+         ALR   @06,@06                                             0241 00673000
+         L     @03,SERPTR(,R2)                                     0241 00674000
+         ALR   @03,@06                                             0241 00675000
+         CLC   OSER74XX(2,BUFFPTR),SERVAL-2(@03)                   0241 00676000
+         BNE   @RF00241                                            0241 00677000
+*                    VALIDSER = ON;                        /*@Z427VLS*/ 00678000
+         OI    VALIDSER,B'01000000'                                0242 00679000
+*                END;                                      /*@Z427VLS*/ 00680000
+@RF00241 LA    @06,1                                               0243 00681000
+         AH    @06,I                                               0243 00682000
+         STH   @06,I                                               0243 00683000
+@DE00240 L     @03,SERPTR(,R2)                                     0243 00684000
+         CH    @06,SERNUM(,@03)                                    0243 00685000
+         BNH   @DL00240                                            0243 00686000
+@DC00240 DS    0H                                                  0244 00687000
+*              ELSE                                                0244 00688000
+*                VALIDSER = ON;                            /*@Z427VLS*/ 00689000
+         B     @RC00239                                            0244 00690000
+@RF00239 OI    VALIDSER,B'01000000'                                0244 00691000
+*              /*                                            @Z427VLS*/ 00692000
+*              IF VALIDCUA = ON & VALIDVOL = ON & VALIDCPU = ON &  0245 00693000
+*                 VALIDSER = ON THEN                               0245 00694000
+@RC00239 TM    VALIDCUA,B'01101100'                                0245 00695000
+         BNO   @RF00245                                            0245 00696000
+*                DO RECCOUNT = RECCOUNT + 1; /* INCREMENT RECORD COUNT* 00697000
+         LA    @06,1                                               0246 00698000
+         AH    @06,RECCOUNT                                        0246 00699000
+         STH   @06,RECCOUNT                                        0246 00700000
+*                  IF PHIST = ON THEN                              0247 00701000
+         TM    PHIST(R2),B'00100000'                               0247 00702000
+         BNO   @RF00247                                            0247 00703000
+*                   DO;                                    /*@0001VLS*/ 00704000
+*                    RESPECIFY (R15) RESTRICTED;           /*@0001VLS*/ 00705000
+*                    CALL IOHND(RITESCRT);                 /*@Z427VLS*/ 00706000
+         L     @15,ADIOHND(,R2)                                    0250 00707000
+         LA    @01,@AL00250                                        0250 00708000
+         BALR  @14,@15                                             0250 00709000
+*                    RETCODE = R15;                        /*@0001VLS*/ 00710000
+         ST    R15,RETCODE                                         0251 00711000
+*                    RESPECIFY (R15) UNRESTRICTED;         /*@0001VLS*/ 00712000
+*                   END;                                   /*@0001VLS*/ 00713000
+*                 IF RETCODE = ZERO THEN                           0254 00714000
+@RF00247 SLR   @06,@06                                             0254 00715000
+         C     @06,RETCODE                                         0254 00716000
+         BNE   @RF00254                                            0254 00717000
+*                  DO;                                     /*@0001VLS*/ 00718000
+*                  /*                                        @Z427VLS*/ 00719000
+*                  /* CHECK FOR SHARED I/O AND CHANGE CUA IF REQUIRED * 00720000
+*                  /*                                        @Z427VLS*/ 00721000
+*                  CONTRTAB = CONTRTAB && CONTRTAB;        /*@0001VLS*/ 00722000
+         XC    CONTRTAB(11,CURRPTR),CONTRTAB(CURRPTR)              0256 00723000
+*                  RECCUA = OCUA2;                         /*@0001VLS*/ 00724000
+         MVC   RECCUA(2),OCUA2(BUFFPTR)                            0257 00725000
+*                  RECCPU = CPUSER;                        /*@0001VLS*/ 00726000
+         MVC   RECCPU(3),CPUSER(BUFFPTR)                           0258 00727000
+*                  IF SHAREPTR ^= ZERO THEN                        0259 00728000
+         C     @06,SHAREPTR(,R2)                                   0259 00729000
+         BE    @RF00259                                            0259 00730000
+*                    CALL CUASHARE;                        /*@Z427VLS*/ 00731000
+         BAL   @14,CUASHARE                                        0260 00732000
+*                  CONTRCUA(2:3) = RECCUA;   /* GET CUA      @0001VLS*/ 00733000
+@RF00259 MVC   CONTRCUA+1(2,CURRPTR),RECCUA                        0261 00734000
+*                  /*                                        @Z427VLS*/ 00735000
+*                  /* IF THRESHOLD, SORT BY CH AND CU ONLY.  @Z427VLS*/ 00736000
+*                  /*                                        @Z427VLS*/ 00737000
+*                  IF PARMTHR = ON THEN                            0262 00738000
+         TM    PARMTHR(R2),B'00001000'                             0262 00739000
+         BNO   @RF00262                                            0262 00740000
+*                    CONTRCUA(3) = CONTRCUA(3) & FOXZERO;  /*@Z427VLS*/ 00741000
+         NI    CONTRCUA+2(CURRPTR),X'F0'                           0263 00742000
+*                  CPU = RECCPU;      /* PUT CPU SERIAL NUMBER IN    */ 00743000
+@RF00262 MVC   CPU(3,CURRPTR),RECCPU                               0264 00744000
+*                  TABCCHHR = RECCCHHR;       /* PUT CCHHR IN TABLE   * 00745000
+         MVC   TABCCHHR(5,CURRPTR),RECCCHHR(R2)                    0265 00746000
+*                  CURRPTR = CURRPTR - 11;   /* DECREMENT TO NEXT ENTR* 00747000
+         SL    CURRPTR,@CF00575                                    0266 00748000
+*                  END;                                    /*@0001VLS*/ 00749000
+*                END;                                      /*@Z427VLS*/ 00750000
+@RF00254 DS    0H                                                  0269 00751000
+*            END;                                          /*@Z427VLS*/ 00752000
+@RF00245 DS    0H                                                  0270 00753000
+*            RESPECIFY (R15) RESTRICTED;                   /*@Z427VLS*/ 00754000
+@RF00215 DS    0H                                                  0271 00755000
+*           IF RETCODE = ZERO THEN                                 0271 00756000
+         L     @14,RETCODE                                         0271 00757000
+         LTR   @14,@14                                             0271 00758000
+         BNZ   @RF00271                                            0271 00759000
+*             DO;                                          /*@0001VLS*/ 00760000
+*               CALL IOHND (READSEQ);         /* GET ANOTHER RECORD  */ 00761000
+         L     @15,ADIOHND(,R2)                                    0273 00762000
+         LA    @01,@AL00273                                        0273 00763000
+         BALR  @14,@15                                             0273 00764000
+*               RETCODE = R15;                             /*@0001VLS*/ 00765000
+         ST    R15,RETCODE                                         0274 00766000
+*             END;                                         /*@0001VLS*/ 00767000
+*            RESPECIFY (R15) UNRESTRICTED;                 /*@Z427VLS*/ 00768000
+@RF00271 DS    0H                                                  0277 00769000
+*        END;                                              /*@Z427VLS*/ 00770000
+@DE00214 C     CURRPTR,TABPTR                                      0277 00771000
+         BL    @DC00214                                            0277 00772000
+         L     @06,RETCODE                                         0277 00773000
+         LTR   @06,@06                                             0277 00774000
+         BZ    @DL00214                                            0277 00775000
+@DC00214 DS    0H                                                  0278 00776000
+*        /*                                                  @Z427VLS*/ 00777000
+*        /* AT END OF FILE THE PART OF THE CONTROL TABLE THAT HAS NOT * 00778000
+*        /* BEEN USED IS FREED AND THEN WE GO TO SORT THE CONTROL     * 00779000
+*        /* TABLE AND PREPARE TO PROCESS THE RECORDS.        @Z427VLS*/ 00780000
+*        /*                                                  @Z427VLS*/ 00781000
+*        IF CURRPTR < TABPTR THEN         /* NOT ENOUGH TABLE SPACE   * 00782000
+         C     CURRPTR,TABPTR                                      0278 00783000
+         BNL   @RF00278                                            0278 00784000
+*          DO;                                             /*@Z427VLS*/ 00785000
+*            CALL IFCMSG(53,ADDR(MSGADDR));                /*@Z427VLS*/ 00786000
+         LA    @06,MSGADDR                                         0280 00787000
+         ST    @06,@AFTEMPS                                        0280 00788000
+         L     @15,ADIFCMSG(,R2)                                   0280 00789000
+         LA    @01,@AL00280                                        0280 00790000
+         BALR  @14,@15                                             0280 00791000
+*            PRINTADR = ADDR(MESSAGE);    /* INSUFF SPACE MESSAGE     * 00792000
+         LA    @06,MESSAGE                                         0281 00793000
+         ST    @06,PRINTADR(,R2)                                   0281 00794000
+*            CALL IOHND(RITEPRTR);        /* OUTPUT MESSAGE  @Z427VLS*/ 00795000
+         L     @15,ADIOHND(,R2)                                    0282 00796000
+         LA    @01,@AL00282                                        0282 00797000
+         BALR  @14,@15                                             0282 00798000
+*          END;                                            /*@Z427VLS*/ 00799000
+*        CURRPTR = CURRPTR + 11;          /* PUT WITHIN BOUNDS        * 00800000
+@RF00278 AL    CURRPTR,@CF00575                                    0284 00801000
+*        CALL IFCMSG(54,ADDR(MSGADDR));                    /*@Z427VLS*/ 00802000
+         LA    @06,MSGADDR                                         0285 00803000
+         ST    @06,@AFTEMPS                                        0285 00804000
+         L     @15,ADIFCMSG(,R2)                                   0285 00805000
+         LA    @01,@AL00285                                        0285 00806000
+         BALR  @14,@15                                             0285 00807000
+*        CVD (RECCOUNT,LASTDATE);         /* CONVVERT TO DECIMAL      * 00808000
+         LH    @06,RECCOUNT                                        0286 00809000
+         CVD   @06,@TS00001                                        0286 00810000
+         MVC   LASTDATE(4),@TS00001+4                              0286 00811000
+*        UNPK (NUMRECP,LASTDATE);         /* PRINTABLE CHARACTERS     * 00812000
+         UNPK  NUMRECP(7),LASTDATE(4)                              0287 00813000
+*        NUMRECP(7) = NUMRECP(7) | FOXZERO;                /*@Z427VLS*/ 00814000
+         OI    NUMRECP+6,X'F0'                                     0288 00815000
+*        I = 1;                                            /*@Z427VLS*/ 00816000
+         MVC   I(2),@CH00052                                       0289 00817000
+*        DO UNTIL (I > 6 | NUMRECP(I) ^= FOXZERO);         /*@Z427VLS*/ 00818000
+@DL00290 DS    0H                                                  0291 00819000
+*          NUMRECP(I) = BLANK;            /* SET LEADING ZERO TO BLANK* 00820000
+         LH    @06,I                                               0291 00821000
+         LA    @03,NUMRECP-1(@06)                                  0291 00822000
+         MVI   0(@03),C' '                                         0291 00823000
+*          I = I + 1;                                      /*@Z427VLS*/ 00824000
+         LA    @06,1(,@06)                                         0292 00825000
+         STH   @06,I                                               0292 00826000
+*        END;                                              /*@Z427VLS*/ 00827000
+@DE00290 LH    @06,I                                               0293 00828000
+         C     @06,@CF00078                                        0293 00829000
+         BH    @DC00290                                            0293 00830000
+         LA    @03,NUMRECP-1(@06)                                  0293 00831000
+         CLI   0(@03),X'F0'                                        0293 00832000
+         BE    @DL00290                                            0293 00833000
+@DC00290 DS    0H                                                  0294 00834000
+*        PRINTADR = ADDR(MESSAGE);                         /*@Z427VLS*/ 00835000
+         LA    @06,MESSAGE                                         0294 00836000
+         ST    @06,PRINTADR(,R2)                                   0294 00837000
+*        CALL IOHND(RITEPRTR);            /* OUTPUT MESSAGE  @Z427VLS*/ 00838000
+         L     @15,ADIOHND(,R2)                                    0295 00839000
+         LA    @01,@AL00295                                        0295 00840000
+         BALR  @14,@15                                             0295 00841000
+*        FREESIZE = (CURRPTR - TABPTR);   /* UNUSED SPACE    @Z427VLS*/ 00842000
+         L     @06,TABPTR                                          0296 00843000
+         LR    @03,CURRPTR                                         0296 00844000
+         SLR   @03,@06                                             0296 00845000
+         ST    @03,FREESIZE                                        0296 00846000
+*        IF FREESIZE > EIGHT THEN         /* OUTPUT MESSAGE  @Z427VLS*/ 00847000
+         C     @03,@CF00063                                        0297 00848000
+         BNH   @RF00297                                            0297 00849000
+*          DO;                                             /*@Z427VLS*/ 00850000
+*            FREESIZE = FREESIZE & 'FFFFF8'X;  /* DOUBLE WORD AMOUNT  * 00851000
+         N     @03,@CF00640                                        0299 00852000
+         ST    @03,FREESIZE                                        0299 00853000
+*            RESPECIFY (R0,R1) RESTRICTED;                 /*@Z427VLS*/ 00854000
+*            R0 = FREESIZE;                                /*@Z427VLS*/ 00855000
+         LR    R0,@03                                              0301 00856000
+*            R1 = TABPTR;                                  /*@Z427VLS*/ 00857000
+         LR    R1,@06                                              0302 00858000
+*            GEN(FREEMAIN R,LV=(R0),A=(R1));               /*@Z427VLS*/ 00859000
+         FREEMAIN R,LV=(R0),A=(R1)                                      00860000
+*            RESPECIFY (R0,R1) UNRESTRICTED;               /*@Z427VLS*/ 00861000
+*          END;                                            /*@Z427VLS*/ 00862000
+*        TABPTR = CURRPTR;                /* SAVE ADDRESS OF NEW TABLE* 00863000
+@RF00297 ST    CURRPTR,TABPTR                                      0306 00864000
+*        SORTNUM = RECCOUNT;              /* STORE NUMBER OF RECORDS  * 00865000
+         LH    @06,RECCOUNT                                        0307 00866000
+         ST    @06,SORTNUM(,R2)                                    0307 00867000
+*        SORTADR = TABPTR;                /* LOCATION OF SORT TABLE   * 00868000
+         L     @06,TABPTR                                          0308 00869000
+         ST    @06,SORTADR(,R2)                                    0308 00870000
+*        IF PHIST = ON THEN                                        0309 00871000
+         TM    PHIST(R2),B'00100000'                               0309 00872000
+         BNO   @RF00309                                            0309 00873000
+*          DO;                                             /*@Z427VLS*/ 00874000
+*            /*                                              @Z427VLS*/ 00875000
+*            /* INPUT DATA SETS MUST BE CLOSED IF HISTORY IS INPUT    * 00876000
+*            /*                                              @Z427VLS*/ 00877000
+*            CLOSEIO = CLOSEIO && CLOSEIO;                 /*@Z427VLS*/ 00878000
+         XC    CLOSEIO(2,R2),CLOSEIO(R2)                           0311 00879000
+*            IF PLOGREC = ON THEN                                  0312 00880000
+         TM    PLOGREC(R2),B'00000010'                             0312 00881000
+         BNO   @RF00312                                            0312 00882000
+*              CSERLOG = ON;                               /*@Z427VLS*/ 00883000
+         OI    CSERLOG(R2),B'00100000'                             0313 00884000
+*            CDRCTWRK = ON;                                /*@Z427VLS*/ 00885000
+@RF00312 OI    CDRCTWRK(R2),B'00000010'                            0314 00886000
+*            CALL IOHND (IOCLOSE);                         /*@Z427VLS*/ 00887000
+         L     @15,ADIOHND(,R2)                                    0315 00888000
+         LA    @01,@AL00315                                        0315 00889000
+         BALR  @14,@15                                             0315 00890000
+*          END;                                            /*@Z427VLS*/ 00891000
+*        /*                                                  @Z427VLS*/ 00892000
+*        /* WHEN END OF FILE HAS BEEN REACHED OR THE CONTROL @Z427VLS*/ 00893000
+*        /* TABLE IS FULL THE ENTRIES ARE SORTED FOR PROCESSING.      * 00894000
+*        /* THE COUNT OF RECORDS AND THE ADDRESS OF THE FIRST ENTRY IS* 00895000
+*        /* SAVED FOR THE SECOND PASS.                       @Z427VLS*/ 00896000
+*        /*                                                  @Z427VLS*/ 00897000
+*        IF RECCOUNT ^= ZERO THEN       /* ANY VALID RECORDS @ZA26586*/ 00898000
+@RF00309 LH    @06,RECCOUNT                                        0317 00899000
+         LTR   @06,@06                                             0317 00900000
+         BZ    @RF00317                                            0317 00901000
+*          DO;                                             /*@Z427VLS*/ 00902000
+*            IF RECCOUNT > ONE THEN     /* INSURE > ONE REC  @ZA26586*/ 00903000
+         C     @06,@CF00052                                        0319 00904000
+         BNH   @RF00319                                            0319 00905000
+*              DO;                                         /*@ZA26586*/ 00906000
+*                CALL SORT;                                /*@ZA26586*/ 00907000
+         BAL   @14,SORT                                            0321 00908000
+*              END;                                        /*@ZA26586*/ 00909000
+*            IF DEBUG11 = ON THEN      /* ABEND REQUESTED?   @Z427VLS*/ 00910000
+@RF00319 TM    DEBUG11(R2),B'00010000'                             0323 00911000
+         BNO   @RF00323                                            0323 00912000
+*              GEN (ABEND 520,DUMP);                       /*@Z427VLS*/ 00913000
+         ABEND 520,DUMP                                                 00914000
+*            /*                                              @Z427VLS*/ 00915000
+*            /* START PROCESSING THE ENTRIES IN THE CONTROL TABLE. AT * 00916000
+*            /* THE END OF THE TABLE, PROCESS THE SUMMARY CTRS WHICH  * 00917000
+*            /* HAVE BEEN BUILT DURING RECORD PROCESSING. LOAD        * 00918000
+*            /* IFCECUA0/1 AND IFCSCUA0/1 FOR PROCESSING. IF THE      * 00919000
+*            /* IFCE/SCUA1 ROUTINES ARE LOADED THRESHOLD HAS BEEN     * 00920000
+*            /* SPECIFIED.                                   @Z427VLS*/ 00921000
+*            /*                                              @Z427VLS*/ 00922000
+*            IF PARMTHR = ON THEN                                  0325 00923000
+@RF00323 TM    PARMTHR(R2),B'00001000'                             0325 00924000
+         BNO   @RF00325                                            0325 00925000
+*              TABNBR = CHARONE;         /* THRESHOLD PROCESSING      * 00926000
+         MVI   TABNBR,C'1'                                         0326 00927000
+*            STABNBR = TABNBR;           /* ESTABLISH SUM TBL NUMBER  * 00928000
+@RF00325 MVC   STABNBR(1),TABNBR                                   0327 00929000
+*            GENERATE REFS(ETABNAME,EDITTAB,STABNAME,SUMTAB);      0328 00930000
+         LOADEREP EPLOC=ETABNAME   LOAD EDIT TABLE                      00931000
+               ST   R0,EDITTAB                  SAVE ADDRESS            00932000
+         LOADEREP EPLOC=STABNAME   LOAD SUMMARY TABLE                   00933000
+               ST   R0,SUMTAB                   SAVE ADDRESS            00934000
+*            DO CURRPTR = CURRPTR BY 11 WHILE (EOTABLE ^= EOT);    0329 00935000
+         B     @DE00329                                            0329 00936000
+@DL00329 DS    0H                                                  0330 00937000
+*              RECCCHHR = TABCCHHR;                        /*@Z427VLS*/ 00938000
+         MVC   RECCCHHR(5,R2),TABCCHHR(CURRPTR)                    0330 00939000
+*              RESPECIFY (R15) RESTRICTED;                 /*@Z427VLS*/ 00940000
+*              CALL IOHND(READIRCT);     /* GET A RECORD BY CCHHR     * 00941000
+         L     @15,ADIOHND(,R2)                                    0332 00942000
+         LA    @01,@AL00332                                        0332 00943000
+         BALR  @14,@15                                             0332 00944000
+*              RETCODE = R15;                              /*@Z427VLS*/ 00945000
+         ST    R15,RETCODE                                         0333 00946000
+*              RESPECIFY (R15) UNRESTRICTED;               /*@Z427VLS*/ 00947000
+*              IF RETCODE = ZERO THEN                              0335 00948000
+         L     @06,RETCODE                                         0335 00949000
+         SLR   @03,@03                                             0335 00950000
+         CR    @06,@03                                             0335 00951000
+         BNE   @RF00335                                            0335 00952000
+*                DO;                                       /*@Z427VLS*/ 00953000
+*                  /*                                        @Z427VLS*/ 00954000
+*                  /* BUILD A TABLE WITH THE CUA, DEVICE CODE, AND CPU* 00955000
+*                  /* SERIAL NUMBER, TO CONTROL PROCESSING THE RECORD.* 00956000
+*                  /*                                        @Z427VLS*/ 00957000
+*                  CUACPU = CUACPU && CUACPU;       /* CLEAR SAVE AREA* 00958000
+         XC    CUACPU(8),CUACPU                                    0337 00959000
+*                  SAVECUA(2:3) = CONTRCUA(2:3);     /* SAVE CUA     */ 00960000
+         MVC   SAVECUA+1(2),CONTRCUA+1(CURRPTR)                    0338 00961000
+*                  SAVECPU(1:3) = CPU;               /* SAVE CPU     */ 00962000
+         MVC   SAVECPU(3),CPU(CURRPTR)                             0339 00963000
+*                  /*                                        @Z427VLS*/ 00964000
+*                  /* DETERMINE IF THE CUA SUMMARY COUNTERS MUST BE   * 00965000
+*                  /* PRINTED.  THEY ARE PRINTED AFTER THE RECORDS FOR* 00966000
+*                  /* EACH CUA.  EACH DATE COVERED HAS A SEPARATE CTR * 00967000
+*                  /*                                        @Z427VLS*/ 00968000
+*                  IF PARMTHR = ON & CNTAREA ^= ZERO &             0340 00969000
+*                    (LASTCUA ^= SAVECUA |                         0340 00970000
+*                    LASTCPU(1:3) ^= SAVECPU(1:3)) THEN            0340 00971000
+         TM    PARMTHR(R2),B'00001000'                             0340 00972000
+         BNO   @RF00340                                            0340 00973000
+         C     @03,CNTAREA                                         0340 00974000
+         BE    @RF00340                                            0340 00975000
+         CLC   LASTCUA(3),SAVECUA                                  0340 00976000
+         BNE   @RT00340                                            0340 00977000
+         CLC   LASTCPU(3),SAVECPU                                  0340 00978000
+         BE    @RF00340                                            0340 00979000
+@RT00340 DS    0H                                                  0341 00980000
+*                    /* DIFFERENT CUAS OR CPUS.              @Z427VLS*/ 00981000
+*                    DO;                                   /*@Z427VLS*/ 00982000
+*                      CALL OUTEDIT (FOXEASY);             /*@Z427VLS*/ 00983000
+         LA    @01,@AL00342                                        0342 00984000
+         BAL   @14,OUTEDIT                                         0342 00985000
+*                      CALL OUTSUM;               /* OUTPUT SUM CTRS  * 00986000
+         BAL   @14,OUTSUM                                          0343 00987000
+*                      GENERATE REFS(ETABNAME,STABNAME,EDITTAB,SUMTAB); 00988000
+                         DELETE EPLOC=ETABNAME  DELETE EDIT TABLE       00989000
+                         DELETE EPLOC=STABNAME  DELETE SUM  TABLE       00990000
+         LOADEREP EPLOC=ETABNAME   LOAD EDIT TABLE                      00991000
+                         ST     R0,EDITTAB                              00992000
+         LOADEREP EPLOC=STABNAME   LOAD SUMMARY TABLE                   00993000
+                         ST     R0,SUMTAB                               00994000
+*                    END;                                  /*@Z427VLS*/ 00995000
+*                  /*                                        @Z427VLS*/ 00996000
+*                  /* IS A DETAIL PRINT OF EVERY RECORD WANTED. FORCE * 00997000
+*                  /* DETAIL PRINT IF THRESHOLD SPECIFIED    @Z427VLS*/ 00998000
+*                  /*                                        @Z427VLS*/ 00999000
+*                     RECCUA = OCUA2;                      /*@0001VLS*/ 01000000
+@RF00340 MVC   RECCUA(2),OCUA2(BUFFPTR)                            0346 01001000
+*                     IF SHAREPTR ^= ZERO THEN                     0347 01002000
+         L     @06,SHAREPTR(,R2)                                   0347 01003000
+         LTR   @06,@06                                             0347 01004000
+         BZ    @RF00347                                            0347 01005000
+*                       CALL CUASHARE;                     /*@0001VLS*/ 01006000
+         BAL   @14,CUASHARE                                        0348 01007000
+*                     SHRCUA = RECCUA;                     /*@0001VLS*/ 01008000
+@RF00347 MVC   SHRCUA(2,BUFFPTR),RECCUA                            0349 01009000
+*                  IF PEDIT = ON THEN                              0350 01010000
+         TM    PEDIT(R2),B'00010000'                               0350 01011000
+         BNO   @RF00350                                            0350 01012000
+*                    CALL OUTEDIT (HEXZERO);               /*@Z427VLS*/ 01013000
+         LA    @01,@AL00351                                        0351 01014000
+         BAL   @14,OUTEDIT                                         0351 01015000
+*                  /*                                        @Z427VLS*/ 01016000
+*                  /* THIS SECTION CONTROLS THE SUMMING OF RECORDS.   * 01017000
+*                  /* THE COUNTERS ARE PROPERLY UPDATED.  IF THRESHOLD* 01018000
+*                  /* IS SPECIFIED, A SUMMARY BY CUA IS FORCED.       * 01019000
+*                  /*                                        @Z427VLS*/ 01020000
+*                  IF PSUM = ON THEN                               0352 01021000
+@RF00350 TM    PSUM(R2),B'00001000'                                0352 01022000
+         BNO   @RF00352                                            0352 01023000
+*                    DO;                                   /*@Z427VLS*/ 01024000
+*                      /*                                    @Z427VLS*/ 01025000
+*                      /* CHECK IF THIS RECORD DATE IS DIFFERENT THAN * 01026000
+*                      /* THE PREVIOUS ONE. IF IT IS, CHAIN ANOTHER   * 01027000
+*                      /* SUM AREA TO THE CURRENT AREA.  IF THE DATES * 01028000
+*                      /* ARE THE SAME, THE RECORD IS SUMMED INTO THE * 01029000
+*                      /* CURRENT AREA.  DO NOT BREAK FOR CUA         * 01030000
+*                      /* THRESHOLD SUMMARY.                 @Z427VLS*/ 01031000
+*                      /*                                    @Z427VLS*/ 01032000
+*                      IF (LASTDATE^=DATE & PARMTHR = OFF) |       0354 01033000
+*                    LASTCPU(1:3) ^= SAVECPU(1:3) |                0354 01034000
+*                    LASTCUA ^= SAVECUA THEN                       0354 01035000
+         CLC   LASTDATE(4),DATE(BUFFPTR)                           0354 01036000
+         BE    @GL00020                                            0354 01037000
+         TM    PARMTHR(R2),B'00001000'                             0354 01038000
+         BZ    @RT00354                                            0354 01039000
+@GL00020 CLC   LASTCPU(3),SAVECPU                                  0354 01040000
+         BNE   @RT00354                                            0354 01041000
+         CLC   LASTCUA(3),SAVECUA                                  0354 01042000
+         BE    @RF00354                                            0354 01043000
+@RT00354 DS    0H                                                  0355 01044000
+*                        CALL GETSPACE;                    /*@Z427VLS*/ 01045000
+         BAL   @14,GETSPACE                                        0355 01046000
+*                     OCUA2 = RECCUA;                      /*@0001VLS*/ 01047000
+@RF00354 MVC   OCUA2(2,BUFFPTR),RECCUA                             0356 01048000
+*                      CALL SUMIT;                         /*@Z427VLS*/ 01049000
+         BAL   @14,SUMIT                                           0357 01050000
+*                    END;                                  /*@Z427VLS*/ 01051000
+*                  /*                                        @Z427VLS*/ 01052000
+*                  /* PLACE THE VOLID IN THE RECORD CONTROL TABLE FOR * 01053000
+*                  /* NEXT SORT OF THE TABLE AND PROCESSING BY VOLID. * 01054000
+*                  /*                                        @Z427VLS*/ 01055000
+*                  CONTRVOL = VOLID;                       /*@Z427VLS*/ 01056000
+@RF00352 MVC   CONTRVOL(6,CURRPTR),VOLID(BUFFPTR)                  0359 01057000
+*                END;                                      /*@Z427VLS*/ 01058000
+*              ELSE                                                0361 01059000
+*                CONTRVOL = CONTRVOL && CONTRVOL;          /*@Z427VLS*/ 01060000
+         B     @RC00335                                            0361 01061000
+@RF00335 XC    CONTRVOL(6,CURRPTR),CONTRVOL(CURRPTR)               0361 01062000
+*            END;                                          /*@Z427VLS*/ 01063000
+@RC00335 AL    CURRPTR,@CF00575                                    0362 01064000
+@DE00329 CLC   EOTABLE(2,CURRPTR),@CB00259                         0362 01065000
+         BNE   @DL00329                                            0362 01066000
+*            IF PARMTHR = ON THEN         /* OUTPUT TRESH STATS AT END* 01067000
+         TM    PARMTHR(R2),B'00001000'                             0363 01068000
+         BNO   @RF00363                                            0363 01069000
+*              CALL OUTEDIT (FOXFOX);                      /*@Z427VLS*/ 01070000
+         LA    @01,@AL00364                                        0364 01071000
+         BAL   @14,OUTEDIT                                         0364 01072000
+*            /*                                              @Z427VLS*/ 01073000
+*            /* WAS A SUMMARY REQUESTED. FORCE SUMMARY EDIT PRINTING  * 01074000
+*            /* IF THRESHOLD IS SPECIFIED.                   @Z427VLS*/ 01075000
+*            /*                                              @Z427VLS*/ 01076000
+*            IF CNTAREA ^= ZERO THEN                               0365 01077000
+@RF00363 L     @06,CNTAREA                                         0365 01078000
+         LTR   @06,@06                                             0365 01079000
+         BZ    @RF00365                                            0365 01080000
+*              CALL OUTSUM;                 /* OUTPUT THE SUMMARY CTRS* 01081000
+         BAL   @14,OUTSUM                                          0366 01082000
+*            /*                                              @Z427VLS*/ 01083000
+*            /* SORT THE RECORDS BY VOLID AND PROCESS ALL THE MES     * 01084000
+*            /* RECORDS BY VOLID.                            @Z427VLS*/ 01085000
+*            /*                                              @Z427VLS*/ 01086000
+*            GENERATE REFS(ETABNAME,STABNAME);             /*@Z427VLS*/ 01087000
+@RF00365 DS    0H                                                  0367 01088000
+               DELETE EPLOC=ETABNAME DELETE EDIT TABLE                  01089000
+               DELETE EPLOC=STABNAME DELETE SUMMARY TABLE               01090000
+*            CURRPTR = TABPTR;         /* GET ADDRESS FIRST TABLE ENT * 01091000
+         L     CURRPTR,TABPTR                                      0368 01092000
+*            REPTYPE = VOLREP;         /* MOVE 'VOL' TO EDIT AND      * 01093000
+         MVC   REPTYPE(4),VOLREP                                   0369 01094000
+*            SREPTYPE = VOLREP;        /* SUMMARY TABLE NAMES         * 01095000
+         MVC   SREPTYPE(4),VOLREP                                  0370 01096000
+*            SORTFLG = ON;             /* RESET SORT FLAG    @Z427VLS*/ 01097000
+         OI    SORTFLG,B'10000000'                                 0371 01098000
+*            IF RECCOUNT > ONE THEN     /* INSURE > ONE REC  @ZA26586*/ 01099000
+         LH    @06,RECCOUNT                                        0372 01100000
+         C     @06,@CF00052                                        0372 01101000
+         BNH   @RF00372                                            0372 01102000
+*              DO;                                         /*@ZA26586*/ 01103000
+*                CALL SORT;                                /*@ZA26586*/ 01104000
+         BAL   @14,SORT                                            0374 01105000
+*              END;                                        /*@ZA26586*/ 01106000
+*            GENERATE REFS(ETABNAME,EDITTAB,STABNAME,SUMTAB);      0376 01107000
+@RF00372 DS    0H                                                  0376 01108000
+         LOADEREP EPLOC=ETABNAME   LOAD EDIT TABLE                      01109000
+               ST   R0,EDITTAB       SAVE THE ENTRY POINT               01110000
+         LOADEREP EPLOC=STABNAME   LOAD SUMMARY TABLE                   01111000
+               ST   R0,SUMTAB        SAVE THE ENTRY POINT               01112000
+*            IF PARMTHR = ON THEN     /* FORCE NO VOL SUM IF THRESHOLD* 01113000
+         TM    PARMTHR(R2),B'00001000'                             0377 01114000
+         BNO   @RF00377                                            0377 01115000
+*              PSUM = OFF;                                 /*@Z427VLS*/ 01116000
+         NI    PSUM(R2),B'11110111'                                0378 01117000
+*            CUACPU = CUACPU && CUACPU;                    /*@Z427VLS*/ 01118000
+@RF00377 XC    CUACPU(8),CUACPU                                    0379 01119000
+*            /*                                              @Z427VLS*/ 01120000
+*            /* PROCESS THE ENTRIES IN THE CONTROL TABLE.  AT THE END,* 01121000
+*            /* PROCESS THE SUMMARY COUNTERS THAT HAVE BEEN BUILD.    * 01122000
+*            /*                                              @Z427VLS*/ 01123000
+*            DO CURRPTR = CURRPTR BY 11 WHILE (EOTABLE ^= EOT);    0380 01124000
+         B     @DE00380                                            0380 01125000
+@DL00380 DS    0H                                                  0381 01126000
+*              RECCCHHR = TABCCHHR;                        /*@Z427VLS*/ 01127000
+         MVC   RECCCHHR(5,R2),TABCCHHR(CURRPTR)                    0381 01128000
+*              RESPECIFY (R15) RESTRICTED;                 /*@Z427VLS*/ 01129000
+*              CALL IOHND(READIRCT);                       /*@Z427VLS*/ 01130000
+         L     @15,ADIOHND(,R2)                                    0383 01131000
+         LA    @01,@AL00383                                        0383 01132000
+         BALR  @14,@15                                             0383 01133000
+*              RETCODE = R15;                              /*@Z427VLS*/ 01134000
+         ST    R15,RETCODE                                         0384 01135000
+*              RESPECIFY (R15) UNRESTRICTED;               /*@Z427VLS*/ 01136000
+*              IF RETCODE = ZERO THEN                              0386 01137000
+         L     @06,RETCODE                                         0386 01138000
+         LTR   @06,@06                                             0386 01139000
+         BNZ   @RF00386                                            0386 01140000
+*                DO;                                       /*@Z427VLS*/ 01141000
+*                  /*                                        @Z427VLS*/ 01142000
+*                  /* BUILD A TABLE WITH THE DEVICE CODE AND VOLID.   * 01143000
+*                  /* THE TABLE IS USED FOR PROCESSING THE RECORD.    * 01144000
+*                  /*                                        @Z427VLS*/ 01145000
+*                  IF PARMTHR = OFF THEN                           0388 01146000
+         TM    PARMTHR(R2),B'00001000'                             0388 01147000
+         BNZ   @RF00388                                            0388 01148000
+*                    CUACPU = VOLID;                       /*@Z427VLS*/ 01149000
+         MVI   CUACPU+6,C' '                                       0389 01150000
+         MVI   CUACPU+7,C' '                                       0389 01151000
+         MVC   CUACPU(6),VOLID(BUFFPTR)                            0389 01152000
+*                  /*                                        @Z427VLS*/ 01153000
+*                  /* IS A DETAIL PRINT OF EVERY RECORD WANTED.       * 01154000
+*                  /*                                        @Z427VLS*/ 01155000
+*                  IF PEDIT = ON THEN                              0390 01156000
+@RF00388 TM    PEDIT(R2),B'00010000'                               0390 01157000
+         BNO   @RF00390                                            0390 01158000
+*                    CALL OUTEDIT (HEXZERO);               /*@Z427VLS*/ 01159000
+         LA    @01,@AL00391                                        0391 01160000
+         BAL   @14,OUTEDIT                                         0391 01161000
+*                  /*                                        @Z427VLS*/ 01162000
+*                  /* CHECK FOR SUMMARY REQUEST. ASSURE THAT SUMMARY  * 01163000
+*                  /* COUNTERS ARE UPDATED PROPERLY.         @Z427VLS*/ 01164000
+*                  /*                                        @Z427VLS*/ 01165000
+*                  IF PSUM = ON THEN                               0392 01166000
+@RF00390 TM    PSUM(R2),B'00001000'                                0392 01167000
+         BNO   @RF00392                                            0392 01168000
+*                    DO;                                   /*@Z427VLS*/ 01169000
+*                      /*                                    @Z427VLS*/ 01170000
+*                      /* DETERMINE IF RECORD BEING PROCESSED SHOULD  * 01171000
+*                      /* BE SUMMED WITH THE CURRENT COUNTERS OR IF A * 01172000
+*                      /* NEW AREA IS NEEDED.                @Z427VLS*/ 01173000
+*                      /*                                    @Z427VLS*/ 01174000
+*                      IF SUMIDENT ^= CUACPU THEN                  0394 01175000
+         L     @06,CURRCNTS                                        0394 01176000
+         CLC   SUMIDENT(8,@06),CUACPU                              0394 01177000
+         BE    @RF00394                                            0394 01178000
+*                        CALL GETSPACE;                    /*@Z427VLS*/ 01179000
+         BAL   @14,GETSPACE                                        0395 01180000
+*                      CALL SUMIT;                         /*@Z427VLS*/ 01181000
+@RF00394 BAL   @14,SUMIT                                           0396 01182000
+*                    END;                                  /*@Z427VLS*/ 01183000
+*                END;                                      /*@Z427VLS*/ 01184000
+@RF00392 DS    0H                                                  0399 01185000
+*            END;                                          /*@Z427VLS*/ 01186000
+@RF00386 AL    CURRPTR,@CF00575                                    0399 01187000
+@DE00380 CLC   EOTABLE(2,CURRPTR),@CB00259                         0399 01188000
+         BNE   @DL00380                                            0399 01189000
+*            IF PARMTHR = ON THEN       /* OUTPUT THRESH STATS AT END * 01190000
+         TM    PARMTHR(R2),B'00001000'                             0400 01191000
+         BNO   @RF00400                                            0400 01192000
+*              CALL OUTEDIT (FOXFOX);                      /*@Z427VLS*/ 01193000
+         LA    @01,@AL00401                                        0401 01194000
+         BAL   @14,OUTEDIT                                         0401 01195000
+*            IF CNTAREA ^= ZERO THEN    /* OUTPUT MES VOLUME SUMMARY  * 01196000
+@RF00400 L     @06,CNTAREA                                         0402 01197000
+         LTR   @06,@06                                             0402 01198000
+         BZ    @RF00402                                            0402 01199000
+*              CALL OUTSUM;                                /*@Z427VLS*/ 01200000
+         BAL   @14,OUTSUM                                          0403 01201000
+*          END;                                            /*@Z427VLS*/ 01202000
+*    END;                /* END FOR GETMAIN FAILURE        @0001VLS   * 01203000
+*     ELSE                                                         0406 01204000
+*      DO;                                                 /*@GZZDGVS*/ 01205000
+         B     @RC00204                                            0406 01206000
+@RF00204 DS    0H                                                  0407 01207000
+*       CALL IFCMSG(55,ADDR(MSGADDR));  /* MESSAGE FOR GETMAIN FAIL  */ 01208000
+         LA    @06,MSGADDR                                         0407 01209000
+         ST    @06,@AFTEMPS                                        0407 01210000
+         L     @15,ADIFCMSG(,R2)                                   0407 01211000
+         LA    @01,@AL00407                                        0407 01212000
+         BALR  @14,@15                                             0407 01213000
+*       PRINTADR = ADDR(MSGADDR);                          /*@0001VLS*/ 01214000
+         LA    @06,MSGADDR                                         0408 01215000
+         ST    @06,PRINTADR(,R2)                                   0408 01216000
+*       CALL IOHND(RITEPRTR);                              /*@0001VLS*/ 01217000
+         L     @15,ADIOHND(,R2)                                    0409 01218000
+         LA    @01,@AL00409                                        0409 01219000
+         BALR  @14,@15                                             0409 01220000
+*      END;                                                /*@GZZDGVS*/ 01221000
+*        IF DEBUG12 = ON THEN           /* ABEND REQUESTED?  @Z427VLS*/ 01222000
+@RC00204 TM    DEBUG12(R2),B'00001000'                             0411 01223000
+         BNO   @RF00411                                            0411 01224000
+*          GEN(ABEND 540,DUMP);                            /*@Z427VLS*/ 01225000
+         ABEND 540,DUMP                                                 01226000
+*        RETURN;                                           /*@Z427VLS*/ 01227000
+@EL00001 L     @13,4(,@13)                                         0413 01228000
+@EF00001 DS    0H                                                  0413 01229000
+@ER00001 L     @14,12(,@13)                                        0413 01230000
+         LM    @00,@12,20(@13)                                     0413 01231000
+         BR    @14                                                 0413 01232000
+* END                                                      /*@Z427VLS*/ 01233000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.      * 01234000
+*/*%INCLUDE SYSLIB  (COMTABLE)                                        * 01235000
+*;                                                                 0414 01236000
+         B     @EL00001                                            0414 01237000
+@DATA    DS    0H                                                       01238000
+@CH00071 DC    H'2'                                                     01239000
+@CH00073 DC    H'3'                                                     01240000
+@CH00076 DC    H'5'                                                     01241000
+@CH00080 DC    H'7'                                                     01242000
+         DS    0F                                                       01243000
+@AL00199 EQU   *                       LIST WITH   1 ARGUMENT(S)        01244000
+@AL00282 EQU   *                       LIST WITH   1 ARGUMENT(S)        01245000
+@AL00295 EQU   *                       LIST WITH   1 ARGUMENT(S)        01246000
+@AL00409 DC    A(@CH00071)             LIST WITH   1 ARGUMENT(S)        01247000
+@AL00211 EQU   *                       LIST WITH   1 ARGUMENT(S)        01248000
+@AL00273 DC    A(@CH00073)             LIST WITH   1 ARGUMENT(S)        01249000
+@AL00250 DC    A(@CH00076)             LIST WITH   1 ARGUMENT(S)        01250000
+@AL00280 DC    A(@CF00572)             LIST WITH   2 ARGUMENT(S)        01251000
+         DC    A(@AFTEMPS)                                              01252000
+@AL00285 DC    A(@CF00637)             LIST WITH   2 ARGUMENT(S)        01253000
+         DC    A(@AFTEMPS)                                              01254000
+@AL00315 DC    A(@CH00080)             LIST WITH   1 ARGUMENT(S)        01255000
+@AL00332 EQU   *                       LIST WITH   1 ARGUMENT(S)        01256000
+@AL00383 DC    A(@CF00078+2)           LIST WITH   1 ARGUMENT(S)        01257000
+@AL00342 DC    A(@CB00457)             LIST WITH   1 ARGUMENT(S)        01258000
+@AL00351 EQU   *                       LIST WITH   1 ARGUMENT(S)        01259000
+@AL00391 DC    A(@CB00223)             LIST WITH   1 ARGUMENT(S)        01260000
+@AL00364 EQU   *                       LIST WITH   1 ARGUMENT(S)        01261000
+@AL00401 DC    A(@CB00276)             LIST WITH   1 ARGUMENT(S)        01262000
+@AL00407 DC    A(@CF00641)             LIST WITH   2 ARGUMENT(S)        01263000
+         DC    A(@AFTEMPS)                                              01264000
+         DS    0F                                                       01265000
+@SA00001 DS    18F                                                      01266000
+@SA00002 DS    15F                                                      01267000
+@SA00003 DS    15F                                                      01268000
+@SA00005 DS    15F                                                      01269000
+@SA00006 DS    15F                                                      01270000
+@SA00004 DS    0F                                                       01271000
+@PC00004 EQU   @SA00004+60                                              01272000
+         DS    16F                                                      01273000
+@TF00001 DS    F                                                        01274000
+@AFTEMPS DS    1F                                                       01275000
+         DS    0F                                                       01276000
+@CF00052 DC    F'1'                                                     01277000
+@CH00052 EQU   @CF00052+2                                               01278000
+@CF00078 DC    F'6'                                                     01279000
+@CH00078 EQU   @CF00078+2                                               01280000
+@CF00063 DC    F'8'                                                     01281000
+@CF00575 DC    F'11'                                                    01282000
+@CH00575 EQU   @CF00575+2                                               01283000
+@CF00610 DC    F'22'                                                    01284000
+@CF00635 DC    F'27'                                                    01285000
+@CF00572 DC    F'53'                                                    01286000
+@CF00637 DC    F'54'                                                    01287000
+@CF00641 DC    F'55'                                                    01288000
+@CF00650 DC    F'-9'                                                    01289000
+@CF00651 DC    F'-4'                                                    01290000
+@CF00655 DC    F'-3'                                                    01291000
+@CF00640 DC    XL4'FFFFF8'                                              01292000
+@CV00534 DC    V(IFCEEDIT)                                              01293000
+         DS    0D                                                       01294000
+EDITTAB  DS    F                                                        01295000
+CNTAREA  DC    A(0)                                                     01296000
+CURRCNTS DS    A                                                        01297000
+SUMTAB   DS    A                                                        01298000
+TABPTR   DS    A                                                        01299000
+RETCODE  DS    F                                                        01300000
+FREESIZE DC    F'8192'                                                  01301000
+SRTCONT  DC    F'0'                                                     01302000
+RECCOUNT DC    H'0'                                                     01303000
+I        DS    H                                                        01304000
+         DS    0D                                                       01305000
+@TS00001 DS    CL8                                                      01306000
+@CB00259 DC    X'FFFF'                                                  01307000
+@CB00460 DC    X'0FFF'                                                  01308000
+@CB00462 DC    X'000F'                                                  01309000
+@CB00223 EQU   @CB00462                                                 01310000
+@CB00276 EQU   @CB00259                                                 01311000
+@CB00457 DC    X'FE'                                                    01312000
+SUMCNTRL DS    CL10                                                     01313000
+         ORG   SUMCNTRL                                                 01314000
+CUACPU   DS    CL8                                                      01315000
+         ORG   CUACPU                                                   01316000
+SAVECUA  DS    CL3                                                      01317000
+SAVECPU  DS    CL5                                                      01318000
+         ORG   SUMCNTRL+8                                               01319000
+SAVEDEV  DC    X'8003'                                                  01320000
+         ORG   SUMCNTRL+10                                              01321000
+RECCPU   DC    CL3' '                                                   01322000
+RECCUA   DC    CL2' '                                                   01323000
+ETABNAME DS    CL8                                                      01324000
+         ORG   ETABNAME                                                 01325000
+@NM00013 DC    CL4'IFCE'                                                01326000
+REPTYPE  DC    CL4'CUA0'                                                01327000
+         ORG   ETABNAME+8                                               01328000
+STABNAME DS    CL8                                                      01329000
+         ORG   STABNAME                                                 01330000
+@NM00014 DC    CL4'IFCS'                                                01331000
+SREPTYPE DC    CL4'CUA0'                                                01332000
+         ORG   STABNAME+8                                               01333000
+LASTDATE DS    CL4                                                      01334000
+LASTCUA  DS    CL3                                                      01335000
+LASTCPU  DS    CL5                                                      01336000
+SWITCH   DC    X'80'                                                    01337000
+         ORG   SWITCH                                                   01338000
+SORTFLG  DS    BL1                                                      01339000
+VALIDSER EQU   SWITCH+0                                                 01340000
+VALIDCPU EQU   SWITCH+0                                                 01341000
+VALIDSHR EQU   SWITCH+0                                                 01342000
+VALIDCUA EQU   SWITCH+0                                                 01343000
+VALIDVOL EQU   SWITCH+0                                                 01344000
+         ORG   SWITCH+1                                                 01345000
+VOLREP   DC    CL4'VOL0'                                                01346000
+MESSAGE  DS    CL134                                                    01347000
+         ORG   MESSAGE                                                  01348000
+@NM00027 DC    CL1'1'                                                   01349000
+@NM00028 DC    CL1' '                                                   01350000
+MSGADDR  DC    CL132' '                                                 01351000
+         ORG   MSGADDR                                                  01352000
+@NM00029 DS    CL8                                                      01353000
+NUMRECP  DS    CL7                                                      01354000
+         ORG   MESSAGE+134                                              01355000
+@NM00030 DS    CL10                                                     01356000
+         ORG   @NM00030                                                 01357000
+SHR74XXX DS    CL5                                                      01358000
+         ORG   SHR74XXX                                                 01359000
+SHR74CUA DS    BL2                                                      01360000
+SHR74CPU DS    CL3                                                      01361000
+         ORG   @NM00030+5                                               01362000
+SHR74XXD DS    CL5                                                      01363000
+         ORG   SHR74XXD                                                 01364000
+@NM00031 DS    CL2                                                      01365000
+         ORG   @NM00031                                                 01366000
+SHR74XDD DS    BL1                                                      01367000
+@NM00032 EQU   @NM00031+0                                               01368000
+SHR74CUX DS    BL1                                                      01369000
+         ORG   SHR74XXD+2                                               01370000
+@NM00033 DS    CL3                                                      01371000
+         ORG   @NM00030+10                                              01372000
+SUPERZAP DC    3CL10'SUPERZAP'                                          01373000
+         DS    CL1                                                      01374000
+PATCH    DC    20H'0'                                                   01375000
+IFCMES01 CSECT                                                          01376000
+         DC    S(SUPERZAP)                                              01377000
+IFCMES01 CSECT                                                          01378000
+         DC    S(PATCH)                                                 01379000
+IFCMES01 CSECT                                                          01380000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       01381000
+@01      EQU   01                                                       01382000
+@02      EQU   02                                                       01383000
+@03      EQU   03                                                       01384000
+@04      EQU   04                                                       01385000
+@05      EQU   05                                                       01386000
+@06      EQU   06                                                       01387000
+@07      EQU   07                                                       01388000
+@08      EQU   08                                                       01389000
+@09      EQU   09                                                       01390000
+@10      EQU   10                                                       01391000
+@11      EQU   11                                                       01392000
+@12      EQU   12                                                       01393000
+@13      EQU   13                                                       01394000
+@14      EQU   14                                                       01395000
+@15      EQU   15                                                       01396000
+SUMSPEC1 EQU   @05                                                      01397000
+CURRPTR  EQU   @05                                                      01398000
+SAVEPARM EQU   @05                                                      01399000
+R0       EQU   @00                                                      01400000
+R1       EQU   @01                                                      01401000
+R2       EQU   @02                                                      01402000
+R3       EQU   @03                                                      01403000
+R4       EQU   @04                                                      01404000
+R6       EQU   @06                                                      01405000
+R7       EQU   @07                                                      01406000
+R9       EQU   @09                                                      01407000
+R12      EQU   @12                                                      01408000
+R15      EQU   @15                                                      01409000
+BUFFPTR  EQU   @07                                                      01410000
+R10      EQU   @10                                                      01411000
+R11      EQU   @11                                                      01412000
+R13      EQU   @13                                                      01413000
+R14      EQU   @14                                                      01414000
+R5       EQU   @05                                                      01415000
+R8       EQU   @08                                                      01416000
+IOHND    EQU   0                                                        01417000
+IFCMSG   EQU   0                                                        01418000
+PARM     EQU   0                                                        01419000
+RECTYPE  EQU   PARM                                                     01420000
+SWITCHES EQU   PARM+2                                                   01421000
+PARMTHR  EQU   SWITCHES                                                 01422000
+SHIFT3RD EQU   SWITCHES+1                                               01423000
+DEBUG    EQU   PARM+4                                                   01424000
+DEBUG4   EQU   DEBUG                                                    01425000
+DEBUG11  EQU   DEBUG+1                                                  01426000
+DEBUG12  EQU   DEBUG+1                                                  01427000
+DEBUGA   EQU   PARM+8                                                   01428000
+MISC     EQU   PARM+12                                                  01429000
+PHIST    EQU   MISC                                                     01430000
+PRINTES  EQU   MISC                                                     01431000
+PEDIT    EQU   PRINTES                                                  01432000
+PSUM     EQU   PRINTES                                                  01433000
+PLOGREC  EQU   MISC                                                     01434000
+OPENCLSE EQU   PARM+13                                                  01435000
+OPENIO   EQU   OPENCLSE                                                 01436000
+CLOSEIO  EQU   OPENCLSE+2                                               01437000
+CSERLOG  EQU   CLOSEIO                                                  01438000
+CDRCTWRK EQU   CLOSEIO                                                  01439000
+DATENOW  EQU   PARM+17                                                  01440000
+STDT     EQU   PARM+23                                                  01441000
+STDATE   EQU   STDT                                                     01442000
+PSTD     EQU   STDATE+1                                                 01443000
+ENDDT    EQU   PARM+31                                                  01444000
+ENDDATE  EQU   ENDDT                                                    01445000
+PEND     EQU   ENDDATE+1                                                01446000
+STTIME1  EQU   PARM+39                                                  01447000
+ENDTIME1 EQU   PARM+43                                                  01448000
+STTIME2  EQU   PARM+47                                                  01449000
+ENDTIME2 EQU   PARM+51                                                  01450000
+STRTDATE EQU   PARM+55                                                  01451000
+RDTHRSH  EQU   PARM+66                                                  01452000
+WRTHRSH  EQU   PARM+69                                                  01453000
+@NM00007 EQU   PARM+75                                                  01454000
+TABSIZE  EQU   PARM+80                                                  01455000
+SORTNUM  EQU   PARM+84                                                  01456000
+ERRID    EQU   PARM+92                                                  01457000
+IDTIMEA  EQU   ERRID+6                                                  01458000
+IDTIME   EQU   IDTIMEA                                                  01459000
+CCHHRLNG EQU   PARM+112                                                 01460000
+RECCCHHR EQU   CCHHRLNG                                                 01461000
+ADIOHND  EQU   PARM+124                                                 01462000
+ADIFCMSG EQU   PARM+128                                                 01463000
+ADEDITB  EQU   PARM+132                                                 01464000
+EVPTR    EQU   PARM+136                                                 01465000
+SORTADR  EQU   PARM+140                                                 01466000
+PRINTADR EQU   PARM+148                                                 01467000
+CUAPTR   EQU   PARM+152                                                 01468000
+DEVPTR   EQU   PARM+156                                                 01469000
+MODPTR   EQU   PARM+160                                                 01470000
+SERPTR   EQU   PARM+164                                                 01471000
+VOLPTR   EQU   PARM+168                                                 01472000
+CPUPTR   EQU   PARM+172                                                 01473000
+CPCUAPTR EQU   PARM+176                                                 01474000
+LIBADPTR EQU   PARM+180                                                 01475000
+SYMCDPTR EQU   PARM+184                                                 01476000
+SYSUMPTR EQU   PARM+188                                                 01477000
+TRENPTR  EQU   PARM+192                                                 01478000
+SHAREPTR EQU   PARM+196                                                 01479000
+MERDCPTR EQU   PARM+208                                                 01480000
+DUMPTABL EQU   PARM+228                                                 01481000
+DUMPINFO EQU   DUMPTABL+4                                               01482000
+TRENDONE EQU   0                                                        01483000
+TREGEN   EQU   TRENDONE+8                                               01484000
+TRECCH0  EQU   TREGEN+8                                                 01485000
+TREND2   EQU   0                                                        01486000
+TRENDKEY EQU   TREND2                                                   01487000
+TRENDRT  EQU   TRENDKEY+1                                               01488000
+TRENCPUS EQU   TRENDKEY+3                                               01489000
+TRENDITM EQU   TRENDKEY+4                                               01490000
+EVTABLE  EQU   0                                                        01491000
+EVSTOP   EQU   EVTABLE                                                  01492000
+EVKEY    EQU   EVTABLE+6                                                01493000
+SORTABLE EQU   0                                                        01494000
+SORTKEY  EQU   SORTABLE                                                 01495000
+SORTCCHR EQU   SORTABLE+5                                               01496000
+SYSUMONE EQU   0                                                        01497000
+SYSUM2   EQU   0                                                        01498000
+SYSUMKEY EQU   SYSUM2                                                   01499000
+SYSRT    EQU   SYSUMKEY+1                                               01500000
+SYSCPUS  EQU   SYSUMKEY+3                                               01501000
+SYSITEM  EQU   SYSUMKEY+4                                               01502000
+SHARE    EQU   0                                                        01503000
+SHARENUM EQU   SHARE                                                    01504000
+SHAREIO  EQU   SHARE+2                                                  01505000
+SHRCUCPU EQU   SHAREIO                                                  01506000
+SHARECUA EQU   SHRCUCPU                                                 01507000
+SHAREDX  EQU   SHARECUA                                                 01508000
+SHARECUB EQU   SHAREIO+5                                                01509000
+SHARSERB EQU   SHAREIO+7                                                01510000
+EDITLOAD EQU   0                                                        01511000
+EDITABLE EQU   EDITLOAD+4                                               01512000
+CUA      EQU   0                                                        01513000
+CUANUM   EQU   CUA                                                      01514000
+CUAVAL   EQU   CUA+2                                                    01515000
+CUA1     EQU   CUAVAL                                                   01516000
+CUA2     EQU   CUAVAL+2                                                 01517000
+DEVICE   EQU   0                                                        01518000
+MODELS   EQU   0                                                        01519000
+DEVSERAL EQU   0                                                        01520000
+SERNUM   EQU   DEVSERAL                                                 01521000
+SERVAL   EQU   DEVSERAL+2                                               01522000
+VOLUME   EQU   0                                                        01523000
+VOLNUM   EQU   VOLUME                                                   01524000
+VOLVAL   EQU   VOLUME+2                                                 01525000
+CPUS     EQU   0                                                        01526000
+CPUNUM   EQU   CPUS                                                     01527000
+CPUVAL   EQU   CPUS+2                                                   01528000
+CPUCUAS  EQU   0                                                        01529000
+CPUCUAV  EQU   CPUCUAS+2                                                01530000
+LIBADR   EQU   0                                                        01531000
+SYMCODE  EQU   0                                                        01532000
+SYMVAL   EQU   SYMCODE+2                                                01533000
+MERIDIAN EQU   0                                                        01534000
+COUNTER  EQU   0                                                        01535000
+EDITCUA1 EQU   0                                                        01536000
+ERTHRE   EQU   EDITCUA1+20                                              01537000
+EWTHRE   EQU   EDITCUA1+23                                              01538000
+SUMTABLE EQU   0                                                        01539000
+SUMPTR   EQU   SUMTABLE                                                 01540000
+SUMEDIT  EQU   SUMTABLE+4                                               01541000
+NEXTENT  EQU   SUMTABLE+8                                               01542000
+CNTSIZE  EQU   SUMTABLE+12                                              01543000
+SUMHEAD  EQU   0                                                        01544000
+NEXTTAB  EQU   SUMHEAD                                                  01545000
+SUMIDENT EQU   SUMHEAD+4                                                01546000
+MODNAME  EQU   SUMHEAD+12                                               01547000
+CURRDEV  EQU   SUMHEAD+20                                               01548000
+COUNTERS EQU   SUMHEAD+22                                               01549000
+SUMENTRY EQU   0                                                        01550000
+SUMFLAG  EQU   SUMENTRY                                                 01551000
+SUMMASK  EQU   SUMENTRY+1                                               01552000
+OFFSET   EQU   SUMENTRY+2                                               01553000
+SUMSPEC  EQU   OFFSET                                                   01554000
+CNTOFSET EQU   SUMENTRY+4                                               01555000
+BUFFER   EQU   0                                                        01556000
+RECTYP   EQU   BUFFER                                                   01557000
+SWITCHE  EQU   BUFFER+2                                                 01558000
+SW2      EQU   SWITCHE+1                                                01559000
+SHORT    EQU   SW2                                                      01560000
+SHRCUA   EQU   BUFFER+5                                                 01561000
+DATE     EQU   BUFFER+8                                                 01562000
+TIME     EQU   BUFFER+12                                                01563000
+CPUIDENT EQU   BUFFER+17                                                01564000
+CPUSER   EQU   CPUIDENT                                                 01565000
+ODEVICE  EQU   BUFFER+52                                                01566000
+DEV2     EQU   ODEVICE+2                                                01567000
+OCUA     EQU   BUFFER+57                                                01568000
+OCUA2    EQU   OCUA+1                                                   01569000
+VOLID    EQU   BUFFER+64                                                01570000
+OSER74XX EQU   BUFFER+123                                               01571000
+CONTRTAB EQU   0                                                        01572000
+CONTRVOL EQU   CONTRTAB                                                 01573000
+CONTRCUA EQU   CONTRVOL                                                 01574000
+EOTABLE  EQU   CONTRCUA                                                 01575000
+CPU      EQU   CONTRVOL+3                                               01576000
+TABCCHHR EQU   CONTRTAB+6                                               01577000
+SUMMARY  EQU   0                                                        01578000
+THRSHRC  EQU   0                                                        01579000
+THRSHFLG EQU   THRSHRC+4                                                01580000
+SPECIAL  EQU   0                                                        01581000
+RECFLAG  EQU   0                                                        01582000
+TABNBR   EQU   REPTYPE+3                                                01583000
+STABNBR  EQU   SREPTYPE+3                                               01584000
+TRECCH   EQU   TRECCH0                                                  01585000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    01586000
+@NM00034 EQU   THRSHRC                                                  01587000
+@NM00026 EQU   BUFFER+70                                                01588000
+@NM00025 EQU   BUFFER+60                                                01589000
+@NM00024 EQU   OCUA                                                     01590000
+@NM00023 EQU   BUFFER+56                                                01591000
+@NM00022 EQU   ODEVICE                                                  01592000
+@NM00021 EQU   BUFFER+22                                                01593000
+CPUMOD   EQU   CPUIDENT+3                                               01594000
+@NM00020 EQU   BUFFER+16                                                01595000
+@NM00019 EQU   BUFFER+7                                                 01596000
+@NM00018 EQU   BUFFER+4                                                 01597000
+@NM00017 EQU   SW2                                                      01598000
+@NM00016 EQU   SWITCHE                                                  01599000
+@NM00015 EQU   BUFFER+1                                                 01600000
+@NM00012 EQU   EDITCUA1                                                 01601000
+MODEL    EQU   MERIDIAN+2                                               01602000
+MRDNUMBR EQU   MERIDIAN                                                 01603000
+SYMVAL2  EQU   SYMVAL+2                                                 01604000
+SYMVAL1  EQU   SYMVAL                                                   01605000
+SYMCDNUM EQU   SYMCODE                                                  01606000
+LIBVAL   EQU   LIBADR+2                                                 01607000
+LIBADNUM EQU   LIBADR                                                   01608000
+CPUCUX3  EQU   CPUCUAV+5                                                01609000
+CPUCUX2  EQU   CPUCUAV+3                                                01610000
+CPUCUX1  EQU   CPUCUAV                                                  01611000
+CPCUANUM EQU   CPUCUAS                                                  01612000
+MODVAL   EQU   MODELS+2                                                 01613000
+MODNUM   EQU   MODELS                                                   01614000
+MDRVAL   EQU   DEVICE+204                                               01615000
+MDRNUM   EQU   DEVICE+202                                               01616000
+DEVVAL   EQU   DEVICE+2                                                 01617000
+DEVNUM   EQU   DEVICE                                                   01618000
+LOADPTR  EQU   EDITABLE+8                                               01619000
+LOADNAME EQU   EDITABLE                                                 01620000
+EDITNUM  EQU   EDITLOAD                                                 01621000
+SHARLET  EQU   SHAREIO+10                                               01622000
+SHARSERA EQU   SHRCUCPU+2                                               01623000
+SYSTEMP  EQU   SYSUM2+9                                                 01624000
+SYSPERM  EQU   SYSUM2+7                                                 01625000
+SYSDEV   EQU   SYSUM2+5                                                 01626000
+SYSOLDA  EQU   SYSITEM                                                  01627000
+SYS3705  EQU   SYSITEM                                                  01628000
+SYSOLD   EQU   SYSCPUS                                                  01629000
+SYSCPU   EQU   SYSCPUS                                                  01630000
+SYSCUA   EQU   SYSRT                                                    01631000
+SYSGROUP EQU   SYSUMKEY                                                 01632000
+SYSUMEOD EQU   SYSUMONE+96                                              01633000
+SYSUMPER EQU   SYSUMONE+92                                              01634000
+SYSUMPEA EQU   SYSUMONE+88                                              01635000
+SYSUMPEI EQU   SYSUMONE+84                                              01636000
+SYSUMCH  EQU   SYSUMONE+20                                              01637000
+SYSUMMCN EQU   SYSUMONE+16                                              01638000
+SYSUMMCR EQU   SYSUMONE+12                                              01639000
+SYSUMNXT EQU   SYSUMONE+8                                               01640000
+SYSUMIPL EQU   SYSUMONE+4                                               01641000
+SYSUMNUM EQU   SYSUMONE                                                 01642000
+SORTCORE EQU   SORTCCHR                                                 01643000
+SORTTIME EQU   SORTKEY+1                                                01644000
+SORTYEAR EQU   SORTKEY                                                  01645000
+EVLETTER EQU   EVKEY+5                                                  01646000
+EVSERIAL EQU   EVKEY+2                                                  01647000
+EVMODEL  EQU   EVKEY                                                    01648000
+EVNUM    EQU   EVTABLE+4                                                01649000
+EVDAY    EQU   EVSTOP+1                                                 01650000
+EVYEAR   EQU   EVSTOP                                                   01651000
+TRETMP   EQU   TREND2+10                                                01652000
+TREPRM   EQU   TREND2+8                                                 01653000
+TRENDDEV EQU   TREND2+6                                                 01654000
+TRENDDAT EQU   TRENDKEY+5                                               01655000
+TRENDOD  EQU   TRENDITM                                                 01656000
+TREND037 EQU   TRENDITM                                                 01657000
+TRENDOLD EQU   TRENCPUS                                                 01658000
+TRENDCPU EQU   TRENCPUS                                                 01659000
+@NM00011 EQU   TRENDRT+1                                                01660000
+TRENDCUA EQU   TRENDRT                                                  01661000
+TRENDGRP EQU   TRENDKEY                                                 01662000
+TREPRE   EQU   TREGEN+72                                                01663000
+TRECCHF  EQU   TREGEN+68                                                01664000
+TRECCHE  EQU   TREGEN+64                                                01665000
+TRECCHD  EQU   TREGEN+60                                                01666000
+TRECCHC  EQU   TREGEN+56                                                01667000
+TRECCHB  EQU   TREGEN+52                                                01668000
+TRECCHA  EQU   TREGEN+48                                                01669000
+TRECCH9  EQU   TREGEN+44                                                01670000
+TRECCH8  EQU   TREGEN+40                                                01671000
+TRECCH7  EQU   TREGEN+36                                                01672000
+TRECCH6  EQU   TREGEN+32                                                01673000
+TRECCH5  EQU   TREGEN+28                                                01674000
+TRECCH4  EQU   TREGEN+24                                                01675000
+TRECCH3  EQU   TREGEN+20                                                01676000
+TRECCH2  EQU   TREGEN+16                                                01677000
+TRECCH1  EQU   TREGEN+12                                                01678000
+TREMCH   EQU   TREGEN+4                                                 01679000
+TREIPL   EQU   TREGEN                                                   01680000
+TRENUM   EQU   TRENDONE+4                                               01681000
+TRENEXT  EQU   TRENDONE                                                 01682000
+DUMPSIZE EQU   DUMPINFO+4                                               01683000
+DUMPADR  EQU   DUMPINFO                                                 01684000
+DUMPNUM  EQU   DUMPTABL                                                 01685000
+@NM00010 EQU   PARM+212                                                 01686000
+RECLNGT1 EQU   PARM+204                                                 01687000
+FRAMEPTR EQU   PARM+200                                                 01688000
+ADCPUT   EQU   PARM+144                                                 01689000
+LINECT   EQU   PARM+120                                                 01690000
+RECLNGTH EQU   CCHHRLNG+6                                               01691000
+@NM00009 EQU   CCHHRLNG+5                                               01692000
+USERPGM  EQU   PARM+102                                                 01693000
+IDTSEC   EQU   IDTIME+3                                                 01694000
+IDSEC    EQU   IDTIME+2                                                 01695000
+IDMIN    EQU   IDTIME+1                                                 01696000
+IDHOUR   EQU   IDTIME                                                   01697000
+IDASID   EQU   ERRID+4                                                  01698000
+IDCPU    EQU   ERRID+3                                                  01699000
+@NM00008 EQU   ERRID+2                                                  01700000
+IDVALUE  EQU   ERRID                                                    01701000
+NUMDAYS  EQU   PARM+88                                                  01702000
+SYSRETRN EQU   @NM00007                                                 01703000
+@NM00006 EQU   PARM+72                                                  01704000
+TERM     EQU   PARM+58                                                  01705000
+EVSDAY   EQU   STRTDATE+1                                               01706000
+EVSYEAR  EQU   STRTDATE                                                 01707000
+PENSEC2  EQU   ENDTIME2+2                                               01708000
+PENMIN2  EQU   ENDTIME2+1                                               01709000
+PENHOUR2 EQU   ENDTIME2                                                 01710000
+PSTSEC2  EQU   STTIME2+2                                                01711000
+PSTMIN2  EQU   STTIME2+1                                                01712000
+PSTHOUR2 EQU   STTIME2                                                  01713000
+PENSEC1  EQU   ENDTIME1+2                                               01714000
+PENMIN1  EQU   ENDTIME1+1                                               01715000
+PENHOUR1 EQU   ENDTIME1                                                 01716000
+PSTSEC1  EQU   STTIME1+2                                                01717000
+PSTMIN1  EQU   STTIME1+1                                                01718000
+PSTHOUR1 EQU   STTIME1                                                  01719000
+@NM00005 EQU   ENDDT+4                                                  01720000
+PENDY    EQU   PEND+1                                                   01721000
+PENYR    EQU   PEND                                                     01722000
+@NM00004 EQU   ENDDATE                                                  01723000
+@NM00003 EQU   STDT+4                                                   01724000
+PSTDY    EQU   PSTD+1                                                   01725000
+PSTYR    EQU   PSTD                                                     01726000
+@NM00002 EQU   STDATE                                                   01727000
+YEARNOW  EQU   DATENOW+4                                                01728000
+@NM00001 EQU   DATENOW+3                                                01729000
+DAYNOW   EQU   DATENOW                                                  01730000
+CSNAP    EQU   CLOSEIO                                                  01731000
+CSYSIN   EQU   CLOSEIO                                                  01732000
+CACCDEV  EQU   CLOSEIO                                                  01733000
+CACCIN   EQU   CLOSEIO                                                  01734000
+CEREPPT  EQU   CLOSEIO                                                  01735000
+CTOURIST EQU   CLOSEIO                                                  01736000
+OSNAP    EQU   OPENIO                                                   01737000
+ODRCTWRK EQU   OPENIO                                                   01738000
+OSYSIN   EQU   OPENIO                                                   01739000
+OACCDEV  EQU   OPENIO                                                   01740000
+OACCIN   EQU   OPENIO                                                   01741000
+OSERLOG  EQU   OPENIO                                                   01742000
+OEREPPT  EQU   OPENIO                                                   01743000
+OTOURIST EQU   OPENIO                                                   01744000
+PASSFLAG EQU   MISC                                                     01745000
+ERRORID  EQU   MISC                                                     01746000
+PACC     EQU   MISC                                                     01747000
+PZERO    EQU   MISC                                                     01748000
+DEBUG63  EQU   DEBUGA+3                                                 01749000
+DEBUG62  EQU   DEBUGA+3                                                 01750000
+DEBUG61  EQU   DEBUGA+3                                                 01751000
+DEBUG60  EQU   DEBUGA+3                                                 01752000
+DEBUG59  EQU   DEBUGA+3                                                 01753000
+DEBUG58  EQU   DEBUGA+3                                                 01754000
+DEBUG57  EQU   DEBUGA+3                                                 01755000
+DEBUG56  EQU   DEBUGA+3                                                 01756000
+DEBUG55  EQU   DEBUGA+2                                                 01757000
+DEBUG54  EQU   DEBUGA+2                                                 01758000
+DEBUG53  EQU   DEBUGA+2                                                 01759000
+DEBUG52  EQU   DEBUGA+2                                                 01760000
+DEBUG51  EQU   DEBUGA+2                                                 01761000
+DEBUG50  EQU   DEBUGA+2                                                 01762000
+DEBUG49  EQU   DEBUGA+2                                                 01763000
+DEBUG48  EQU   DEBUGA+2                                                 01764000
+DEBUG47  EQU   DEBUGA+1                                                 01765000
+DEBUG46  EQU   DEBUGA+1                                                 01766000
+DEBUG45  EQU   DEBUGA+1                                                 01767000
+DEBUG44  EQU   DEBUGA+1                                                 01768000
+DEBUG43  EQU   DEBUGA+1                                                 01769000
+DEBUG42  EQU   DEBUGA+1                                                 01770000
+DEBUG41  EQU   DEBUGA+1                                                 01771000
+DEBUG40  EQU   DEBUGA+1                                                 01772000
+DEBUG39  EQU   DEBUGA                                                   01773000
+DEBUG38  EQU   DEBUGA                                                   01774000
+DEBUG37  EQU   DEBUGA                                                   01775000
+DEBUG36  EQU   DEBUGA                                                   01776000
+DEBUG35  EQU   DEBUGA                                                   01777000
+DEBUG34  EQU   DEBUGA                                                   01778000
+DEBUG33  EQU   DEBUGA                                                   01779000
+DEBUG32  EQU   DEBUGA                                                   01780000
+DEBUG31  EQU   DEBUG+3                                                  01781000
+DEBUG30  EQU   DEBUG+3                                                  01782000
+DEBUG29  EQU   DEBUG+3                                                  01783000
+DEBUG28  EQU   DEBUG+3                                                  01784000
+DEBUG27  EQU   DEBUG+3                                                  01785000
+DEBUG26  EQU   DEBUG+3                                                  01786000
+DEBUG25  EQU   DEBUG+3                                                  01787000
+DEBUG24  EQU   DEBUG+3                                                  01788000
+DEBUG23  EQU   DEBUG+2                                                  01789000
+DEBUG22  EQU   DEBUG+2                                                  01790000
+DEBUG21  EQU   DEBUG+2                                                  01791000
+DEBUG20  EQU   DEBUG+2                                                  01792000
+DEBUG19  EQU   DEBUG+2                                                  01793000
+DEBUG18  EQU   DEBUG+2                                                  01794000
+DEBUG17  EQU   DEBUG+2                                                  01795000
+DEBUG16  EQU   DEBUG+2                                                  01796000
+DEBUG15  EQU   DEBUG+1                                                  01797000
+DEBUG14  EQU   DEBUG+1                                                  01798000
+DEBUG13  EQU   DEBUG+1                                                  01799000
+DEBUG10  EQU   DEBUG+1                                                  01800000
+DEBUG9   EQU   DEBUG+1                                                  01801000
+DEBUG8   EQU   DEBUG+1                                                  01802000
+DEBUG7   EQU   DEBUG                                                    01803000
+DEBUG6   EQU   DEBUG                                                    01804000
+DEBUG5   EQU   DEBUG                                                    01805000
+DEBUG3   EQU   DEBUG                                                    01806000
+DEBUG2   EQU   DEBUG                                                    01807000
+DEBUG1   EQU   DEBUG                                                    01808000
+DEBUG0   EQU   DEBUG                                                    01809000
+SORTBRK  EQU   SWITCHES+1                                               01810000
+COREFAIL EQU   SWITCHES+1                                               01811000
+ANALYSIS EQU   SWITCHES+1                                               01812000
+DEVEXCL  EQU   SWITCHES+1                                               01813000
+ZEROALL  EQU   SWITCHES+1                                               01814000
+NOTALL   EQU   SWITCHES+1                                               01815000
+NOSDR    EQU   SWITCHES                                                 01816000
+TIMESEQ  EQU   SWITCHES                                                 01817000
+SYSUM    EQU   SWITCHES                                                 01818000
+TREND    EQU   SWITCHES                                                 01819000
+SHORTOBR EQU   SWITCHES                                                 01820000
+PARMMES  EQU   SWITCHES                                                 01821000
+RDESUM   EQU   SWITCHES                                                 01822000
+PCCHFRAM EQU   RECTYPE+1                                                01823000
+PMCHFRAM EQU   RECTYPE+1                                                01824000
+PTTYP    EQU   RECTYPE+1                                                01825000
+PEOD     EQU   RECTYPE                                                  01826000
+PMIH     EQU   RECTYPE                                                  01827000
+PDDR     EQU   RECTYPE                                                  01828000
+PIPL     EQU   RECTYPE                                                  01829000
+PSOFT    EQU   RECTYPE                                                  01830000
+POBR     EQU   RECTYPE                                                  01831000
+PCHAN    EQU   RECTYPE                                                  01832000
+PMCH     EQU   RECTYPE                                                  01833000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      01834000
+@RF00145 EQU   @RC00143                                                 01835000
+@PB00006 EQU   @PB00007                                                 01836000
+@RF00171 EQU   @RC00169                                                 01837000
+@RF00317 EQU   @RC00204                                                 01838000
+@RF00402 EQU   @RC00204                                                 01839000
+@RF00411 EQU   @EL00001                                                 01840000
+@PB00005 EQU   @PB00006                                                 01841000
+@PB00004 EQU   @PB00005                                                 01842000
+@PB00003 EQU   @PB00004                                                 01843000
+@PB00002 EQU   @PB00003                                                 01844000
+@ENDDATA EQU   *                                                        01845000
+         END   IFCMES01,(C'PLS2112',0701,78017)                         01846000

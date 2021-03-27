@@ -1,0 +1,796 @@
+         TITLE 'ISTSC028-FREECORE'                                      00001000
+ISTSC028 CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'ISTSC028  78.337'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  ST    @14,12(,@13)                                        0001 00009000
+         STM   @02,@12,28(@13)                                     0001 00010000
+         BALR  @12,0                                               0001 00011000
+@PSTART  DS    0H                                                  0001 00012000
+         USING @PSTART,@12                                         0001 00013000
+         ST    @13,@SA00001+4                                      0001 00014000
+         LA    @14,@SA00001                                        0001 00015000
+         ST    @14,8(,@13)                                         0001 00016000
+         LR    @13,@14                                             0001 00017000
+         EJECT                                                          00018000
+*                                                                  0047 00019000
+*/********************************************************************/ 00020000
+*/*      CONSTANTS                                                   */ 00021000
+*/********************************************************************/ 00022000
+*/********************************************************************/ 00023000
+*/*      TEST  MACRO LEVEL & MORE CORE ISSUED                        */ 00024000
+*/********************************************************************/ 00025000
+*                                                                  0048 00026000
+*   R15=0;                          /* SET RTN REG TO ZERO           */ 00027000
+         SLR   R15,R15                                             0048 00028000
+*   IF $FSTMCIS='0'B                /* HAS ANY MORE CORE'S BEEN      */ 00029000
+*     THEN                          /* ISSUED                        */ 00030000
+         TM    $FSTMCIS(WAPTR),B'00000100'                         0049 00031000
+         BZ    @RT00049                                            0049 00032000
+*     GOTO S28C0090;                /* BR-NOT ON RTN CDE 8           */ 00033000
+*   R6=$FRELPTR;                    /* PICK UP CHAIN PTR             */ 00034000
+         L     R6,$FRELPTR(,WAPTR)                                 0051 00035000
+*/********************************************************************/ 00036000
+*/*      SEARCH  CHAIN MORE/FREE                                     */ 00037000
+*/********************************************************************/ 00038000
+*                                                                  0052 00039000
+*   R7=$FREEPTR;                    /* PICK UP PTR TO BE FREED       */ 00040000
+         L     R7,$FREEPTR(,FREMAP)                                0052 00041000
+*   R7=AREAADDR;                    /* PTR TO PTR ON MAP             */ 00042000
+         L     R7,AREAADDR(,R7)                                    0053 00043000
+*S28C0000:                                                         0054 00044000
+*   ;                                                              0054 00045000
+S28C0000 DS    0H                                                  0055 00046000
+*   R5=R6+8;                        /* SET COMPARE PTR+8 FOR MANG    */ 00047000
+         LA    R5,8                                                0055 00048000
+         ALR   R5,R6                                               0055 00049000
+*   IF R5^=R7                       /* COMPARE PTRS                  */ 00050000
+*     THEN                          /* IF NOT EQUAL GOTO NXT PTR     */ 00051000
+         CR    R5,R7                                               0056 00052000
+         BNE   @RT00056                                            0056 00053000
+*     GOTO S28C0001;                /*                               */ 00054000
+*   IF FREE='1'B                    /* IF EQUAL IS AREA FREE         */ 00055000
+*     THEN                          /* IF BIT ON AREA FREE           */ 00056000
+         TM    FREE(R6),B'00000001'                                0058 00057000
+         BO    @RT00058                                            0058 00058000
+*     GOTO S28C0090;                /* THEN GIVE RTN CODE 8          */ 00059000
+*   GOTO S28C0002;                  /* IF OFF COMBINE AREAS          */ 00060000
+         B     S28C0002                                            0060 00061000
+*S28C0001:                                                         0061 00062000
+*   ;                               /*                               */ 00063000
+S28C0001 DS    0H                                                  0062 00064000
+*   R8=R6;                          /* SAVE PTR TO PREV AREA         */ 00065000
+         LR    R8,R6                                               0062 00066000
+*   IF COREFWD=0                    /* IS THIS END OF CHAIN          */ 00067000
+*     THEN                          /* IF YES GIVE RTN CODE 8        */ 00068000
+         L     @14,COREFWD(,R6)                                    0063 00069000
+         LTR   @14,@14                                             0063 00070000
+         BZ    @RT00063                                            0063 00071000
+*     GOTO S28C0090;                /*                               */ 00072000
+*   R6=COREFWD;                     /* IF NO PICK UP PTR TO NXT      */ 00073000
+         LR    R6,@14                                              0065 00074000
+*   GOTO S28C0000;                  /* AND LOOP                      */ 00075000
+         B     S28C0000                                            0066 00076000
+*S28C0002:                                                         0067 00077000
+*   ;                               /*                               */ 00078000
+S28C0002 DS    0H                                                  0068 00079000
+*   IF R6=$FRELPTR                  /* TEST AREA FOR 1ST FREE        */ 00080000
+*     THEN                          /* IF YES JUST SET FREE BIT      */ 00081000
+         C     R6,$FRELPTR(,WAPTR)                                 0068 00082000
+         BE    @RT00068                                            0068 00083000
+*     GOTO S28C0003;                /* NO COMBINING NEEDED           */ 00084000
+*   IF FREEN='0'B                   /* IS PREV AREA FREE             */ 00085000
+*     THEN                          /* BR-NO NO COMBINING NEEDED     */ 00086000
+         TM    FREEN(R8),B'00000001'                               0070 00087000
+         BZ    @RT00070                                            0070 00088000
+*     GOTO S28C0003;                /*                               */ 00089000
+*/********************************************************************/ 00090000
+*/*      COMBINE NEW FREE AREAS                                      */ 00091000
+*/********************************************************************/ 00092000
+*                                                                  0072 00093000
+*   CORESZEN=CORESZEN+CORESZE;      /* SET UP COMBINED SIZE IN       */ 00094000
+         L     @14,CORESZEN(,R8)                                   0072 00095000
+         AL    @14,CORESZE(,R6)                                    0072 00096000
+         ST    @14,CORESZEN(,R8)                                   0072 00097000
+*   COREFWDN=COREFWD;               /* PREV & MOVE THIS FWD PTR      */ 00098000
+         L     @14,COREFWD(,R6)                                    0073 00099000
+         ST    @14,COREFWDN(,R8)                                   0073 00100000
+*   R6=R8;                          /* TO PREV. SET R6 WITH PREV     */ 00101000
+         LR    R6,R8                                               0074 00102000
+*S28C0003:                                                         0075 00103000
+*   ;                               /*                               */ 00104000
+S28C0003 DS    0H                                                  0076 00105000
+*   FREE='1'B;                      /* SET FREE BIT ON               */ 00106000
+         OI    FREE(R6),B'00000001'                                0076 00107000
+*   R8=COREFWD;                     /* TEST NXT AREA FOR FREE        */ 00108000
+         L     R8,COREFWD(,R6)                                     0077 00109000
+*   IF R8=0                         /* IS FWD PTR ZERO?              */ 00110000
+*     THEN                          /* YES NO MORE COMBINING         */ 00111000
+         LTR   R8,R8                                               0078 00112000
+         BZ    @RT00078                                            0078 00113000
+*     GOTO S28C0092;                /* NEED EP                       */ 00114000
+*   IF FREEN='0'B                   /* IS IT FREE                    */ 00115000
+*     THEN                          /* BR-NO                         */ 00116000
+         TM    FREEN(R8),B'00000001'                               0080 00117000
+         BZ    @RT00080                                            0080 00118000
+*     GOTO S28C0092;                /* NO MORE COMBINING             */ 00119000
+*   CORESZE=CORESZE+CORESZEN-1;     /* COMBINE LENGTHS               */ 00120000
+         L     @14,CORESZE(,R6)                                    0082 00121000
+         AL    @14,CORESZEN(,R8)                                   0082 00122000
+         BCTR  @14,0                                               0082 00123000
+         ST    @14,CORESZE(,R6)                                    0082 00124000
+*   COREFWD=COREFWDN;               /* SET FWD PTR OF NXT            */ 00125000
+         L     @14,COREFWDN(,R8)                                   0083 00126000
+         ST    @14,COREFWD(,R6)                                    0083 00127000
+*   GOTO S28C0092;                  /* GIVE RTN CODE OF 0            */ 00128000
+         B     S28C0092                                            0084 00129000
+*/********************************************************************/ 00130000
+*                                                                  0085 00131000
+*   GEN(EJECT);                                                    0085 00132000
+         EJECT                                                          00133000
+*                                                                  0086 00134000
+*/********************************************************************/ 00135000
+*/*      RTN CODE                                                    */ 00136000
+*/********************************************************************/ 00137000
+*                                                                  0086 00138000
+*S28C0090:                                                         0086 00139000
+*   ;                                                              0086 00140000
+S28C0090 DS    0H                                                  0087 00141000
+*   R15=R15+4;                      /* RTN CODE=8                    */ 00142000
+         AL    R15,@CF00088                                        0087 00143000
+*S28C0091:                                                         0088 00144000
+*   ;                                                              0088 00145000
+S28C0091 DS    0H                                                  0089 00146000
+*   R15=R15+4;                      /* RTN CODE=4                    */ 00147000
+         AL    R15,@CF00088                                        0089 00148000
+*S28C0092:                                                         0090 00149000
+*   ;                                                              0090 00150000
+S28C0092 DS    0H                                                  0091 00151000
+*   DO;                             /* ATDSPLY                       */ 00152000
+*   END;                            /* ATDSPLY                       */ 00153000
+*   END;                            /* RTN CODE=0                    */ 00154000
+@EL00001 L     @13,4(,@13)                                         0093 00155000
+@EF00001 DS    0H                                                  0093 00156000
+@ER00001 L     @14,12(,@13)                                        0093 00157000
+         LM    @02,@12,28(@13)                                     0093 00158000
+         BR    @14                                                 0093 00159000
+@DATA    DS    0H                                                       00160000
+         DS    0F                                                       00161000
+@SA00001 DS    18F                                                      00162000
+         DS    0F                                                       00163000
+@CF00088 DC    F'4'                                                     00164000
+         DS    0D                                                       00165000
+PATCH    DC    10F'0'                                                   00166000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00167000
+@01      EQU   01                                                       00168000
+@02      EQU   02                                                       00169000
+@03      EQU   03                                                       00170000
+@04      EQU   04                                                       00171000
+@05      EQU   05                                                       00172000
+@06      EQU   06                                                       00173000
+@07      EQU   07                                                       00174000
+@08      EQU   08                                                       00175000
+@09      EQU   09                                                       00176000
+@10      EQU   10                                                       00177000
+@11      EQU   11                                                       00178000
+@12      EQU   12                                                       00179000
+@13      EQU   13                                                       00180000
+@14      EQU   14                                                       00181000
+@15      EQU   15                                                       00182000
+R0       EQU   @00                                                      00183000
+R1       EQU   @01                                                      00184000
+R2       EQU   @02                                                      00185000
+R3       EQU   @03                                                      00186000
+R4       EQU   @04                                                      00187000
+R5       EQU   @05                                                      00188000
+R6       EQU   @06                                                      00189000
+R7       EQU   @07                                                      00190000
+R8       EQU   @08                                                      00191000
+R15      EQU   @15                                                      00192000
+RCAPTR   EQU   @03                                                      00193000
+WAPTR    EQU   @02                                                      00194000
+MORMAP   EQU   @01                                                      00195000
+FREMAP   EQU   @01                                                      00196000
+R10      EQU   @10                                                      00197000
+R11      EQU   @11                                                      00198000
+R12      EQU   @12                                                      00199000
+R13      EQU   @13                                                      00200000
+R14      EQU   @14                                                      00201000
+R9       EQU   @09                                                      00202000
+$RCAAREA EQU   0                                                        00203000
+$POINTER EQU   $RCAAREA+100                                             00204000
+$TRTBLA  EQU   $POINTER+124                                             00205000
+$CONSTNT EQU   $RCAAREA+244                                             00206000
+$RCAFLG  EQU   $RCAAREA+604                                             00207000
+TOLTEPWA EQU   0                                                        00208000
+$SCTTBLE EQU   TOLTEPWA                                                 00209000
+$TESTOPT EQU   $SCTTBLE+2                                               00210000
+$ERROPT  EQU   $SCTTBLE+3                                               00211000
+$PDEVFLG EQU   $SCTTBLE+10                                              00212000
+$CDSFLGS EQU   $SCTTBLE+11                                              00213000
+$CDS8T19 EQU   $SCTTBLE+20                                              00214000
+$EXECFLG EQU   $SCTTBLE+33                                              00215000
+$OLTFLGS EQU   $SCTTBLE+36                                              00216000
+$OLTFLG2 EQU   $SCTTBLE+37                                              00217000
+$TOTFLG1 EQU   $SCTTBLE+38                                              00218000
+$ROUTMSK EQU   $SCTTBLE+40                                              00219000
+$CDA     EQU   TOLTEPWA+100                                             00220000
+$RCA     EQU   $CDA+44                                                  00221000
+$OLTPTR  EQU   $CDA+52                                                  00222000
+$HIMOREC EQU   $CDA+60                                                  00223000
+$FRELPTR EQU   $CDA+64                                                  00224000
+$COMMFLG EQU   TOLTEPWA+224                                             00225000
+$FLAG1   EQU   $COMMFLG                                                 00226000
+$FLAG2   EQU   $COMMFLG+1                                               00227000
+$FLAG3   EQU   $COMMFLG+2                                               00228000
+$FLAG4   EQU   $COMMFLG+3                                               00229000
+$FLAG5   EQU   $COMMFLG+4                                               00230000
+$EOJ     EQU   $FLAG5                                                   00231000
+$CANCEL  EQU   $EOJ                                                     00232000
+$FLAG6   EQU   $COMMFLG+5                                               00233000
+$FSTMCIS EQU   $FLAG6                                                   00234000
+$ABNDBIT EQU   $FLAG6                                                   00235000
+$FLAG7   EQU   $COMMFLG+6                                               00236000
+$FLAG8   EQU   $COMMFLG+7                                               00237000
+$FLAG9   EQU   $COMMFLG+8                                               00238000
+$FLAG10  EQU   $COMMFLG+9                                               00239000
+$FLAG11  EQU   $COMMFLG+10                                              00240000
+$FLAG12  EQU   $COMMFLG+11                                              00241000
+$FLAG13  EQU   $COMMFLG+12                                              00242000
+$DEVTBLE EQU   TOLTEPWA+240                                             00243000
+$DEVCDS  EQU   $DEVTBLE                                                 00244000
+$DEVUNAD EQU   $DEVCDS                                                  00245000
+@NM00039 EQU   $DEVUNAD+2                                               00246000
+$DEVFEAT EQU   $DEVCDS+4                                                00247000
+$DEVCDSF EQU   $DEVCDS+9                                                00248000
+$DEVSDCF EQU   $DEVCDS+10                                               00249000
+$$SYMNME EQU   $DEVCDS+12                                               00250000
+$DEVFLG1 EQU   $DEVTBLE+20                                              00251000
+$EVNCPLT EQU   $DEVFLG1                                                 00252000
+$ATTNEXP EQU   $DEVFLG1                                                 00253000
+$INTOCC  EQU   $DEVFLG1                                                 00254000
+$DEVFLG2 EQU   $DEVTBLE+21                                              00255000
+$DEVTECB EQU   $DEVTBLE+22                                              00256000
+$OPIS    EQU   $DEVTECB                                                 00257000
+$OPND    EQU   $DEVTECB+2                                               00258000
+$DEVFLG3 EQU   $DEVTBLE+27                                              00259000
+$SIOFLG  EQU   $DEVFLG3                                                 00260000
+$IFTOUT  EQU   $DEVTBLE+36                                              00261000
+$DEVSESP EQU   $IFTOUT                                                  00262000
+$SSCPDAF EQU   $IFTOUT+6                                                00263000
+$LDNCBPT EQU   $DEVTBLE+48                                              00264000
+$RNINFO  EQU   $DEVTBLE+56                                              00265000
+$DEVFLG5 EQU   $RNINFO+8                                                00266000
+$DEVFLG4 EQU   $DEVTBLE+65                                              00267000
+$SLTBL   EQU   TOLTEPWA+1468                                            00268000
+$RUNTEST EQU   $SLTBL+13                                                00269000
+$TESTFLG EQU   $SLTBL+21                                                00270000
+$SECLST  EQU   $SLTBL+22                                                00271000
+#EXITA   EQU   TOLTEPWA+2632                                            00272000
+$CCOMDAT EQU   TOLTEPWA+2644                                            00273000
+$CFLGS   EQU   $CCOMDAT+16                                              00274000
+$24FEMSG EQU   TOLTEPWA+2681                                            00275000
+$24CATMG EQU   $24FEMSG+11                                              00276000
+@NM00048 EQU   TOLTEPWA+2776                                            00277000
+$OUNTPTR EQU   @NM00048+4                                               00278000
+$NSPTR   EQU   $OUNTPTR                                                 00279000
+$NSCNT   EQU   @NM00048+10                                              00280000
+$ENXX    EQU   @NM00048+15                                              00281000
+$IMITX   EQU   $ENXX                                                    00282000
+SVESC033 EQU   TOLTEPWA+3160                                            00283000
+SVECC013 EQU   TOLTEPWA+3232                                            00284000
+SVEIC003 EQU   TOLTEPWA+3592                                            00285000
+SVESC022 EQU   TOLTEPWA+3736                                            00286000
+SVECC011 EQU   TOLTEPWA+4024                                            00287000
+MORECMAP EQU   0                                                        00288000
+FREEMAP  EQU   0                                                        00289000
+$FREEPTR EQU   FREEMAP+4                                                00290000
+AREAADDR EQU   0                                                        00291000
+COREMANG EQU   0                                                        00292000
+CORESZE  EQU   COREMANG                                                 00293000
+@NM00052 EQU   CORESZE+3                                                00294000
+FREE     EQU   @NM00052                                                 00295000
+COREFWD  EQU   COREMANG+4                                               00296000
+@NM00054 EQU   0                                                        00297000
+CORESZEN EQU   @NM00054                                                 00298000
+@NM00056 EQU   CORESZEN+3                                               00299000
+FREEN    EQU   @NM00056                                                 00300000
+COREFWDN EQU   @NM00054+4                                               00301000
+$TRTBL   EQU   0                                                        00302000
+#EXIT    EQU   0                                                        00303000
+SVECC012 EQU   SVESC022                                                 00304000
+SVEIC00A EQU   SVEIC003                                                 00305000
+SVEIC004 EQU   SVEIC003                                                 00306000
+SVEIC005 EQU   SVEIC003                                                 00307000
+SVESC02A EQU   SVESC022                                                 00308000
+SVESC02B EQU   SVESC022                                                 00309000
+SVESC02D EQU   SVESC022                                                 00310000
+SVESC02E EQU   SVESC022                                                 00311000
+SVESC02F EQU   SVECC013                                                 00312000
+SVESC024 EQU   SVESC022                                                 00313000
+SVESC027 EQU   SVESC022                                                 00314000
+SVESC029 EQU   SVESC033                                                 00315000
+SVESC031 EQU   SVECC013                                                 00316000
+SVESC032 EQU   SVECC011                                                 00317000
+SVETC037 EQU   SVEIC003                                                 00318000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00319000
+@NM00057 EQU   @NM00056                                                 00320000
+@NM00055 EQU   CORESZEN                                                 00321000
+@NM00053 EQU   @NM00052                                                 00322000
+@NM00051 EQU   CORESZE                                                  00323000
+$FREIDNT EQU   FREEMAP+2                                                00324000
+$FRELEVL EQU   FREEMAP+1                                                00325000
+$FRETRMG EQU   FREEMAP                                                  00326000
+$MORCMIN EQU   MORECMAP+8                                               00327000
+$MORCMAX EQU   MORECMAP+4                                               00328000
+$MORIDNT EQU   MORECMAP+2                                               00329000
+$MORLEVL EQU   MORECMAP+1                                               00330000
+$MORTRMG EQU   MORECMAP                                                 00331000
+SVECC010 EQU   TOLTEPWA+3952                                            00332000
+SVETC035 EQU   TOLTEPWA+3880                                            00333000
+SVESC030 EQU   TOLTEPWA+3808                                            00334000
+SVESC020 EQU   TOLTEPWA+3664                                            00335000
+SVEIC002 EQU   TOLTEPWA+3520                                            00336000
+SVECC014 EQU   TOLTEPWA+3376                                            00337000
+SVESC120 EQU   TOLTEPWA+3304                                            00338000
+SVESC025 EQU   TOLTEPWA+3088                                            00339000
+@NM00050 EQU   TOLTEPWA+2980                                            00340000
+$RPLERR  EQU   TOLTEPWA+2977                                            00341000
+@NM00049 EQU   TOLTEPWA+2976                                            00342000
+$R13PR3  EQU   TOLTEPWA+2972                                            00343000
+$CEINT2  EQU   TOLTEPWA+2968                                            00344000
+$CEINT1  EQU   TOLTEPWA+2964                                            00345000
+$MSGGET  EQU   TOLTEPWA+2960                                            00346000
+$ACQLIST EQU   TOLTEPWA+2956                                            00347000
+$R4SAVE1 EQU   TOLTEPWA+2952                                            00348000
+$CLSISS  EQU   TOLTEPWA+2950                                            00349000
+$CLSCNT  EQU   TOLTEPWA+2948                                            00350000
+$CUTABLE EQU   TOLTEPWA+2868                                            00351000
+$BUFSZ2  EQU   TOLTEPWA+2864                                            00352000
+$RESID2  EQU   TOLTEPWA+2860                                            00353000
+$OLTCCW2 EQU   TOLTEPWA+2856                                            00354000
+$ENDBFR2 EQU   TOLTEPWA+2852                                            00355000
+$1STBFR2 EQU   TOLTEPWA+2848                                            00356000
+$TECB2   EQU   TOLTEPWA+2844                                            00357000
+$BUFSZ1  EQU   TOLTEPWA+2840                                            00358000
+$RESID1  EQU   TOLTEPWA+2836                                            00359000
+$OLTCCW1 EQU   TOLTEPWA+2832                                            00360000
+$ENDBFR1 EQU   TOLTEPWA+2828                                            00361000
+$1STBFR1 EQU   TOLTEPWA+2824                                            00362000
+$TECB1   EQU   TOLTEPWA+2820                                            00363000
+$WAITIME EQU   TOLTEPWA+2816                                            00364000
+$TRTN#   EQU   TOLTEPWA+2815                                            00365000
+$WIODEV  EQU   TOLTEPWA+2814                                            00366000
+$RQSTSZE EQU   TOLTEPWA+2812                                            00367000
+$RQSTPTR EQU   TOLTEPWA+2808                                            00368000
+$R4SAVE  EQU   TOLTEPWA+2804                                            00369000
+$PARTADR EQU   TOLTEPWA+2800                                            00370000
+$TBSDATA EQU   TOLTEPWA+2796                                            00371000
+$CTWIDTH EQU   TOLTEPWA+2795                                            00372000
+$CTLINE  EQU   TOLTEPWA+2794                                            00373000
+$APWIDTH EQU   TOLTEPWA+2793                                            00374000
+$APLINE  EQU   TOLTEPWA+2792                                            00375000
+$INDEX   EQU   $IMITX                                                   00376000
+$UMXX    EQU   @NM00048+14                                              00377000
+$NSXX    EQU   @NM00048+12                                              00378000
+$ATACNT  EQU   $NSCNT                                                   00379000
+$CTR     EQU   @NM00048+8                                               00380000
+$ATAPTR  EQU   $NSPTR                                                   00381000
+$DDRPTR  EQU   @NM00048                                                 00382000
+$DTORESP EQU   TOLTEPWA+2712                                            00383000
+$APNAME  EQU   TOLTEPWA+2704                                            00384000
+$24SYMNE EQU   $24CATMG+4                                               00385000
+$24DEVAD EQU   $24CATMG                                                 00386000
+$24RTN#  EQU   $24FEMSG+8                                               00387000
+$ESECTID EQU   $24FEMSG                                                 00388000
+$24FLGS  EQU   TOLTEPWA+2680                                            00389000
+$24SAVE2 EQU   TOLTEPWA+2676                                            00390000
+$24SAVE1 EQU   TOLTEPWA+2672                                            00391000
+$24UNADR EQU   TOLTEPWA+2668                                            00392000
+$24SAV13 EQU   TOLTEPWA+2664                                            00393000
+$24RETCD EQU   TOLTEPWA+2663                                            00394000
+$MACID   EQU   TOLTEPWA+2661                                            00395000
+$CSPARE  EQU   $CFLGS                                                   00396000
+$C2WAY   EQU   $CFLGS                                                   00397000
+$CINCT   EQU   $CCOMDAT+12                                              00398000
+$CINADR  EQU   $CCOMDAT+8                                               00399000
+$COUTCT  EQU   $CCOMDAT+4                                               00400000
+$COUTAD  EQU   $CCOMDAT                                                 00401000
+ROOTLOC  EQU   TOLTEPWA+2640                                            00402000
+$RETREG  EQU   TOLTEPWA+2636                                            00403000
+$WORK    EQU   TOLTEPWA+2376                                            00404000
+$EXTA    EQU   TOLTEPWA+2320                                            00405000
+$PASSONA EQU   TOLTEPWA+2264                                            00406000
+$TRMINPT EQU   TOLTEPWA+2184                                            00407000
+$INBUFR  EQU   TOLTEPWA+2104                                            00408000
+$BUFFER  EQU   TOLTEPWA+1976                                            00409000
+$TLTRPL3 EQU   TOLTEPWA+1856                                            00410000
+$TLTRPL2 EQU   TOLTEPWA+1736                                            00411000
+$TLTRPL1 EQU   TOLTEPWA+1616                                            00412000
+@NM00047 EQU   $SLTBL+135                                               00413000
+$HIGHRTN EQU   $SLTBL+134                                               00414000
+$PRIMADR EQU   $SLTBL+130                                               00415000
+$CTSTPT  EQU   $SLTBL+128                                               00416000
+$TSTCNT  EQU   $SLTBL+126                                               00417000
+$SECFLGS EQU   $SECLST+3                                                00418000
+$SECTION EQU   $SECLST                                                  00419000
+$SECACT  EQU   $TESTFLG                                                 00420000
+$CANTRUN EQU   $TESTFLG                                                 00421000
+$FINAL   EQU   $TESTFLG                                                 00422000
+$TESTSUF EQU   $RUNTEST+5                                               00423000
+$TESTNUM EQU   $RUNTEST+1                                               00424000
+$LETPRF  EQU   $RUNTEST                                                 00425000
+$SYMBOLC EQU   $SLTBL+5                                                 00426000
+$FAMILY  EQU   $SLTBL                                                   00427000
+$CDEVPT  EQU   TOLTEPWA+1466                                            00428000
+$DEVCNTS EQU   TOLTEPWA+1464                                            00429000
+$FEEDBCK EQU   $DEVTBLE+66                                              00430000
+$WTISUED EQU   $DEVFLG4                                                 00431000
+$EXIOISD EQU   $DEVFLG4                                                 00432000
+$REMWRIT EQU   $DEVFLG4                                                 00433000
+$REMDONE EQU   $DEVFLG4                                                 00434000
+$2NDUSED EQU   $DEVFLG4                                                 00435000
+$1STUSED EQU   $DEVFLG4                                                 00436000
+$IGLXIFB EQU   $DEVFLG4                                                 00437000
+$EXIOLV3 EQU   $DEVFLG4                                                 00438000
+@NM00046 EQU   $DEVFLG5                                                 00439000
+$DVBASIC EQU   $DEVFLG5                                                 00440000
+$ASCII   EQU   $DEVFLG5                                                 00441000
+$DEVLU   EQU   $DEVFLG5                                                 00442000
+$OPNDFAL EQU   $DEVFLG5                                                 00443000
+$ACQNCB  EQU   $DEVFLG5                                                 00444000
+$REMOTE  EQU   $DEVFLG5                                                 00445000
+$ENDNODE EQU   $DEVFLG5                                                 00446000
+$LINENME EQU   $RNINFO                                                  00447000
+$CID     EQU   $DEVTBLE+52                                              00448000
+$DVCOL   EQU   $LDNCBPT+2                                               00449000
+$DVROW   EQU   $LDNCBPT                                                 00450000
+$NCSPLP  EQU   $DEVTBLE+44                                              00451000
+$DVLN    EQU   $SSCPDAF                                                 00452000
+$DAF     EQU   $DEVSESP+4                                               00453000
+$VARYPAB EQU   $DEVSESP                                                 00454000
+$SYSMN   EQU   $DEVTBLE+28                                              00455000
+@NM00045 EQU   $DEVFLG3                                                 00456000
+$CLRSNT  EQU   $DEVFLG3                                                 00457000
+$OLTERR  EQU   $DEVFLG3                                                 00458000
+$SRTEST  EQU   $DEVFLG3                                                 00459000
+$DVSNDOK EQU   $SIOFLG                                                  00460000
+$POLLREQ EQU   $DEVFLG3                                                 00461000
+$ACQRED  EQU   $DEVFLG3                                                 00462000
+$NOTDEV  EQU   $DEVFLG3                                                 00463000
+$DVINCT  EQU   $DEVTBLE+26                                              00464000
+$DVBRKST EQU   $OPND+1                                                  00465000
+$DVBRKSN EQU   $OPND                                                    00466000
+$DVSEQNO EQU   $OPIS                                                    00467000
+$CEINTRP EQU   $DEVFLG2                                                 00468000
+$TESTMDE EQU   $DEVFLG2                                                 00469000
+$DEVALOC EQU   $DEVFLG2                                                 00470000
+$ALLDATA EQU   $DEVFLG2                                                 00471000
+$ENDCNTL EQU   $DEVFLG2                                                 00472000
+$CTLDEV  EQU   $DEVFLG2                                                 00473000
+$NOCDS   EQU   $DEVFLG2                                                 00474000
+$DATAIN  EQU   $DEVFLG2                                                 00475000
+$PRIMARY EQU   $DEVFLG1                                                 00476000
+$DVCTBYT EQU   $INTOCC                                                  00477000
+$DEVACT  EQU   $DEVFLG1                                                 00478000
+$DVLGMDE EQU   $ATTNEXP                                                 00479000
+$DVSPRM  EQU   $EVNCPLT                                                 00480000
+$GRABBED EQU   $DEVFLG1                                                 00481000
+$CATASTR EQU   $DEVFLG1                                                 00482000
+$LETGO   EQU   $DEVFLG1                                                 00483000
+$CURELEM EQU   $$SYMNME+4                                               00484000
+$MSGOTSD EQU   $$SYMNME                                                 00485000
+$EXTDEV  EQU   $DEVCDS+11                                               00486000
+@NM00044 EQU   $DEVSDCF                                                 00487000
+$NOTPRIM EQU   $DEVSDCF                                                 00488000
+@NM00043 EQU   $DEVCDSF                                                 00489000
+@NM00042 EQU   $DEVCDSF                                                 00490000
+@NM00041 EQU   $DEVCDSF                                                 00491000
+$CDSNAME EQU   $DEVCDSF                                                 00492000
+$EXTRN   EQU   $DEVCDSF                                                 00493000
+$CEVOLUM EQU   $DEVCDSF                                                 00494000
+$SHARD   EQU   $DEVCDSF                                                 00495000
+$DEVFPM  EQU   $DEVCDSF                                                 00496000
+$DEVCNT  EQU   $DEVCDS+8                                                00497000
+$DEVTYPE EQU   $DEVFEAT+3                                               00498000
+$DEVCLAS EQU   $DEVFEAT+2                                               00499000
+$DEVFRRS EQU   $DEVFEAT+1                                               00500000
+$DEVMOD  EQU   $DEVFEAT                                                 00501000
+$DEVRDGT EQU   @NM00039+1                                               00502000
+$DEVCTLU EQU   @NM00039+1                                               00503000
+$DEVCHAN EQU   @NM00039                                                 00504000
+@NM00040 EQU   @NM00039                                                 00505000
+$CTINDX  EQU   $DEVUNAD                                                 00506000
+$FLAG16  EQU   $COMMFLG+15                                              00507000
+$FLAG15  EQU   $COMMFLG+14                                              00508000
+$FLAG14  EQU   $COMMFLG+13                                              00509000
+$TEP2ND  EQU   $FLAG13                                                  00510000
+$TEP1ST  EQU   $FLAG13                                                  00511000
+$CATMSG  EQU   $FLAG13                                                  00512000
+$PRMPTSW EQU   $FLAG13                                                  00513000
+$DEVENT  EQU   $FLAG13                                                  00514000
+$OLTMACC EQU   $FLAG13                                                  00515000
+$LGON    EQU   $FLAG13                                                  00516000
+$CTLOGON EQU   $FLAG13                                                  00517000
+@NM00038 EQU   $FLAG12                                                  00518000
+$VARYINP EQU   $FLAG12                                                  00519000
+$ENDTEST EQU   $FLAG12                                                  00520000
+$VRYHRD  EQU   $FLAG12                                                  00521000
+$VRYSFT  EQU   $FLAG12                                                  00522000
+$POSTFLG EQU   $FLAG12                                                  00523000
+$OPTMSG  EQU   $FLAG12                                                  00524000
+$FEORCAT EQU   $FLAG11                                                  00525000
+@NM00037 EQU   $FLAG11                                                  00526000
+@NM00036 EQU   $FLAG10                                                  00527000
+$INBND   EQU   $FLAG10                                                  00528000
+$WAITFLG EQU   $FLAG10                                                  00529000
+$DPRINT  EQU   $FLAG10                                                  00530000
+$HOLD    EQU   $FLAG9                                                   00531000
+$NOTRRCH EQU   $FLAG9                                                   00532000
+@NM00035 EQU   $FLAG9                                                   00533000
+$COPY    EQU   $FLAG9                                                   00534000
+$LSTLNSW EQU   $FLAG9                                                   00535000
+$MULLNSW EQU   $FLAG9                                                   00536000
+$REMSW   EQU   $FLAG9                                                   00537000
+$IGRES   EQU   $FLAG9                                                   00538000
+$TCECM   EQU   $FLAG8                                                   00539000
+$VS2     EQU   $FLAG8                                                   00540000
+$VS1     EQU   $FLAG8                                                   00541000
+$EDOS    EQU   $FLAG8                                                   00542000
+@NM00034 EQU   $FLAG8                                                   00543000
+$TWOWAY  EQU   $FLAG8                                                   00544000
+@NM00033 EQU   $FLAG8                                                   00545000
+$RCVMSG  EQU   $FLAG7                                                   00546000
+$RCVRFLG EQU   $FLAG7                                                   00547000
+$SNDRFLG EQU   $FLAG7                                                   00548000
+$LDOIS   EQU   $FLAG7                                                   00549000
+$DCONTCT EQU   $FLAG7                                                   00550000
+$EXIOWAT EQU   $FLAG7                                                   00551000
+$2NDDATA EQU   $FLAG7                                                   00552000
+$1STDATA EQU   $FLAG7                                                   00553000
+$CIREQ   EQU   $FLAG6                                                   00554000
+$ABTERM  EQU   $ABNDBIT                                                 00555000
+$DISCREQ EQU   $FLAG6                                                   00556000
+$DISCISS EQU   $FLAG6                                                   00557000
+$CHANGE  EQU   $FLAG6                                                   00558000
+$CTERROR EQU   $FLAG6                                                   00559000
+$RECAL11 EQU   $FLAG6                                                   00560000
+@NM00032 EQU   $FLAG5                                                   00561000
+$PROGCK  EQU   $CANCEL                                                  00562000
+$PRINTAP EQU   $FLAG5                                                   00563000
+@NM00031 EQU   $FLAG5                                                   00564000
+$MSG922  EQU   $FLAG5                                                   00565000
+$CT924   EQU   $FLAG5                                                   00566000
+$FSTCAT  EQU   $FLAG5                                                   00567000
+$FSTFE   EQU   $FLAG5                                                   00568000
+$ACTOPND EQU   $FLAG4                                                   00569000
+$ACQCUTT EQU   $FLAG4                                                   00570000
+$CLSSACT EQU   $FLAG4                                                   00571000
+$BACKINT EQU   $FLAG4                                                   00572000
+$DMSGSW  EQU   $FLAG4                                                   00573000
+$TSTDEVP EQU   $FLAG4                                                   00574000
+$APRQPER EQU   $FLAG4                                                   00575000
+$OPCOM   EQU   $FLAG4                                                   00576000
+$NEWAP   EQU   $FLAG3                                                   00577000
+$ALTPRTR EQU   $FLAG3                                                   00578000
+$OPTERR  EQU   $FLAG3                                                   00579000
+$PRTONLY EQU   $FLAG3                                                   00580000
+$REQSTOR EQU   $FLAG3                                                   00581000
+$LOGOFFE EQU   $FLAG3                                                   00582000
+$TSTERR  EQU   $FLAG3                                                   00583000
+$DEVERR  EQU   $FLAG3                                                   00584000
+$PARTIAL EQU   $FLAG2                                                   00585000
+$NRMTERM EQU   $FLAG2                                                   00586000
+$VALDTST EQU   $FLAG2                                                   00587000
+$VALDDEV EQU   $FLAG2                                                   00588000
+$DBLSLSH EQU   $FLAG2                                                   00589000
+$NDR     EQU   $FLAG2                                                   00590000
+@NM00030 EQU   $FLAG2                                                   00591000
+$OLTACT  EQU   $FLAG1                                                   00592000
+$NORELDV EQU   $FLAG1                                                   00593000
+@NM00029 EQU   $FLAG1                                                   00594000
+$OPTCHNG EQU   $FLAG1                                                   00595000
+$DEVCHNG EQU   $FLAG1                                                   00596000
+$TESTCNG EQU   $FLAG1                                                   00597000
+$CNSLFG  EQU   $FLAG1                                                   00598000
+$TEP3RD  EQU   $FLAG1                                                   00599000
+@NM00028 EQU   $CDA+120                                                 00600000
+$CUCNT   EQU   $CDA+118                                                 00601000
+@NM00027 EQU   $CDA+117                                                 00602000
+$PRTFORM EQU   $CDA+116                                                 00603000
+$OPISCNT EQU   $CDA+114                                                 00604000
+$OPNDCNT EQU   $CDA+112                                                 00605000
+$GETMSZE EQU   $CDA+110                                                 00606000
+$GRCNTS  EQU   $CDA+108                                                 00607000
+$CTLCNT  EQU   $CDA+106                                                 00608000
+$ACTLVL  EQU   $CDA+105                                                 00609000
+$PRNTLVL EQU   $CDA+104                                                 00610000
+$ERRCNTA EQU   $CDA+102                                                 00611000
+$TLCNT   EQU   $CDA+100                                                 00612000
+$TIMEALW EQU   $CDA+96                                                  00613000
+$PTRAREA EQU   $CDA+92                                                  00614000
+$GETMPTR EQU   $CDA+88                                                  00615000
+$R13PTRT EQU   $CDA+84                                                  00616000
+$R13PTR  EQU   $CDA+80                                                  00617000
+$TEPEND  EQU   $CDA+76                                                  00618000
+$PLINKDL EQU   $CDA+72                                                  00619000
+$TEPBEGN EQU   $CDA+68                                                  00620000
+$HIGHADR EQU   $HIMOREC                                                 00621000
+$LOMOREC EQU   $CDA+56                                                  00622000
+$LOWADDR EQU   $OLTPTR                                                  00623000
+$ENDCOMM EQU   $CDA+48                                                  00624000
+$COMMON  EQU   $RCA                                                     00625000
+$SLASHAD EQU   $CDA+32                                                  00626000
+$PASSON  EQU   $CDA+28                                                  00627000
+$TOLBRTB EQU   $CDA+24                                                  00628000
+$SCTPTR8 EQU   $CDA+20                                                  00629000
+$SCTPTR  EQU   $CDA+16                                                  00630000
+$TBWDPTR EQU   $CDA+12                                                  00631000
+$TFWDPTR EQU   $CDA+8                                                   00632000
+@NM00026 EQU   $CDA                                                     00633000
+@NM00025 EQU   $SCTTBLE+98                                              00634000
+$SCTLWTC EQU   $SCTTBLE+96                                              00635000
+$SCTLWTA EQU   $SCTTBLE+92                                              00636000
+#EXT     EQU   $SCTTBLE+88                                              00637000
+#PASS    EQU   $SCTTBLE+84                                              00638000
+#TABLE   EQU   $SCTTBLE+80                                              00639000
+#MSGIDAC EQU   $SCTTBLE+78                                              00640000
+@NM00024 EQU   $SCTTBLE+71                                              00641000
+$RETMASK EQU   $SCTTBLE+70                                              00642000
+$R249255 EQU   $ROUTMSK+29                                              00643000
+$R241248 EQU   $ROUTMSK+28                                              00644000
+$R233240 EQU   $ROUTMSK+27                                              00645000
+$R225232 EQU   $ROUTMSK+26                                              00646000
+$R217224 EQU   $ROUTMSK+25                                              00647000
+$R209216 EQU   $ROUTMSK+24                                              00648000
+$R201208 EQU   $ROUTMSK+23                                              00649000
+$R193200 EQU   $ROUTMSK+22                                              00650000
+$R185192 EQU   $ROUTMSK+21                                              00651000
+$R177184 EQU   $ROUTMSK+20                                              00652000
+$R169176 EQU   $ROUTMSK+19                                              00653000
+$R161168 EQU   $ROUTMSK+18                                              00654000
+$R153160 EQU   $ROUTMSK+17                                              00655000
+$R145152 EQU   $ROUTMSK+16                                              00656000
+$R137144 EQU   $ROUTMSK+15                                              00657000
+$R129136 EQU   $ROUTMSK+14                                              00658000
+$R121128 EQU   $ROUTMSK+13                                              00659000
+$R113120 EQU   $ROUTMSK+12                                              00660000
+$R105112 EQU   $ROUTMSK+11                                              00661000
+$R097104 EQU   $ROUTMSK+10                                              00662000
+$R089096 EQU   $ROUTMSK+9                                               00663000
+$R081088 EQU   $ROUTMSK+8                                               00664000
+$R073080 EQU   $ROUTMSK+7                                               00665000
+$R065072 EQU   $ROUTMSK+6                                               00666000
+$R057064 EQU   $ROUTMSK+5                                               00667000
+$R049056 EQU   $ROUTMSK+4                                               00668000
+$R041048 EQU   $ROUTMSK+3                                               00669000
+$R033040 EQU   $ROUTMSK+2                                               00670000
+$R025032 EQU   $ROUTMSK+1                                               00671000
+$R017024 EQU   $ROUTMSK                                                 00672000
+$TOTFLG2 EQU   $SCTTBLE+39                                              00673000
+@NM00023 EQU   $TOTFLG1                                                 00674000
+@NM00022 EQU   $TOTFLG1                                                 00675000
+@NM00021 EQU   $TOTFLG1                                                 00676000
+$CURELOD EQU   $TOTFLG1                                                 00677000
+$CTEQTT  EQU   $TOTFLG1                                                 00678000
+@NM00020 EQU   $TOTFLG1                                                 00679000
+@NM00019 EQU   $TOTFLG1                                                 00680000
+$LINESHR EQU   $TOTFLG1                                                 00681000
+@NM00018 EQU   $OLTFLG2                                                 00682000
+@NM00017 EQU   $OLTFLG2                                                 00683000
+@NM00016 EQU   $OLTFLG2                                                 00684000
+@NM00015 EQU   $OLTFLG2                                                 00685000
+@NM00014 EQU   $OLTFLG2                                                 00686000
+@NM00013 EQU   $OLTFLG2                                                 00687000
+@NM00012 EQU   $OLTFLG2                                                 00688000
+$TALK    EQU   $OLTFLG2                                                 00689000
+$DYCOM   EQU   $OLTFLGS                                                 00690000
+@NM00011 EQU   $OLTFLGS                                                 00691000
+$TRACE   EQU   $OLTFLGS                                                 00692000
+$RETCODE EQU   $OLTFLGS                                                 00693000
+$CONTCB  EQU   $OLTFLGS                                                 00694000
+$RETAIN  EQU   $OLTFLGS                                                 00695000
+$CLEANRT EQU   $OLTFLGS                                                 00696000
+$MANINTV EQU   $OLTFLGS                                                 00697000
+$OLTSIZE EQU   $SCTTBLE+34                                              00698000
+$QSCTMOD EQU   $EXECFLG                                                 00699000
+$CTRLMOD EQU   $EXECFLG                                                 00700000
+$CLEANUP EQU   $EXECFLG                                                 00701000
+$LSTPDEV EQU   $EXECFLG                                                 00702000
+$ERRCNT  EQU   $EXECFLG                                                 00703000
+$RTNSLCT EQU   $EXECFLG                                                 00704000
+$MULTDEV EQU   $EXECFLG                                                 00705000
+@NM00010 EQU   $EXECFLG                                                 00706000
+$RMSKCNT EQU   $SCTTBLE+32                                              00707000
+$SYNAME  EQU   $CDS8T19+4                                               00708000
+$EXTSIG  EQU   $CDS8T19+3                                               00709000
+$CDFLGS  EQU   $CDS8T19+1                                               00710000
+$CDSCNT  EQU   $CDS8T19                                                 00711000
+$PDEVDSC EQU   $SCTTBLE+16                                              00712000
+$PDEVADR EQU   $SCTTBLE+12                                              00713000
+$COMMCN  EQU   $CDSFLGS                                                 00714000
+$CUSTSYM EQU   $CDSFLGS                                                 00715000
+$TWOCHSW EQU   $CDSFLGS                                                 00716000
+$SYMNAME EQU   $CDSFLGS                                                 00717000
+$EXTINTC EQU   $CDSFLGS                                                 00718000
+$CEVOL   EQU   $CDSFLGS                                                 00719000
+$SHARED  EQU   $CDSFLGS                                                 00720000
+$FPM     EQU   $CDSFLGS                                                 00721000
+$LASTSUB EQU   $PDEVFLG                                                 00722000
+@NM00009 EQU   $PDEVFLG                                                 00723000
+@NM00008 EQU   $PDEVFLG                                                 00724000
+@NM00007 EQU   $PDEVFLG                                                 00725000
+$LASTDEV EQU   $PDEVFLG                                                 00726000
+@NM00006 EQU   $PDEVFLG                                                 00727000
+$EXFILPT EQU   $PDEVFLG                                                 00728000
+$FPMOLD  EQU   $PDEVFLG                                                 00729000
+$TSSSYM  EQU   $SCTTBLE+8                                               00730000
+$SCTLEVL EQU   $SCTTBLE+7                                               00731000
+$DRIVER  EQU   $SCTTBLE+6                                               00732000
+$RT0916  EQU   $SCTTBLE+5                                               00733000
+$RT0108  EQU   $SCTTBLE+4                                               00734000
+$LOOPTST EQU   $ERROPT                                                  00735000
+$LOOPERR EQU   $ERROPT                                                  00736000
+$NERRPRT EQU   $ERROPT                                                  00737000
+$NOCNTRL EQU   $ERROPT                                                  00738000
+$ALTPRNT EQU   $ERROPT                                                  00739000
+$CATERR  EQU   $ERROPT                                                  00740000
+$ASTERIK EQU   $ERROPT                                                  00741000
+$TESTERR EQU   $ERROPT                                                  00742000
+$FSTCOMM EQU   $TESTOPT                                                 00743000
+$INDEFLP EQU   $TESTOPT                                                 00744000
+$NOPRT   EQU   $TESTOPT                                                 00745000
+$PARAPRT EQU   $TESTOPT                                                 00746000
+@NM00005 EQU   $TESTOPT                                                 00747000
+$ERRLPCT EQU   $SCTTBLE                                                 00748000
+$TLTEND  EQU   $RCAAREA+945                                             00749000
+$CNSLID  EQU   $RCAAREA+936                                             00750000
+$EXITSAV EQU   $RCAAREA+864                                             00751000
+$TRASCII EQU   $RCAAREA+608                                             00752000
+@NM00004 EQU   $RCAAREA+605                                             00753000
+$VTAMEND EQU   $RCAFLG                                                  00754000
+$TPPOSTD EQU   $RCAFLG                                                  00755000
+$NEWCT   EQU   $RCAFLG                                                  00756000
+$ABNDALL EQU   $RCAFLG                                                  00757000
+$CUTESTB EQU   $RCAFLG                                                  00758000
+$CONSOLE EQU   $RCAFLG                                                  00759000
+$TPLOGON EQU   $RCAFLG                                                  00760000
+$UPDATE  EQU   $RCAFLG                                                  00761000
+$DEVAREA EQU   $RCAAREA+600                                             00762000
+$CTDVAR  EQU   $RCAAREA+596                                             00763000
+$BUFFS   EQU   $RCAAREA+464                                             00764000
+$TLTNIB  EQU   $CONSTNT+140                                             00765000
+$TLTPRPL EQU   $CONSTNT+20                                              00766000
+@NM00003 EQU   $CONSTNT+4                                               00767000
+@NM00002 EQU   $CONSTNT+2                                               00768000
+$USECNT  EQU   $CONSTNT                                                 00769000
+$CURRTWA EQU   $POINTER+140                                             00770000
+$CTNAME  EQU   $POINTER+132                                             00771000
+$CTARGX  EQU   $POINTER+128                                             00772000
+$COMINT  EQU   $POINTER+120                                             00773000
+$QUEHNDL EQU   $POINTER+116                                             00774000
+@NM00001 EQU   $POINTER+36                                              00775000
+$RTNPTR  EQU   $POINTER+32                                              00776000
+$TLTECB2 EQU   $POINTER+28                                              00777000
+$TLTECB1 EQU   $POINTER+24                                              00778000
+$CLEANP  EQU   $POINTER+20                                              00779000
+$ABEND   EQU   $POINTER+16                                              00780000
+$LSTAREA EQU   $POINTER+12                                              00781000
+$FSTAREA EQU   $POINTER+8                                               00782000
+$CVTSAVE EQU   $POINTER+4                                               00783000
+$TOLTEP  EQU   $POINTER                                                 00784000
+$TLTACB  EQU   $RCAAREA                                                 00785000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00786000
+@RT00049 EQU   S28C0090                                                 00787000
+@RT00056 EQU   S28C0001                                                 00788000
+@RT00058 EQU   S28C0090                                                 00789000
+@RT00063 EQU   S28C0090                                                 00790000
+@RT00068 EQU   S28C0003                                                 00791000
+@RT00070 EQU   S28C0003                                                 00792000
+@RT00078 EQU   S28C0092                                                 00793000
+@RT00080 EQU   S28C0092                                                 00794000
+@ENDDATA EQU   *                                                        00795000
+         END   ISTSC028,(C'PLS1531',0702,78337)                         00796000

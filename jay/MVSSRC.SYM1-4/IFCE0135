@@ -1,0 +1,1573 @@
+         TITLE 'IFCE0135 MODEL  135 MACHINE CHECK EDIT'                 00080002
+         MACRO                                                          00160002
+&NAME    DSGEN                                                          00240002
+.*                            THIS MACRO GENERATES ONE DSECT WORD       00320002
+.*                                 FORMATTED FOR THE SUBJECT LOG RECORD 00400002
+.*                                 EACH OPERAND HAS TWO SUB LISTS. THE  00480002
+.*                                 FIRST IS THE NAME OF THE LOG ITEM    00560002
+.*                                 WHILE THE SECOND IS THE # OF BITS TO 00640002
+.*                                 ALLOCATE FOR THIS ITEM. ITEMS MUST   00720002
+.*                                 BE DEFINED CONTIGUOUSLY WITHOUT GAPS 00800002
+.*                                 UNUSED BIT GROUPS MUST BE GIVEN      00880002
+.*                                 DUMMY NAMES. THE NAMES PROVIDED FOR  00960002
+.*                                 THE LOG ITEMS MAY THEN BE USED IN    01040002
+.*                                 THE CONVERSION MACRO INSTRUCTIONS.   01120002
+         GBLC &ITEM(1000)                                               01200002
+         GBLA &ITEMNBR,&BITS(1000),&SHIFT(1000)                         01280002
+         LCLB  &ONLY1,&CTIND                                            01360002
+         LCLA  &START1,&START2,&END1,&END2                              01440002
+         LCLC  &SYMBOL,&EQUSYM                                          01520002
+         LCLA  &OP,&COUNT,&BYTE,&EQUCNT                                 01600002
+         ACTR  100000                                                   01680002
+.START   AIF   (N'&SYSLIST(&OP+1) LT 3).LOOP                            01760002
+         AIF   ('&SYSLIST(&OP+1,3)' EQ 'EQU').LOOP     TEST FOR EQU     01840002
+  AIF   ('&SYSLIST(&OP+1,3)' EQ '' AND '&SYSLIST(&OP+1,4)' EQ '').ERR1  01920002
+  AIF   ('&SYSLIST(&OP+1,3)' EQ '' OR '&SYSLIST(&OP+1,4)' EQ '').ERR1   02000002
+         AIF   ('&SYSLIST(&OP+1,3)' GT '&SYSLIST(&OP+1,4)').ERR3        02080002
+&START1  SETA  &SYSLIST(&OP+1,3)        GET START COUNT OF 1            02160002
+&START2  SETA  &SYSLIST(&OP+1,4)        GET FIRST END COUNT             02240002
+         AGO   .SET2A                   BRANCH AROUND                   02320002
+.ERR1    MNOTE '**FIRST SYMBOL CONCATENATION INCOMPLETE**'              02400002
+         MEXIT                                                          02480002
+.SET2A   AIF   ('&SYSLIST(&OP+1,5)' EQ ''AND '&SYSLIST(&OP+1,6)' EQ '' X02560002
+               ).SET2                   TEST FOR NO SECOND              02640002
+  AIF   ('&SYSLIST(&OP+1,5)' EQ '' OR '&SYSLIST(&OP+1,6)' EQ '').ERR2   02720002
+         AIF   ('&SYSLIST(&OP+1,5)' GT '&SYSLIST(&OP+1,6)').ERR3        02800002
+&END1    SETA  &SYSLIST(&OP+1,5)        GET START COUNT OF 2            02880002
+&END2    SETA  &SYSLIST(&OP+1,6)        GET END COUNT OF 2              02960002
+         AGO   .LOOP                                                    03040002
+.SET2    ANOP                                                           03120002
+&ONLY1   SETB  1                        INDICATE ONLY ONE CONCATENATION 03200002
+         AGO   .LOOP                                                    03280002
+.ERR2    MNOTE '**SECOND SYMBOL CONCATENATION INCOMPLETE**'             03360002
+         MEXIT                                                          03440002
+.ERR3    MNOTE '**START GREATER THAN END CONCATENATION**'               03520002
+         MEXIT                                                          03600002
+.LOOP    ANOP                                                           03680002
+&OP      SETA  &OP+1                                                    03760002
+         AIF   (&OP GT N'&SYSLIST).DONE      TEST IF ALL DONE           03840002
+&ITEMNBR SETA  &ITEMNBR+1                                               03920002
+         AIF   ('&SYSLIST(&OP,2)' NE '').OK1                            04000002
+         MNOTE '**NULL BIT COUNT FIELD**'                               04080002
+         MEXIT                                                          04160002
+.OK1     ANOP                                                           04240002
+&SYMBOL  SETC  '&SYSLIST(&OP,1)'                                        04320002
+         AIF   ('&SYMBOL' NE '').OK                                     04400002
+*              *****     LOG ITEM SYMBOL NOT PROVIDED     *****         04480002
+         AIF   ('&SYSLIST(&OP,3)' NE 'EQU').CNT                         04560002
+         AGO   .START                   GET NEXT                        04640002
+.OK      AIF   (N'&SYSLIST(&OP) LT 3).NO3    TEST FOR OLD FORMAT        04720002
+         AIF   ('&SYSLIST(&OP,3)' EQ 'EQU').EQU   TEST FOR EQU          04800002
+         AIF   (&ONLY1).OK2             TEST FOR ONLY ONE CONCAT        04880002
+&SYMBOL  SETC  '&SYMBOL.&START1.&END1'       GET 1 AND 2 CONCAT         04960002
+         AGO   .NO3                     BRANCH AROUND                   05040002
+.OK2     ANOP                                                           05120002
+&SYMBOL  SETC  '&SYMBOL.&START1'        GET 1 CONCATENATED              05200002
+.NO3     ANOP                                                           05280002
+&SYMBOL  EQU   *+&BYTE                                                  05360002
+&ITEM(&ITEMNBR) SETC '&SYMBOL'          GET LABEL IN GLOBAL             05440002
+&BITS(&ITEMNBR) SETA &SYSLIST(&OP,2)                                    05520002
+&SHIFT(&ITEMNBR) SETA &COUNT-&BYTE*8                                    05600002
+.CNT     ANOP                                                           05680002
+&CTIND   SETB  1                        SET COUNT INDICATOR             05760002
+&COUNT   SETA  &COUNT+&SYSLIST(&OP,2)                                   05840002
+&BYTE    SETA  &COUNT/8                                                 05920002
+         AIF   (N'&SYSLIST(&OP) LT 3).START  TEST FOR OLD FORMAT        06000002
+         AIF   (&ONLY1).TSTST           TEST FOR ONLY ONE CONCAT        06080002
+         AIF   (&END1 EQ &END2).TSTST   TEST FOR SECOND END             06160002
+&END1    SETA  &END1+1                  INCREMENT COUNT                 06240002
+&OP      SETA  &OP-1                    DECREMENT INCREMENT             06320002
+         AGO   .LOOP                    GENERATE NEXT                   06400002
+.TSTST   ANOP                                                           06480002
+         AIF   (&START1 EQ &START2).LPDONE   TEST FOR END               06560002
+         AIF   (&ONLY1).NSET1           TEST FOR ONLY ONE CONCAT        06640002
+&END1    SETA  &SYSLIST(&OP,5)          RE-INIT SECOND START COUNT      06720002
+.NSET1   ANOP                                                           06800002
+&OP      SETA  &OP-1                    DECREMENT INDEX                 06880002
+&START1  SETA  &START1+1                INCREMENT FIRST COUNT           06960002
+         AGO   .LOOP                    GO DO NEXT                      07040002
+.LPDONE  ANOP                                                           07120002
+&ONLY1   SETB  0                        CLEAR INDICATOR                 07200002
+         AGO   .START                   GO TEST FOR MORE SUB-LISTS      07280002
+.DONE    AIF   (&COUNT-&COUNT/8*8 NE 0).ERR  TEST FOR MULTIPLE OF EIGHT 07360002
+         AIF   (&CTIND EQ 0).END        NO DS IF NO COUNT               07440002
+&COUNT   SETA  &COUNT/8                 GET NUMBER OF BYTES             07520002
+&NAME    DS    &COUNT.C                                                 07600002
+.END     MEXIT                                                          07680002
+.ERR     MNOTE '**BIT COUNT FLDS DO NOT TOTAL MULTIPLE OF 8**'          07760002
+         MEXIT                                                          07840002
+.EQU     AIF   ('&SYSLIST(&OP,4)' NE '').EQU1     TEST FOR NULL LABEL   07920002
+.ERR4    MNOTE '**EQU OPERAND OMITTED OR NOT FOUND**'                   08000002
+         MEXIT                                                          08080002
+.EQU1    AIF   (&SYSLIST(&OP,2) LT 16).EQU2  COUNT OVER FIFTEEN         08160002
+*****               THE FOLLOWING STATEMENT                *****        08240002
+*****     NUMBER OF BITS EXCEED 15 - DO NOT USE AS BIN     *****        08320002
+.EQU2    ANOP                                                           08400002
+&EQUCNT  SETA  0                        CLEAR COUNTER                   08480002
+&EQUSYM  SETC  '&SYSLIST(&OP,4)'        GET EQU OPERAND                 08560002
+.EQULOP  ANOP                                                           08640002
+&EQUCNT  SETA  &EQUCNT+1                INCREMENT INDEX                 08720002
+         AIF   ('&ITEM(&EQUCNT)' EQ '&EQUSYM').EQUOUT  LABEL FOUND?     08800002
+         AIF   (&EQUCNT EQ &ITEMNBR).ERR4    ALL TESTED?                08880002
+         AGO   .EQULOP                  NO-GET NEXT                     08960002
+.EQUOUT  ANOP                                                           09040002
+&ITEM(&ITEMNBR) SETC '&SYMBOL'          GET LABEL NAME                  09120002
+&BITS(&ITEMNBR) SETA &SYSLIST(&OP,2)    GET NUMBER OF BITS              09200002
+&SHIFT(&ITEMNBR) SETA &SHIFT(&EQUCNT)   GET SHIFT COUNT                 09280002
+&SYMBOL  EQU   &EQUSYM                  THIS SYMBOL EQUATED             09360002
+         AGO   .START                   RETURN FOR NEXT                 09440002
+         MEND                                                           09520002
+         EJECT                                                          09600002
+*  LINE MACRO     LINE MACRO     LINE MACRO     LINE MACRO            * 09680002
+         SPACE 2                                                        09760002
+         MACRO                                                          09840002
+&NAME    LINE  &DATA,&LABEL,&SKIP=                                      09920002
+.*                            THIS MACRO ESTABLISHES THE MARGINS OR     10000002
+.*                                 COLUMN SETTINGS FOR EACH LINE. IT    10080002
+.*                                 GENERATES NECESSARY CARRIAGE CONTROL 10160002
+.*                                 ENTRIES. LASTLY IT DETERMINES THE    10240002
+.*                                 NUMBER OF ENTRIES ASSOCIATED WITH    10320002
+.*                                 THE PREVIOUS LINE AND STORES THAT #  10400002
+.*                                 INTO THE APPROPRIATE BYTE.           10480002
+.*                            &DATA(1) - CHARACTER POSITION TO BEGIN    10560002
+.*                                 DATA.                                10640002
+.*                            &DATA(2) - # OF SPACES BETWEEN SUCCESSIVE 10720002
+.*                                 DATA COLUMN STARTING CHARACTERS.     10800002
+.*                            &LABEL(1) - CHAR. POS. TO BEGIN LABELS.   10880002
+.*                            &LABEL(2) - # SPACES BETWEEN LINE'S LABEL 10960002
+.*                                 STARTING CHARACTERS.                 11040002
+.*                            &SKIP= - # OF LINES TO ADVANCE CARRIAGE   11120002
+.*                                 TO BEGIN NEXT PRINTED LINE.          11200002
+.*                            NEW ENTRIES ARE GENERATED ONLY WHEN       11280002
+.*                                 NECESSARY. OMISSION OF ITEMS MEANS   11360002
+.*                                 THEY HAVE NOT CHANGED SINCE PREVIOUS 11440002
+.*                                 SETTINGS. A LINE MACRO IS REQUIRED   11520002
+.*                                 FOR EACH PRINTED LINE. IF NO SETTING 11600002
+.*                                 CHANGES ARE REQUIRED ALL OPERANDS    11680002
+.*                                 ARE OMITTED IN WHICH CASE ONLY THE   11760002
+.*                                 # OF ENTRIES FOR THE PREVIOUS LINE   11840002
+.*                                 IS COMPUTED. THIS MACRO MUST BE THE  11920002
+.*                                 FIRST MACRO INSTRUCTION ISSUED FOR   12000002
+.*                                 THE SUBJECT LINE                     12080002
+         GBLA  &DB,&DT,&LB,&LT,&NRENTS                                  12160002
+         GBLA  &LASTCC,&INITIAL                                         12240002
+         GBLC  &NRENTSX                                                 12320002
+         GBLC  &CARRCON                                                 12400002
+         GBLB  &TEST                                                    12480002
+         LCLA  &S                                                       12560002
+&NAME    DS    0C                                                       12640002
+         AIF   (&INITIAL EQ 0).FIRSTLN                                  12720002
+         LINEND                                                         12800002
+         AGO   .NTFIRST                                                 12880002
+.FIRSTLN ANOP                                                           12960002
+&NRENTSX SETC  'N&SYSNDX'                                               13040002
+&INITIAL SETA  1                                                        13120002
+N&SYSNDX EQU   *                                                        13200002
+.NTFIRST ANOP                                                           13280002
+         DC    AL1(0)                                                   13360002
+         AIF   ('&DATA(1)' EQ '').CKDTABS                               13440002
+         AIF   (&DATA(1) EQ &DB).CKDTABS                                13520002
+&DB      SETA  &DATA(1)                                                 13600002
+         AGO   .AA                                                      13680002
+.CKDTABS AIF   ('&DATA(2)' EQ '').NCDATA                                13760002
+         AIF   (&DATA(2) EQ &DT).NCDATA                                 13840002
+         AGO   .CC                                                      13920002
+.AA      AIF   ('&DATA(2)' EQ '').BB                                    14000002
+         AIF   (&DATA(2) EQ &DT).BB                                     14080002
+.CC      ANOP                                                           14160002
+&DT      SETA  &DATA(2)                                                 14240002
+.BB      DC    XL2'FFFE'                                                14320002
+         DC    FL1'&DB'                                                 14400002
+         DC    FL1'&DT'                                                 14480002
+&NRENTS  SETA  &NRENTS+1                                                14560002
+.NCDATA  ANOP                                                           14640002
+         AIF   ('&LABEL(1)' EQ '').CKLTABS                              14720002
+         AIF   (&LABEL(1) EQ &LB).CKLTABS                               14800002
+&LB      SETA  &LABEL(1)                                                14880002
+         AGO   .AAA                                                     14960002
+.CKLTABS AIF   ('&LABEL(2)' EQ '').NCLABEL                              15040002
+         AIF   (&LABEL(2) EQ &LT).NCLABEL                               15120002
+         AGO   .CCC                                                     15200002
+.AAA     AIF   ('&LABEL(2)' EQ '').BBB                                  15280002
+         AIF   (&LABEL(2) EQ &LT).BBB                                   15360002
+.CCC     ANOP                                                           15440002
+&LT      SETA  &LABEL(2)                                                15520002
+.BBB     DC    XL2'FFFF'                                                15600002
+         DC    FL1'&LB'                                                 15680002
+         DC    FL1'&LT'                                                 15760002
+&NRENTS  SETA  &NRENTS+1                                                15840002
+.NCLABEL ANOP                                                           15920002
+         AIF   ('&SKIP' NE '').CONT                                     16000002
+         AIF   (&TEST EQ 0).NOCHANG                                     16080002
+&S       SETA  &LASTCC                                                  16160002
+         AGO   .DEFAULT                                                 16240002
+.CONT    ANOP                                                           16320002
+         AIF   (&TEST EQ 0).AB                                          16400002
+&S       SETA  &SKIP                                                    16480002
+.DEFAULT ANOP                                                           16560002
+         ORG   &CARRCON+3                                               16640002
+         DC    AL.3(0),AL.2(&S),AL.3(1)                                 16720002
+         ORG                                                            16800002
+&LASTCC  SETA  &S                                                       16880002
+&TEST    SETB  0                                                        16960002
+         AGO   .DD                                                      17040002
+.AB      AIF   (&SKIP EQ &LASTCC).NOCHANG                               17120002
+A&SYSNDX DC    XL2'FFFB'                                                17200002
+         DC    AL.3(0),AL.2(&SKIP),AL.3(1)                              17280002
+         DC    FL1'9'                                                   17360002
+&LASTCC  SETA  &SKIP                                                    17440002
+&TEST    SETB  1                                                        17520002
+&CARRCON SETC  'A&SYSNDX'                                               17600002
+&NRENTS  SETA  &NRENTS+1                                                17680002
+.DD      ANOP                                                           17760002
+.NOCHANG ANOP                                                           17840002
+         MEND                                                           17920002
+         EJECT                                                          18000002
+         MACRO                                                          18080002
+         LINEND                                                         18160002
+.*                            THIS MACRO IS USED ONLY BY THE LINE       18240002
+.*                                 MACRO TO SET THE NUMBER OF ENTRIES   18320002
+.*                                 ASSOCIATED WITH EACH LINE.           18400002
+         GBLA  &NRENTS                                                  18480002
+         GBLC &NRENTSX                                                  18560002
+         AIF   (&NRENTS EQ 0).NORENTS   TEST FOR NO COUNT               18640002
+         ORG   &NRENTSX                                                 18720002
+         DC    FL1'&NRENTS'                                             18800002
+         ORG                                                            18880002
+&NRENTS  SETA  0                                                        18960002
+.NORENTS ANOP                                                           19040002
+B&SYSNDX EQU   *                                                        19120002
+&NRENTSX SETC  'B&SYSNDX'                                               19200002
+         MEND                                                           19280002
+         MACRO                                                          19360002
+         BIN   &LOGITEM,&SKIP$OR                                        19440002
+.*                                 &LOGITEM - NAME OF ITEM IN LOG       19520002
+.*                                      RECORD DSECT                    19600002
+.*                                 &SKIP$OR - NBR OF SPACES TO SKIP ON  19680002
+.*                                 MULTIPLE PRINT OR NBR OF SPACES      19760002
+.*                                      TO BACK UP FROM COLUMN FOR      19840002
+.*                                      START OF PRINTING. THE LETTER   19920002
+.*                                      B PRECEEDS THE NUMBER (B5) IF   20000002
+.*                                      THE LATTER IS DESIRED. OMISSION 20080002
+.*                                      OF THIS OPERAND FORCES OPTION 2 20160002
+.*                                      WITH BACKUP SPACING EQUAL TO    20240002
+.*                                 THE NUMBER OF BITS IN THE ITEM       20320002
+.*                                 DEFINITION (VIA MACRO 'DSGEN').      20400002
+.*                            A LIMIT OF 15 BITS IS IMPOSED FOR THE     20480002
+.*                                 TOTAL NUMBER OF BITS TO PRINT.       20560002
+         GBLC &ITEM(1000)                                               20640002
+         GBLA &ITEMNBR,&BITS(1000),&SHIFT(1000),&NRENTS                 20720002
+         GBLC  &DSECT                                                   20800002
+         LCLB  &B                                                       20880002
+         LCLA  &IBITS,&NDX,&ISHIFT,&K                                   20960002
+         LCLA  &TEMP,&T                                                 21040002
+         LCLC  &S                                                       21120002
+.LOOP    ANOP                                                           21200002
+&NDX     SETA  &NDX+1                                                   21280002
+         AIF   ('&ITEM(&NDX)' EQ '&LOGITEM').FOUND                      21360002
+         AIF   (&NDX LT &ITEMNBR).LOOP                                  21440002
+         MNOTE *,'YOU BLEW IT'                                          21520002
+         ROUTINE DUM,SKIPPER                                            21600002
+         MEXIT                                                          21680002
+.FOUND   ANOP                                                           21760002
+&ISHIFT  SETA  &SHIFT(&NDX)                                             21840002
+&IBITS   SETA  &BITS(&NDX)                                              21920002
+&T       SETA  &IBITS-1                                                 22000002
+&B       SETB  0                                                        22080002
+         AIF   ('&SKIP$OR' EQ '').BACKUP                                22160002
+&K       SETA  K'&SKIP$OR                                               22240002
+&B       SETB  ('&SKIP$OR'(1,1) EQ 'B')                                 22320002
+&S       SETC  '&SKIP$OR'(&B+1,&K-&B)                                   22400002
+&T       SETA  &S                                                       22480002
+.BACKUP  ANOP                                                           22560002
+&NRENTS  SETA  &NRENTS+1                                                22640002
+&TEMP    SETA  &ISHIFT                                                  22720002
+         AIF   (&IBITS NE 1 OR &B NE 0).BIN2                            22800002
+         DC    AL.12(&LOGITEM-&DSECT),XL.4'&TEMP'                       22880002
+         MEXIT                                                          22960002
+.BIN2    AIF   ('&SKIP$OR' NE '').BIN3                                  23040002
+&B       SETB  1                                                        23120002
+.BIN3    ANOP                                                           23200002
+         DC    AL.12(&LOGITEM-&DSECT),XL.4'C'                           23280002
+         DC    BL.1'&B',AL.7(&T),AL.4(&IBITS),FL.4'&ISHIFT'             23360002
+.OUT     ANOP                                                           23440002
+         MEND                                                           23520002
+         MACRO                                                          23600002
+         HEX   &LOGITEM,&SKIP$OR,&BYTES                                 23680002
+.*                            THIS MACRO FACILITATES GENERATION OF THE  23760002
+.*                                 TABLE ENTRIES SPECIFYING HEX TYPE    23840002
+.*                                 CONVERSIONS.                         23920002
+.*                            &LOGITEM - NAME OF DATA ITEM TO BE        24000002
+.*                                 CONVERTED                            24080002
+.*                            &SKIP$OR - NUMBER OF SPACES TO SKIP ON    24160002
+.*                                 MULTIPLE PRINT OR NBR OF SPACES TO   24240002
+.*                                 BACK UP FROM COLUMN FOR START OF     24320002
+.*                                 PRINTING. THE LETTER B PRECEEDS THE  24400002
+.*                                 NUMBER (B8) IF THE LATTER OPTION IS  24480002
+.*                                 DESIRED. OMISSION OF THIS OPERAND    24560002
+.*                                 FORCES OPTION 2 WITH BACKUP SPACING  24640002
+.*                                 EQUAL TO THE NUMBER OF BYTES SPECI-  24720002
+.*                                 FIED BY THE NEXT OPERAND (TWICE THIS 24800002
+.*                                 NUMBER IF SUFFIX IS EXPLICITLY OR    24880002
+.*                                 IMPLICITLY B).                       24960002
+.*                            &BYTES - NUMBER OF TOTAL INPUT BYTES TO   25040002
+.*                                 PROCESS. THIS NUMBER IS SUFFIXED     25120002
+.*                                 WITH AN L,R, OR B TO STIPULATE       25200002
+.*                                 PRINTING OF THE LEFT HALF, RIGHT     25280002
+.*                                 HALF, OR BOTH HALVES OF THE BYTE     25360002
+.*                                 RESPECTIVELY. OMISSION OF THIS       25440002
+.*                                 OPERAND DEFAULTS TO B WITH THE NUM-  25520002
+.*                                 BER OF BYTES EQUAL TO THE ITEM LNGTH 25600002
+.*                            A NEW ENTRY IS GENERATED ONLY WHEN NECES- 25680002
+.*                                 SARY. THIS MACRO MUST BE THE FIRST   25760002
+.*                                 MACRO INSTRUCTION ISSUED FOR THE     25840002
+.*                                 SUBJECT LINE(S).                     25920002
+         GBLC &ITEM(1000),&DSECT                                        26000002
+         GBLA &ITEMNBR,&BITS(1000),&SHIFT(1000),&NRENTS                 26080002
+         LCLB  &B                                                       26160002
+         LCLA  &IBITS,&NDX,&ISHIFT,&K,&T,&CODE,&BYTESP                  26240002
+         LCLC  &S,&LETTER                                               26320002
+.LOOP    ANOP                                                           26400002
+&NDX     SETA  &NDX+1                                                   26480002
+         AIF   ('&ITEM(&NDX)' EQ '&LOGITEM').FOUND                      26560002
+         AIF   (&NDX LT &ITEMNBR).LOOP                                  26640002
+         MNOTE *,'LOG ITEM NOT DEFINED'                                 26720002
+         MEXIT                                                          26800002
+.FOUND   ANOP                                                           26880002
+&ISHIFT  SETA  &SHIFT(&NDX)                                             26960002
+&IBITS   SETA  &BITS(&NDX)                                              27040002
+&CODE    SETA  1                                                        27120002
+&K       SETA  K'&BYTES                                                 27200002
+         AIF   (&IBITS-(&IBITS/4)*4 EQ 0).OK                            27280002
+         MNOTE *,'BIT LENGTH SPECIFICATION INCONSISTENT WITH CONTROL'   27360002
+         MEXIT                                                          27440002
+.OK      AIF   ('&BYTES' EQ '').USEDEFN                                 27520002
+&LETTER  SETC  '&BYTES'(&K,1)                                           27600002
+&S       SETC  '&BYTES'(1,&K-1)                                         27680002
+&BYTESP  SETA  &S                                                       27760002
+         AIF   ('&LETTER' EQ 'B').BOTH                                  27840002
+         AIF   ('&LETTER' EQ 'L').LEFT                                  27920002
+&CODE    SETA  2                                                        28000002
+         AGO   .L                                                       28080002
+.LEFT    ANOP                                                           28160002
+&CODE    SETA  1                                                        28240002
+         AGO   .L                                                       28320002
+         AIF   (&ISHIFT EQ 0 OR &ISHIFT EQ 4).OK2                       28400002
+.ERR     MNOTE *,'DATA NOT ALLIGNED ON HEX OR BYTE BOUNDARY'            28480002
+         MEXIT                                                          28560002
+.USEDEFN ANOP                                                           28640002
+&BYTESP  SETA  &IBITS/8                                                 28720002
+.BOTH    AIF   (&ISHIFT NE 0).ERR                                       28800002
+&CODE    SETA  3                                                        28880002
+&T       SETA  &BYTESP*2-1                                              28960002
+&S       SETC  '&T'                                                     29040002
+.OK2     AIF   (&ISHIFT EQ 0).L                                         29120002
+&CODE    SETA  2                                                        29200002
+.L       ANOP                                                           29280002
+&B       SETB  1                                                        29360002
+         AIF   ('&SKIP$OR' EQ '').BACKUP                                29440002
+&K       SETA  K'&SKIP$OR                                               29520002
+&B       SETB  ('&SKIP$OR'(1,1) EQ 'B')                                 29600002
+&S       SETC  '&SKIP$OR'(&B+1,&K-&B)                                   29680002
+.BACKUP  ANOP                                                           29760002
+&NRENTS  SETA  &NRENTS+1                                                29840002
+         DC    AL.12(&LOGITEM-&DSECT),XL.4'A'                           29920002
+         DC    BL.1'&B',FL.7'&S',AL.4(&BYTESP),FL.4'&CODE'              30000002
+.OUT     ANOP                                                           30080002
+         MEND                                                           30160002
+         SPACE 2                                                        30240002
+*  ROUTINE MACRO     ROUTINE MACRO     ROUTINE MACRO     ROUTINE MACRO* 30320002
+         SPACE 2                                                        30400002
+         MACRO                                                          30480002
+&NAME    ROUTINE &LOGITEM,&RNAME                                        30560002
+         GBLC  &DSECT,&CSECT                                            30640002
+         GBLC  &ITEM(1000)                                              30720002
+         GBLA  &SHIFT(1000),&ITEMNBR                                    30800002
+         GBLA  &NRENTS                                                  30880002
+         LCLA  &ISHIFT,&NDX                                             30960002
+.LOOP    ANOP                                                           31040002
+&NDX     SETA  &NDX+1                                                   31120002
+         AIF   ('&ITEM(&NDX)' EQ '&LOGITEM').FOUND                      31200002
+         AIF   (&NDX LT &ITEMNBR).LOOP                                  31280002
+         MNOTE *,'LOG ITEM NOT DEFINED'                                 31360002
+         MEXIT                                                          31440002
+.FOUND   ANOP                                                           31520002
+&ISHIFT  SETA  &SHIFT(&NDX)                                             31600002
+&NAME    DC    AL.12(&LOGITEM-&DSECT),XL.4'D'                           31680002
+         DC    AL.4(&ISHIFT),AL.12(&RNAME-&CSECT)                       31760002
+&NRENTS  SETA  &NRENTS+1                                                31840002
+         MEND                                                           31920002
+         EJECT                                                          32000002
+*  LABEL MACRO     LABEL MACRO     LABEL MACRO     LABEL MACRO        * 32080002
+         SPACE 2                                                        32160002
+         MACRO                                                          32240002
+         LABEL &LABEL1,&LABEL2,&LABEL3,&LABEL4,&LABEL5,&LABEL6,        C32320002
+               &LABEL7,&LABEL8                                          32400002
+.*                            THIS MACRO ALLOWS UP TO ACHT LABELS TO    32480002
+.*                                 BE SPECIFIED FOR A GIVEN LINE. THE   32560002
+.*                                 LABELS SHOULD BE ENCLOSED IN QUOTA-  32640002
+.*                                 TION MARKS. THE COLUMN AND LINE END  32720002
+.*                                 CONTROLS WILL BE INSERTED BY THE     32800002
+.*                                 MACRO. OMITTED OPERANDS MEAN NO      32880002
+.*                                 LABEL REQUIRED FOR RESPECTIVE        32960002
+.*                                 COLUMN. THIS MACRO WILL ALSO ALERT   33040002
+.*                                 THE PROGRAMMER TO EXACTLY WHERE THE  33120002
+.*                                 TABLE MUST BE BROKEN IF NECESSARY    33200002
+.*                                 TO AVOID EXCEEDING THE MAXIMUM LIMIT 33280002
+         GBLC &LABELS(1000)                                             33360002
+         GBLA  &LABELNR                                                 33440002
+         GBLA  &NRENTS                                                  33520002
+         LCLC  &MARGIN,&TACK                                            33600002
+         LCLC  &TEXT                                                    33680002
+         LCLA  &OP,&K,&START,&NRCHAR,&REMAIN                            33760002
+&MARGIN  SETC  '*'                                                      33840002
+.LOOPOUT ANOP                                                           33920002
+&OP      SETA  &OP+1                                                    34000002
+&K       SETA  K'&SYSLIST(&OP)                                          34080002
+         AIF (&K GE 2).NORM                                             34160002
+&K       SETA  2                                                        34240002
+.NORM    ANOP                                                           34320002
+&START   SETA  2                                                        34400002
+         AIF (&OP LT N'&SYSLIST).NOTLAST                                34480002
+&MARGIN  SETC  '$'                                                      34560002
+.NOTLAST ANOP                                                           34640002
+&NRCHAR  SETA  8                                                        34720002
+&TACK    SETC  ''                                                       34800002
+.LOOPIN  ANOP                                                           34880002
+&REMAIN  SETA  &K-&START                                                34960002
+         AIF (&REMAIN GE 8).MORE                                        35040002
+&TACK    SETC  '&MARGIN'                                                35120002
+&NRCHAR  SETA  &REMAIN                                                  35200002
+.MORE    ANOP                                                           35280002
+&TEXT    SETC  ''                                                       35360002
+         AIF (&REMAIN EQ 0).ENDTEXT                                     35440002
+&TEXT    SETC  '&SYSLIST(&OP)'(&START,&NRCHAR)                          35520002
+.ENDTEXT ANOP                                                           35600002
+&LABELNR SETA  &LABELNR+1                                               35680002
+&LABELS(&LABELNR) SETC '&TEXT'.'&TACK'                                  35760002
+&START   SETA  &START+8                                                 35840002
+         AIF ('&TACK' EQ '').LOOPIN                                     35920002
+         AIF ('&TACK' EQ '*').LOOPOUT                                   36000002
+         MEND                                                           36080002
+         MACRO                                                          36160002
+         LSTART                                                         36240002
+.*                            THIS MACRO IS ISSUED WHEN THE LABEL AREA  36320002
+.*                                 OF THE TABLE IS TO BEGIN.            36400002
+         GBLC &LABELS(1000)                                             36480002
+         GBLA  &LABELNR                                                 36560002
+         LCLA  &NDX                                                     36640002
+         LINEND                                                         36720002
+.LOOP    ANOP                                                           36800002
+&NDX     SETA  &NDX+1                                                   36880002
+         DC    C'&LABELS(&NDX)'                                         36960002
+         AIF   (&NDX LT &LABELNR).LOOP                                  37040002
+         MEND                                                           37120002
+         GBLC  &DSECT,&CSECT                                            37200002
+IFCE0135 CSECT                                                          37280002
+&CSECT   SETC  'IFCE0135'                                               37360002
+&DSECT   SETC  'DSECT135'                                               37440002
+DSECT135 DSECT                                                          37520002
+         DS    0F                                                       37600002
+         DSGEN (XKEY,8),(XRELN,8),(XSWS0,8),(XSWS8,1),(XSWS9,1),       C37680002
+               (XSWS10,1),(XSWS11,1),                                  *37760002
+               (XSWS12,1),(XSWS13,1),(XSWS14,1),(XSWS15,1)              37840002
+         DSGEN (LOGWORK1,8),(LOGWORK2,6),(LOGWORK3,2),(LOGWRK3A,4),    *37920002
+               (LOGWRK3B,3),(LOGWRK3C,1),(LOGWORK4,8)                   38000002
+         DSGEN (XDATE,32)                                               38080002
+         DSGEN (XTIME,32)                                               38160002
+         DSGEN (XDUM2,8),(XSER,24)                                      38240002
+         DSGEN (XCPUMOD,16),(XDUM3,16)                                  38320002
+         DSGEN (XPGMID,64)                                              38400002
+         DSGEN (XJOBID,64)                                              38480002
+         DSGEN (XMCKPSW,64)                                             38560002
+         DSGEN (SYSDAM,1),(PROCD,1),(SYSREC,1),(TIMDAM,1),(CLOCKD,1),  X38640002
+               (EXTDAM,1),(MDUM0,1),(AUTOCON,1),(WARNG,1),             X38720002
+               (DUM,5),(BACKUP1,1),(DELAY,1),(UNSTOR,1),               *38800002
+               (CORRST,1),(KEYERR,1),(DUMMY001,1),(EMWP,1),            *38880002
+               (SYSMSK,1),(PGMSK,1),(IAVLD,1),(FASTVLD,1),             X38960002
+               (RCVLD,1),(MDUM3,1),(FLPVLD,1),(GPRVLD,1),              X39040002
+               (CTLVLD,1),(LOGVLD,1),(STVLD,1)                          39120002
+         DSGEN (LRBNVLD,1),(RESERVDA,15),(EXTDLOG,16)          @XA20224 39200001
+         DSGEN (RESRVDB,64)                                             39280002
+         DSGEN (FAILSTA,32)                                             39360002
+         DSGEN (ERCORCD,16),(CTRLWD,16)                                 39440002
+         DSGEN (MCHRG00,1),(MCHRG01,1),(MCHRG02,1),(MCHRG03,1),        X39520002
+               (MCHRG04,1),(MCHRG05,1),(MCHRG06,1),(MCHRG07,1),        X39600002
+               (MCHRG08,1),(MCHRG09,1),(MCHRG10,1),(MCHRG11,1),        X39680002
+               (MCHRG12,1),(MCHRG13,1),(MCHRG14,1),(MCHRG15,1),        X39760002
+               (MCHRG16,1),(MCHRG17,1),(MCHRG18,1),(MCHRG19,1),        X39840002
+               (MCHRG20,1),(MCHRG21,1),(MCHRG22,1),(MCHRG23,1),        X39920002
+               (MCHRG24,1),(MCHRG25,1),(MCHRG26,1),(MCHRG27,1),        X40000002
+               (MCHRG28,1),(MCHRG29,1),(MCHRG30,1),(MCHRG31,1)          40080002
+         DSGEN (BUFADRG,16)                                             40160002
+         DSGEN (ZONER00,1),(ZONER01,3),(ZDUMY,1),(ZONER03,3),  @XA06108X40240002
+               (SAREG00,24)                                             40320002
+SEL135   DSGEN (BFCTRG00,1),(BFCTRG01,1),(BFCTRG02,1),(BFCTRG03,1),    X40400002
+               (BFCTRG04,1),(BFCTRG05,1),(BFCTRG06,2),                 X40480002
+               (BFCTRG08,1),(BFCTRG09,1),(BFCTRG10,1),(BFCTRG11,1),    X40560002
+               (BFCTRG12,1),(BFCTRG13,3),                              X40640002
+               (BFCTRG16,1),(BFCTRG17,1),(BFCTRG18,1),(BFCTRG19,1),    X40720002
+               (BFCTRG20,1),(BFCTRG21,1),(BFCTRG22,1),(BFCTRG23,1),    X40800002
+               (BFCTRG24,1),(BFCTRG25,1),(BFCTRG26,1),(BFCTRG27,1),    X40880002
+               (BFCTRG28,1),(BFCTRG29,1),(BFCTRG30,1),(BFCTRG31,1)      40960002
+         DSGEN (DUMMY00,16)                                             41040002
+         DSGEN (CHANTG00,1),(CHANTG01,1),(CHANTG02,1),(CHANTG03,1),    X41120002
+               (CHANTG04,1),(CHANTG05,1),(CHANTG06,1),(CHANTG07,1),    X41200002
+               (CHANTG08,1),(CHANTG09,1),(CHANTG10,1),(CHANTG11,1),    X41280002
+               (CHANTG12,1),(CHANTG13,1),(CHANTG14,1),(CHANTG15,1),    X41360002
+               (CHANTG16,1),(CHANTG17,1),(CHANTG18,1),(CHANTG19,1),    X41440002
+               (CHANTG20,1),(CHANTG21,1),(CHANTG22,1),(CHANTG23,1),    X41520002
+               (CHANTG24,1),(CHANTG25,1),(CHANTG26,1),(CHANTG27,1),    X41600002
+               (CHANTG28,1),(CHANTG29,1),(CHANTG30,1),(CHANTG31,1)      41680002
+         DSGEN (CHCTRG00,1),(CHCTRG01,1),(CHCTRG02,1),(CHCTRG03,1),    X41760002
+               (CHCTRG04,1),(CHCTRG05,1),(CHCTRG06,1),(CHCTRG07,1),    X41840002
+               (CHCTRG08,1),(CHCTRG09,1),(CHCTRG10,1),(CHCTRG11,1),    X41920002
+               (CHCTRG12,1),(CHCTRG13,1),(CHCTRG14,1),(CHCTRG15,1),    X42000002
+               (CHCTRG16,1),(CHCTRG17,1),(CHCTRG18,1),(CHCTRG19,1),    X42080002
+               (CHCTRG20,1),(CHCTRG21,1),(CHCTRG22,1),(CHCTRG23,1),    X42160002
+               (CHCTRG24,1),(CHCTRG25,1),(CHCTRG26,1),(CHCTRG27,1),    X42240002
+               (CHCTRG28,1),(CHCTRG29,1),(CHCTRG30,1),(DUMMY,1)         42320002
+         DSGEN (CHANCK0,1,0,7),(DUM,8,0,2)                      XA00642 42360002
+         DSGEN (CHK0,16,EQU,MCHRG00),(CHK1,16,EQU,MCHRG16)              42400002
+         DSGEN (MCRR1,32)                                               42480002
+         DSGEN (MCRR2,32)                                               42560002
+         DSGEN (ICM90,32)                                               42640002
+         DSGEN (STATUS,32)                                              42720002
+         DSGEN (FDUM1,32)                                               42800002
+         DSGEN (FDUM2,32)                                               42880002
+         DSGEN (FDUM3,32)                                               42960002
+         DSGEN (FDUM4,32)                                               43040002
+         DSGEN (FDUM5,32)                                               43120002
+         DSGEN (FDUM6,32)                                               43200002
+         DSGEN (FDUM7,32)                                               43280002
+         DSGEN (FDUM8,32)                                               43360002
+         DSGEN (FDUM9,32)                                               43440002
+         DSGEN (FDUM10,32)                                              43520002
+         DSGEN (FDUM11,32)                                              43600002
+         DSGEN (FDUM12,32)                                              43680002
+         DSGEN (FDUM13,32)                                              43760002
+         DSGEN (FDUM14,32)                                              43840002
+FLOATPTS DSGEN (FP,32,0,7),(GPR,32,0,9),(GP,32,10,15),(CTR,32,0,9),    X43920002
+               (CR,32,10,15)                                            44000002
+         DSGEN (DARLNGTH,16),(,48)                                      44080002
+         DSGEN (SYSSTAT,1,0,7)                                          44180002
+         DSGEN (AREADT,1,0,15)                                          44280002
+         DSGEN (ERRTYPE,1,0,7)                                          44380002
+         DSGEN (RMSACTN,1,0,7)                                          44480002
+         DSGEN (RMSINFO,1,0,7)                                          44580002
+         DSGEN (WAITSUFF,8),(,8),(MCHFSAR,32),(,32)                     44680002
+         DSGEN (TRNSMOD,32,0,7)                                         44780002
+         DSGEN (MCHPDR,1,0,7,0,7)                                       44880002
+         DSGEN (MCHFSAV,32),(MCHFSEAV,32),(MCHPDARI,32),(MCHTCBCU,32)   44980002
+         ORG   ZONER00                                         @XA06108 45280002
+         DSGEN (ZONER99,8)                                     @XA06108 45580002
+        ORG    BUFADRG                                         @X60CAFR 45660002
+        DSGEN  (EXTRA,15),(HILO,1)                             @X60CAFR 45740002
+        ORG    MCHRG24                                         @X60CAFR 45820002
+        DSGEN  (ACCEL,8)                                       @X60CAFR 45900002
+IFCE0135 CSECT                                                          46000002
+         USING     *,9                                                  46080002
+ENTRYPTR DC    A(STARTER)                                               46160002
+TABLNAME DC    CL8'IFCE0135'                                            46240002
+REG9     DC    F'0'                                                     46320002
+LP       DC    F'0'                                                     46400002
+SKIPPER  BR        14                                                   46480002
+R0       EQU   0                                                        46560002
+R1       EQU   1                                                        46640002
+R2       EQU   2                                                        46720002
+R3       EQU   3                                                        46800002
+R4       EQU   4                                                        46880002
+R5       EQU   5                                                        46960002
+R6       EQU   6                                                        47040002
+R7       EQU   7                                                        47120002
+R8       EQU   8                                                        47200002
+R9       EQU   9                                                        47280002
+R10      EQU   10                                                       47360002
+R11      EQU   11                                                       47440002
+R12      EQU   12                                                       47520002
+         USING DSECT135,2                                               47600002
+R13      EQU   13                                                       47680002
+R14      EQU   14                                                       47760002
+R15      EQU   15                                                       47840002
+HEX00    EQU   X'00'                                                    47920002
+HEX08    EQU   X'08'                                                    48000002
+HEX13    EQU   X'13'                                           @XA20224 48040001
+HEX40    EQU   X'40'                                                    48080002
+HEX80    EQU   X'80'                                                    48160002
+HEX48    EQU   X'48'                                                    48240002
+HEXBF    EQU   X'BF'                                                    48320002
+L0       EQU   0                                                        48400002
+L1       EQU   1                                                        48480002
+L2       EQU   2                                                        48560002
+L3       EQU   3                                                        48640002
+L4       EQU   4                                                        48720002
+L5       EQU   5                                                        48800002
+L6       EQU   6                                                        48880002
+L7       EQU   7                                                        48960002
+L8       EQU   8                                                        49040002
+L12      EQU   12                                                       49120002
+L19      EQU   19                                                       49200002
+L29      EQU   29                                              @XA06108 49240002
+L60      EQU   60                                                       49280002
+*                                                                       49360002
+SETJOBN  MVC   L0(L8,R3),L0(R4)         MOVE JOB NAME                   49440002
+         BR    R14                      RETURN                          49520002
+*                                                                       49600002
+SETDATE  UNPK  XWORK(L8),L0(L4,R4)      UNPACK DATE                     49680002
+         MVZ   XWORK+L7(L1),XWORK       SET ZONE                        49760002
+         MVC   L0(L3,R3),XWORK+L5       MOVE DAY                        49840002
+         MVC   L6(L2,R3),XWORK+L3 MOVE YEAR                             49920002
+         BR    R14                      RETURN                          50000002
+CONVREL  STM   R5,R8,XSAVE              SAVE WORK REGS                  50080002
+         SR    R6,R6                    CLEAR R6                        50160002
+         IC    R6,L0(R4)                PICK UP REL & SYS VALUES        50240002
+         SRDL  R6,L5                    SAVE REL NO IN R7               50320002
+        SLL   R6,L2                    MULTIPLY SYS VALUE BY 4          50400002
+         L     R8,XLABELP               PICK UP LABEL POINTER           50480002
+         LA    R6,RELTAB(R6)            INDEX INTO TABLE OF SYSTEMS     50560002
+         MVC   L0(L4,R8),L0(R6)         MOVE SYSTEM NAME INTO LABEL     50640002
+         SR    R6,R6                    CLEAR R6                        50720002
+         SLDL  R6,L5                    RETREIVE REL NO.                50800002
+         LTR   R6,R6                    IS IT ZERO                      50880002
+         BZ    NOREL                    BR-YES                          50960002
+         CVD   R6,WORK                  CONVERT IT                      51040002
+         UNPK  L0(L2,R3),WORK+L6(L2)    UNPACK IT INTO PRINT BUFF       51120002
+         MVZ   L1(L1,R3),L0(R3)         MOVE ON PROPER ZONE             51200002
+         B     RETURN                   EXIT                            51280002
+NOREL    MVC   L0(L4,R3),NONE           MOVE IN NONE FOR REL            51360002
+         B     RETURN                                                   51440002
+*        ELIMINATE LINE IF NOT MVS                             @XA20224 51450001
+ISITMVS  CLI   XKEY,HEX13              IS IT MVS               @XA20224 51460001
+         BE    RETURNA                 YES MVS                 @XA20224 51470001
+         SR    R15,R15                 ELIM. LINE              @XA20224 51480001
+RETURNA  BR    R14                                             @XA20224 51490001
+*                                                                       51520002
+CYCLFLG  STM   R5,R8,XSAVE         SAVE REGS                   @XA06108 51620002
+         MVC   QSAVE(L1),L0(R4)    CYCLE FLAG TO WORK AREA     @XA06108 51720002
+         NI    QSAVE,X'80'         SAVE ONLY CYCLE FLAG        @XA06108 51820002
+         SR    R7,R7               CLEAR REG 7                 @XA06108 51920002
+         IC    R7,QSAVE            CYCLE FLAG TO REG 7         @XA06108 52020002
+         SRL   R7,7                CYCLE FLAG TO LOW ORDER     @XA06108 52120002
+         B     ZONE10              GO TO CHARACTER MOVE        @XA06108 52220002
+ZONE10   LA    R8,CHARS            GET CHARACTER STRING        @XA06108 52320002
+         AR    R8,R7               INDEX INTO CHARACTER STRING @XA06108 52420002
+         L     R6,XLABELP          GET LABEL ADDRESS           @XA06108 52520002
+         MVC   L29(L1,R6),L0(R8)   MOVE CHARACTER TO LABEL     @XA06108 52620002
+         B     RETURN                                          @XA06108 52720002
+CYCLZON  STM   R5,R8,XSAVE         SAVE REGS                   @XA06108 52820002
+         MVC   QSAVE(L1),L0(R4)    CYCLE ZONE TO WORK AREA     @XA06108 52920002
+         NI    QSAVE,X'70'         GET CYCLE ZONE ONLY         @XA06108 53020002
+         SR    R7,R7               CLEAR REG 7                 @XA06108 53120002
+         IC    R7,QSAVE            CYCLE ZONE TO REG 7         @XA06108 53220002
+         SRL   R7,4                SHIFT TO LOW ORDER          @XA06108 53320002
+         B     ZONE10              GO TO CHARACTER MOVE        @XA06108 53420002
+DATAZON  STM   R5,R8,XSAVE         SAVE REGS                   @XA06108 53520002
+         MVC   QSAVE(L1),L0(R4)    DATA ZONE TO WORK AREA      @XA06108 53620002
+         NI    QSAVE,X'07'         GET ONLY DATA ZONE          @XA06108 53720002
+         SR    R7,R7               CLEAR REG 7                 @XA06108 53820002
+         IC    R7,QSAVE            DATA ZONE TO REG 7          @XA06108 53920002
+         B     ZONE10              GO TO CHARACTER MOVE        @XA06108 54020002
+RETURN   LM    R5,R8,XSAVE         RESTORE WORK REGISTERS               56480002
+         BR    R14                 RETURN                               56560002
+TSTREC   ST    R5,XSAVE           SAVE REG                              56640002
+         TM    0(R4),HEX80        TEST SHORT FORM RECORD SWITCH         56720002
+         BZ    TSTRECN            BRANCH IF LONG FORM                   56800002
+         LA    R5,SHORTREC-L4           ADDRESS OF END OF SHORT RECORD  56880002
+         ST    R5,REG9            INTO ENTRY POINTER                    56960002
+         L     R5,XSAVE                                        @XA20224 57000001
+         BR    R14                                                      57040002
+TSTRECN  SR    R15,R15            DON'T PRINT LAST LINE        @XA20224 57200001
+         BR    R14                RETURN                                57280002
+ROUT3    ST    R3,XSAVE           SAVE REG 3                            57360002
+         TM    0(R4),HEX80        TEST SHORT FORM RECORD SWITCH         57440002
+         BO    ROUT3A             BRANCH IF SHORT FORM                  57520002
+         SR    R15,R15            DON'T PRINT LAST LINE                 57600002
+ROUT3A   L     R3,XSAVE           RESTORE REG 3                         57680002
+RETURN2  BR    R14                                             @X60CAFR 57760002
+MASK     ST    R6,XSAVE                                        @X60CAFR 57766002
+         MVC   HLSAVE(L1),L1(R4)   MOVE DATA TO WORKAREA       @X60CAFR 57772002
+         NI    L1(R4),X'FE'        SET CONTRL STR HI OFF,IF ON          57778002
+         BCTR  R3,0                BACK UP PRINT PTR                    57778702
+         B     EXIT1               RETURN                               57779402
+CHKHI    TM    HLSAVE,X'01'        CONTROL STORAGE HI?                  57780102
+         BO    ISHI                YES                                  57780802
+         LA    R3,2(R3)            CONTROL STORAGE LOW,4 DIGITS TO PRT  57781502
+         BR    R14                 RETURN                               57782202
+ISHI     MVI   0(R3),X'F1'         MOVE A 1 TO FIRST POSITION           57782902
+         LA    R3,3(R3)            CONTROL STORAGE HI,5 DIGITS TO PRT   57783602
+         BR    R14                                                      57784302
+IS138    CLI   L1(R4),X'38'        IS THIS A 138?                       57785002
+         BNE   NOPRINT             NO,SKIP THIS LINE                    57785702
+         BR    R14                 THIS IS A 138,PRINT LINE             57786402
+NOT138   CLI   L1(R4),X'35'        IS THIS A 135?                       57787102
+         BNE   NOPRINT             NO,SKIP THIS LINE                    57787802
+         BR    R14                 THIS IS A 135,PRINT LINE             57788502
+SETHIGH  ST    R6,XSAVE                                        @X60CAFR 57790002
+         MVC   L1(L1,R4),HLSAVE    RESTORE DATA                @X60CAFR 57796002
+         B     EXIT                                            @X60CAFR 57802002
+SETLOW   ST    R6,XSAVE                                        @X60CAFR 57808002
+         MVC   L1(L1,R4),HLSAVE    RESTORE DATA                @X60CAFR 57814002
+         TM    L1(R4),X'01'        CTRL STORAGE HIGH?          @X60CAFR 57820002
+         BO    CHANGE                                          @X60CAFR 57826002
+         OI    L1(R4),X'FF'        SET CTRL STORAGE LOW=1      @X60CAFR 57832002
+         B     EXIT                                            @X60CAFR 57838002
+CHANGE   NI    L1(R4),X'FE'        SET CTRL STORAGE LOW=0      @X60CAFR 57844002
+EXIT     LA    R6,30                                           @X60CAFR 57850002
+         SR    R3,R6               BACKUP BUFFER PTR           @X60CAFR 57856002
+EXIT1    L     R6,XSAVE                                        @X60CAFR 57862002
+         BR    R14                                             @X60CAFR 57868002
+HLSAVE   DC    X'00'                                           @X60CAFR 57874002
+TYPE02   STM   R5,R8,XSAVE                                     @X60CAFR 57880002
+         L     R6,XLABELP          GET LABEL POINTER           @X60CAFR 57886002
+         MVC   QSAVE(L1),L0(R4)    MOVE DATA TO WORKAREA       @X60CAFR 57892002
+         NI    QSAVE,X'80'         GET TYPE 0 FLAG             @X60CAFR 57898002
+         SR    R7,R7                                           @X60CAFR 57904002
+         IC    R7,QSAVE            TYPE 0 FLAG TO REG 7        @X60CAFR 57910002
+         SRL   R7,7                TYPE 0 TO LOW ORDER         @X60CAFR 57916002
+         LA    R8,CHARS            GET CHARACTER STRING        @X60CAFR 57922002
+         AR    R8,R7               INDEX INTO CHARACTER STRING @X60CAFR 57928002
+         MVC   64(L1,R6),L0(R8)    MOVE CHARACTER TO LABEL     @X60CAFR 57934002
+         MVC   QSAVE(L1),L0(R4)    MOVE DATA TO WORKAREA       @X60CAFR 57940002
+         NI    QSAVE,X'20'         GET TYPE 2 FLAG             @X60CAFR 57946002
+         SR    R7,R7                                           @X60CAFR 57952002
+         IC    R7,QSAVE            TYPE 2 FLAG TO REG 7        @X60CAFR 57958002
+         SRL   R7,5                TYPE 2 TO LOW ORDER         @X60CAFR 57964002
+         LA    R8,CHARS            GET CHARACTER STRING        @X60CAFR 57970002
+         AR    R8,R7               INDEX INTO CHARACTER STRING @X60CAFR 57976002
+         MVC   89(L1,R6),L0(R8)    MOVE CHARACTER TO LABEL     @X60CAFR 57982002
+         B     RETURN                                          @X60CAFR 57988002
+TYPE13   STM   R5,R8,XSAVE                                     @X60CAFR 57994002
+         L     R6,XLABELP          GET LABEL POINTER           @X60CAFR 58000002
+         MVC   QSAVE(L1),L0(R4)    MOVE DATA TO WORKAREA       @X60CAFR 58006002
+         NI    QSAVE,X'40'         GET TYPE 1 FLAG             @X60CAFR 58012002
+         SR    R7,R7                                           @X60CAFR 58018002
+         IC    R7,QSAVE            TYPE 1 FLAG TO REG 7        @X60CAFR 58024002
+         SRL   R7,6                TYPE 1 TO LOW ORDER         @X60CAFR 58030002
+         LA    R8,CHARS            GET CHARACTER STRING        @X60CAFR 58036002
+         AR    R8,R7               INDEX INTO CHARACTER STRING @X60CAFR 58042002
+         MVC   64(L1,R6),L0(R8)    MOVE CHARACTER TO LABEL     @X60CAFR 58048002
+         MVC   QSAVE(L1),L0(R4)    MOVE DATA TO WORKAREA       @X60CAFR 58054002
+         NI    QSAVE,X'10'         GET TYPE 3 FLAG             @X60CAFR 58060002
+         SR    R7,R7                                           @X60CAFR 58066002
+         IC    R7,QSAVE            TYPE 3 FLAG TO REG 7        @X60CAFR 58072002
+         SRL   R7,4                TYPE 3 TO LOW ORDER         @X60CAFR 58078002
+         LA    R8,CHARS            GET CHARACTER STRING        @X60CAFR 58084002
+         AR    R8,R7               INDEX INTO CHARACTER STRING @X60CAFR 58090002
+         MVC   89(L1,R6),L0(R8)    MOVE CHARACTER TO LABEL     @X60CAFR 58096002
+         B     RETURN                                          @X60CAFR 58102002
+NOTVIRG  ST    R6,XSAVE                                        @X60CAFR 58108002
+         CLI   21(R2),X'35'        IS IT A 135?                @X60CAFR 58114002
+         BE    C135                                            @X60CAFR 58120002
+NOPRINT  SR    R15,R15             DO NOT PRINT THIS LINE      @X60CAFR 58126002
+         B     EXIT1                                           @X60CAFR 58132002
+C135     TM    L0(R4),X'01'        IS IT A 135I?               @X60CAFR 58138002
+         BO    NOPRINT                                         @X60CAFR 58144002
+         B     EXIT1                                           @X60CAFR 58150002
+ISVIRG   ST    R6,XSAVE                                        @X60CAFR 58156002
+         CLI   21(R2),X'35'        IS IT A 135?                @X60CAFR 58162002
+         BNE   EXIT1                                           @X60CAFR 58168002
+CP135    TM    L0(R4),X'01'        IS IT A 135I?               @X60CAFR 58174002
+         BO    EXIT1                                           @X60CAFR 58180002
+         B     NOPRINT                                         @X60CAFR 58186002
+ISIT138  STM   R5,R8,XSAVE         SAVE REGS                            58189002
+         LA    R5,40               NUMBER TO BACK UP                    58192002
+         LR    R6,R3               GET LABEL PTR                        58195002
+         SR    R6,R5               BACK UP TO MODEL NUMBER              58198002
+         MVI   L0(R6),C'8'         MAKE IT 138                          58201002
+         CLI   21(R2),X'35'        IS IT A 135                          58204002
+         BNE   RETURN              NO,ITS A 138                         58207002
+         MVI   L0(R6),C'5'         MAKE IT A 135                        58210002
+         CLI   L0(R4),X'01'        IS IT A 135I                         58213002
+         BNE   RETURN              NO,ITS A 135                         58216002
+         MVC   L1(L2,R6),LAB135I   MAKE IT IT 135-3 OR 135I             58219002
+         B     RETURN              DONE                                 58222002
+LAB135I  DC    C'-3'                                                    58225002
+XWORK    DS    D                                                        58240002
+RELTAB   DS    0C                                                       58320002
+         DC    C'OS  '                                                  58370002
+         DC    C'DOS '                                                  58420002
+         DC    C'VS 1'                                                  58470002
+         DC    C'V370'                                                  58520002
+         DC    C'VS 2'                                                  58570002
+         DC    C'    '                                                  58620002
+         DC    C'    '                                                  58670002
+         DC    C'    '                                                  58720002
+QSAVE    DC    X'00'                                           @XA06108 58740002
+CHARS    DC    C'0123456789ABCDEF'                             @XA06108 58760002
+XSAVE    DS    2D                                                       58800002
+NONE     DC    CL4'NONE'                                                58880002
+WORK     EQU   XWORK                                                    58960002
+XLABELP  EQU   LP                                                       59040002
+         LTORG                                                          59120002
+STARTER  DS    0F                                                       59200002
+         DC    XL4'00010001'                                            59280002
+         DC    XL4'00010001'                                            59360002
+         DC    A(LABAREA)                                               59440002
+         DC    H'0'                                                     59520002
+         DC    X'01'                                                    59600002
+         DC    X'000B8B00'                                              59680002
+         LABEL     ''                                                   59760002
+         LINE      ,,SKIP=2                                             59840002
+         LABEL     ''                                                   59920002
+         LINE  (48,1),(1,35),SKIP=2                                     60000002
+         HEX   XSER,0,3B                                                60080002
+         ROUTINE XDUM2,ISIT138                                          60160002
+         LABEL 'MODEL 13','SERIAL NO'                                   60200002
+*                                                                       60240002
+         LINE  (10,)                                                    60320002
+         ROUTINE    XRELN,CONVREL                                       60400002
+         LABEL      'XXXX REL.'                                         60480002
+         LINE                                                           60560002
+         LABEL '--- RECORD SOURCE - MCH ---','TYPE - CPU'               60640002
+*                                                                       60720002
+         LINE  (15,1),(1,1)                                             60800002
+         HEX   XMCKPSW,1,8B                                             60880002
+         LABEL 'MCK OLD PSW'                                            60960002
+         LINE  (21,1),(1,1)                                             61040002
+         ROUTINE    XJOBID,SETJOBN                                      61120002
+         LABEL      'JOB NAME'                                          61200002
+*                                                                       61280002
+         LINE                                                           61360002
+         ROUTINE    XPGMID,SETJOBN                                      61440002
+         LABEL 'PROGRAM NAME'                                           61520002
+*                                                                       61600002
+         LINE       ,(8,40),SKIP=1                                      61680002
+         ROUTINE XSWS0,SKIPPER                                          61760002
+         LABEL      'DAY  YEAR','HH MM SS.TH'                           61840002
+         LINE       (8,40),(1,40),SKIP=2                                61920002
+         ROUTINE    XDATE,SETDATE                                       62000002
+         HEX        XTIME,1,4B                                          62080002
+         LABEL      'DATE _','TIME _'                                   62160002
+**********************************************************************  62240002
+START    DS    0C                                                       62320002
+         LINE  (1,1),(5,1),SKIP=1                                       62400002
+         LABEL '--- MACHINE CHECK INTERRUPT CODE ---'                   62480002
+         LINE                                                           62560002
+         LABEL 'SUB CLASS'                                              62640002
+         LINE  (23,41),(1,41)                                           62720002
+         BIN   SYSDAM                                                   62800002
+         BIN   CLOCKD                                                   62880002
+         LABEL 'SYSTEM DAMAGE (SD)','CLOCK DAMAGE (CD)'                 62960002
+         LINE                                                           63040002
+         BIN   PROCD                                                    63120002
+         BIN   EXTDAM                                                   63200002
+         LABEL 'PROC DAMAGE (PD)','EXTERNAL DAMAGE (CD)'                63280002
+         LINE                                                           63360002
+         BIN   SYSREC                                                   63440002
+         BIN   AUTOCON                                                  63520002
+         LABEL 'SYSTEM RECOVERY (SR)','AUTO-CONFIG (AC)'                63600002
+         LINE                                                           63680002
+         BIN   TIMDAM                                                   63760002
+         BIN   WARNG                                                    63840002
+         LABEL 'TIMER DAMAGE','WARNING (W)'                             63920002
+         LINE                                                           64000002
+         LABEL     ''                                                   64080002
+         LINE  ,(1,1),SKIP=1                                            64160002
+         LABEL '--- INTERRUPT SENSE CODES ---'                          64240002
+         LINE  (23,41),(1,41),SKIP=1                                    64320002
+         BIN   BACKUP1                                                  64400002
+         BIN   DELAY                                                    64480002
+         LABEL 'BACK-UP (B)','DELAYED (D)'                              64560002
+         LINE                                                           64640002
+         LABEL     ''                                                   64720002
+         LINE  ,(1,1),SKIP=1                                            64800002
+         LABEL '--- STORAGE AND PROTECTION ERROR CODES ---'             64880002
+         LINE  (41,50),(1,50)                                           64960002
+         BIN   UNSTOR                                                   65040002
+         BIN   KEYERR                                                   65120002
+         LABEL 'UNCORRECTED STORAGE ERRORS (SE)','UNCORRECTED PROTECTIOX65200002
+               N ERROR (PE)'                                            65280002
+         LINE                                                           65360002
+         BIN   CORRST                                                   65440002
+         LABEL 'CORRECTED STORAGE ERRORS (SC)'                          65520002
+         LINE                                                           65600002
+         LABEL     ''                                                   65680002
+         LINE  ,(1,1),SKIP=1                                            65760002
+         LABEL '--- PSW VALIDITY CODES'                                 65840002
+         LINE  (41,50),(1,50)                                           65920002
+         BIN   EMWP                                                     66000002
+         BIN   SYSMSK                                                   66080002
+         LABEL 'AMWP BITS OF M.C. OLD ARE VALID (WP)','SYSTEM MASK OF MX66160002
+               .C. OLD IS VALID (MS)'                                   66240002
+         LINE                                                           66320002
+         BIN   PGMSK                                                    66400002
+         BIN   IAVLD                                                    66480002
+         LABEL 'PROGRAM MASK OF M.C. OLD IS VALID (PM)','INSTR ADDR OF X66560002
+               M.C. OLD IS VALID (IA)'                                  66640002
+         LINE                                                           66720002
+         LABEL     ''                                                   66800002
+         LINE  ,(1,1),SKIP=1                                            66880002
+         LABEL '--- MISC VALIDITY CODES ---'                            66960002
+         LINE  (41,50),(1,50)                                           67040002
+         BIN   FASTVLD                                                  67120002
+         BIN   RCVLD                                                    67200002
+         LABEL 'FAILING STORAGE ADDR IS VALID (FA)','REGION CODE VALID X67280002
+                (RC)'                                                   67360002
+         LINE                                                           67440002
+         BIN   FLPVLD                                                   67520002
+         BIN   GPRVLD                                                   67600002
+         LABEL 'FP REGS STORED ARE VALID (FP)','GP REGS STORED ARE VALIX67680002
+               D (GP)'                                                  67760002
+         LINE                                                           67840002
+         BIN   CTLVLD                                                   67920002
+         BIN   LOGVLD                                                   68000002
+         LABEL 'CONTROL REGS STORED ARE VALID (CR)','EXTENDED LOGOUT ARX68080002
+               EA VALID (LG)'                                           68160002
+         LINE                                                           68240002
+         BIN   STVLD                                                    68320002
+         LABEL 'INSTR MODIFIED STORAGE VALID (ST)'                      68400002
+         LINE                                                           68480002
+         LABEL ''                                                       68560002
+         LINE  (58,1),(30,30),SKIP=2                           @XA20224 68570001
+         BIN   LRBNVLD                                         @XA20224 68580001
+         ROUTINE  XKEY,ISITMVS                                 @XA20224 68590001
+         LABEL '--- LRB MAY NOT BE VALID','---'                @XA20224 68600001
+         LINE  (37,50),(1,50),SKIP=2                                    68640002
+         HEX   EXTDLOG,1,2B                                             68720002
+         LABEL 'EXTENDED LOGOUT LENGTH'                                 68800002
+         LINE      (37,1),(1,1)                                         68880002
+         HEX       RESRVDB,1,14B                                        68960002
+         ROUTINE   XSWS8,ROUT3                                          69040002
+         LABEL     'MC STATUS FIELD'                                    69120002
+         LINE  ,(1,1),SKIP=2                                            69200002
+         ROUTINE   XSWS8,TSTREC                                         69280002
+         LABEL 'ABBREVIATED MACHINE CHECK LOGOUT'                       69360002
+         LINE  (35,1),(1,1),SKIP=2                                      69440002
+         HEX   FAILSTA,1,4B                                             69520002
+         LABEL 'FAILING STORAGE ADDRESS'                                69600002
+         LINE  ,(1,1),SKIP=2                                            69680002
+         LABEL '--- REGION CODE ---'                                    69760002
+         LINE  (37,50),(1,50),SKIP=2                                    69840002
+         HEX   ERCORCD                                                  69920002
+         HEX   CTRLWD                                                   70000002
+         LABEL 'ERROR CORRECTION CODES','CONTROL WORD ADDRESS'          70080002
+         LINE                                                           70160002
+         LABEL     ''                                                   70240002
+         DC    X'01000B8B00'                                            70320002
+         LABEL ''                                                       70400002
+         LINE  ,(5,1),SKIP=2                                            70480002
+         LABEL 'CPU DEPENDENT LOGOUT BYTES'                             70560002
+         LINE  ,(16,60)                                                 70640002
+         LABEL '--- CPU CHECKS 0 ---','--- CPU  CHECKS 1 ---'           70720002
+         LINE  (25,30),(1,30),SKIP=1                                    70800002
+         BIN   MCHRG00                                                  70880002
+         BIN   MCHRG08                                                  70960002
+         BIN   MCHRG16                                                  71040002
+         LABEL 'EARLY CHECK','BUS IN','ALU BYTE 0'                      71120002
+         LINE                                                           71200002
+         BIN   MCHRG01                                                  71280002
+         BIN   MCHRG09                                                  71360002
+         BIN   MCHRG17                                                  71440002
+         BIN   MCHRG25                                                  71520002
+         LABEL 'LATE CHECK','DISPLAY BUS BYTE 0','ALU BYTE 1',         X71600002
+               'ALU AUXILIARY'                                          71680002
+         LINE                                                           71760002
+         BIN   MCHRG02                                                  71840002
+         BIN   MCHRG10                                                  71920002
+         BIN   MCHRG18                                                  72000002
+         BIN   MCHRG26                                                  72080002
+         LABEL 'STOR INPUT DATA','ALU SHIFT','ALU CONTROLS',           X72160002
+               'SP PROTECTION KEY'                                      72240002
+         LINE                                                           72320002
+         BIN   MCHRG03                                                  72400002
+         BIN   MCHRG11                                                  72480002
+         BIN   MCHRG19                                                  72560002
+         BIN   MCHRG27                                                  72640002
+         LABEL 'WS OUTPUT','SINGLE BIT ERROR','T REGISTER',      XM5997X72720002
+               'SP STOR KEY'                                     XM5997 72760002
+         LINE                                                           72800002
+         BIN   MCHRG04                                                  72880002
+         BIN   MCHRG12                                                  72960002
+         BIN   MCHRG20                                                  73040002
+         BIN   MCHRG28                                                  73120002
+         LABEL 'SELECT LATCHES','DOUBLE BIT ERROR','CDR/CTRL',   XM5997X73200002
+               'FIELD LENGTH CTR'                                       73280002
+         LINE                                                           73360002
+         BIN   MCHRG05                                                  73440002
+         BIN   MCHRG13                                                  73520002
+         BIN   MCHRG21                                                  73600002
+         BIN   MCHRG29                                           XM5997 73680002
+         LABEL 'WSAR','ECC ADDR CHECK','BRANCH DECODE',          XM5997X73760002
+               'ASSOC ARRAY'                                     XM5997 73840002
+         LINE                                                           73920002
+         BIN   MCHRG06                                                  74000002
+         BIN   MCHRG14                                                  74080002
+         BIN   MCHRG22                                                  74160002
+         BIN   MCHRG30                                           XM5997 74240002
+         LABEL 'ASAR','CPU SAR CHECK','MICROPROGRAM',            XM5997X74290002
+               'PHYSICAL REG'                                    XM5997 74340002
+         LINE  (25,30),(1,30),SKIP=2                                    74400002
+         BIN   MCHRG07                                                  74480002
+         BIN   MCHRG15                                                  74560002
+        ROUTINE   XDUM2,NOTVIRG                                         74600002
+         LABEL 'DISP BUS BYTE 1','MS LAST ACCESS BIT'                   74640002
+        LINE   ,                                               @X60CAFR 74648002
+        BIN       MCHRG07                                      @X60CAFR 74656002
+        BIN       MCHRG15                                      @X60CAFR 74664002
+        ROUTINE   XDUM2,RETURN2                                @X60CAFR 74672002
+        BIN       MCHRG31                                      @X60CAFR 74680002
+        ROUTINE   XDUM2,ISVIRG                                          74688002
+         LABEL 'DISP BUS BYTE 1','MS LAST ACCESS BIT',' ',     @X60CAFRX74696002
+               'ACCELERATOR CHK'                               @X60CAFR 74704002
+         LINE  (32,1),(1,1)                                             74706002
+         ROUTINE BUFADRG,MASK                                           74708002
+         ROUTINE BUFADRG,CHKHI                                          74710002
+         HEX   BUFADRG                                                  74712002
+         ROUTINE XDUM2,ISVIRG                                           74714002
+         LABEL 'EFFECTIVE CONTROL STORAGE ADDR'                         74716002
+         LINE  (25,30),(1,30),SKIP=1                                    74720002
+         HEX   BUFADRG                                                  74800002
+         HEX   SAREG00                                                  74880002
+        ROUTINE   XDUM2,NOTVIRG                                         74920002
+         LABEL 'BACKUP ADDR REG','STOR ADDR REG'                 XM5997 74960002
+        LINE   ,                                               @X60CAFR 74966002
+        HEX       BUFADRG                                      @X60CAFR 74978002
+        HEX       SAREG00                                      @X60CAFR 74984002
+        ROUTINE   BUFADRG,SETLOW                               @X60CAFR 74990002
+        BIN       HILO                                         @X60CAFR 74996002
+        ROUTINE   BUFADRG,SETHIGH                              @X60CAFR 75002002
+        BIN       HILO                                         @X60CAFR 75008002
+        ROUTINE   XDUM2,ISVIRG                                          75014002
+         LABEL 'BACKUP ADDR REG','STOR ADDR REG',              @X60CAFRX75020002
+               'CONTROL STORAGE LOW','CONTROL STORAGE HI'      @X60CAFR 75026002
+         LINE  SKIP=2                                                   75040002
+         BIN   ZONER00                                                  75120002
+         BIN   ZONER01                                                  75200002
+         BIN   ZONER03                                                  75280002
+         LABEL 'CYCLE STEAL','CYCLE STEAL ZONE','DATA FLOW ZONE'        75360002
+         LINE  ,(8,30)                                                  75440002
+         LABEL 'RETRY THRESHOLD','CPU RETRY',                          X75520002
+               '    INTERRUPT STATUS LATCHES'                           75600002
+         LINE  (25,30),(1,30),SKIP=1                                    75680002
+         BIN   BFCTRG00                                                 75760002
+         BIN   BFCTRG08                                                 75840002
+         BIN   BFCTRG16                                                 75920002
+         BIN   BFCTRG24                                                 76000002
+         LABEL 'GPR/STOR ALTERED','CPU RETRY FLAG','HRT OVERFLOW',     X76080002
+               'TIMER ENABLE'                                           76160002
+         LINE                                                           76240002
+         BIN   BFCTRG01                                                 76320002
+         BIN   BFCTRG13                                                 76400002
+         BIN   BFCTRG17                                                 76480002
+         BIN   BFCTRG25                                                 76560002
+        LABEL 'SYSTEM DAMAGE','RETRY COUNT','NEW BYTE 83','START LATCH' 76640002
+         LINE                                                           76720002
+         BIN   BFCTRG02                                                 76800002
+         ROUTINE    DUMMY,SKIPPER                                       76880002
+         BIN   BFCTRG18                                                 76960002
+         BIN   BFCTRG26                                                 77040002
+         LABEL 'PSW/CR ALTERED','','PER REQUEST','M/C CHECK THRESHOLD'  77120002
+         LINE                                                           77280002
+         BIN   BFCTRG03                                                 77360002
+         ROUTINE    DUMMY,SKIPPER                                       77440002
+         BIN   BFCTRG19                                                 77520002
+         BIN   BFCTRG27                                                 77600002
+         LABEL 'SECOND ERROR','','SUCCESSFUL BRANCH','IC DUMPED'        77680002
+         LINE                                                           77760002
+         BIN   BFCTRG04                                                 77840002
+         ROUTINE    DUMMY,SKIPPER                                       77920002
+         BIN   BFCTRG20                                                 78000002
+         BIN   BFCTRG28                                                 78080002
+         LABEL 'PER ZONE 1','','RESTART BUTTON',                       X78160002
+               'ALTER/DISPLAY REQUEST'                                  78240002
+         LINE                                                           78320002
+         ROUTINE DUMMY,SKIPPER                                          78400002
+         ROUTINE    DUMMY,SKIPPER                                       78480002
+         BIN   BFCTRG21                                                 78560002
+         BIN   BFCTRG29                                                 78640002
+         LABEL '','','STOP LATCH','MANUAL STATE'                        78720002
+         LINE                                                           78800002
+         ROUTINE    DUMMY,SKIPPER                                       78880002
+         ROUTINE    DUMMY,SKIPPER                                       78960002
+         BIN   BFCTRG22                                                 79040002
+         BIN   BFCTRG30                                                 79080002
+         LABEL '','','PRIO SAMPLE','PER LOG LATCH'                      79120002
+         LINE  (85,30),(61,30),SKIP=2                                   79280002
+         BIN   BFCTRG23                                                 79360002
+         BIN   BFCTRG31                                                 79440002
+         LABEL 'PER INSTR. FETCH','TOD CLOCK PRI'                       79520002
+         LINE  ,(40,)                                                   79600002
+         LABEL '-----CHANNEL LOGOUT BYTES-----'                         79680002
+         LINE  (25,30),(6,30),SKIP=2                                    79760002
+         ROUTINE XCPUMOD,NOT138                                         79800002
+         LABEL 'ICA CHANNEL','SEL CHANNEL A','2319 IFA CHANNEL',       X79840002
+               'SEL CHANNEL B'                                 @XA06108 79920002
+         LINE  (25,30),(6,30),SKIP=2                                    79930002
+         ROUTINE XCPUMOD,IS138                                          79940002
+         LABEL 'ICA CHANNEL','SEL CHANNEL A',                          X79950002
+               'SEL CHANNEL B'                                          79960002
+         LINE  (25,30),(1,30),SKIP=1                                    80000002
+         BIN   CHCTRG00                                          XM5997 80080002
+         BIN   CHCTRG08                                                 80160002
+         BIN   CHCTRG16                                                 80240002
+         BIN   CHCTRG24                                                 80320002
+         ROUTINE XCPUMOD,NOT138                                         80360002
+         LABEL 'INTERFACE CHECK','CHAN CONTROL','CONTROL',       XM5997X80400002
+               'CHAN CONTROL'                                    XM5997 80440002
+         LINE  (25,30),(1,30),SKIP=1                                    80445002
+         BIN   CHCTRG00                                                 80450002
+         BIN   CHCTRG08                                                 80455002
+         BIN   CHCTRG24                                                 80460002
+         ROUTINE XCPUMOD,IS138                                          80465002
+         LABEL 'INTERFACE CHECK','CHAN CONTROL',                       X80470002
+               'CHAN CONTROL'                                           80475002
+         LINE                                                           80480002
+         BIN   CHCTRG01                                          XM5997 80560002
+         BIN   CHCTRG09                                                 80640002
+         BIN   CHCTRG17                                                 80720002
+         BIN   CHCTRG25                                                 80800002
+         ROUTINE XCPUMOD,NOT138                                         80840002
+         LABEL 'LSAR CHECK','I/F CONTROL CHECK','COUNT',         XM5997X80880002
+               'I/F CONTROL CHECK'                               XM5997 80920002
+         LINE                                                           80925002
+         BIN   CHCTRG01                                                 80930002
+         BIN   CHCTRG09                                                 80935002
+         BIN   CHCTRG25                                                 80940002
+         ROUTINE XCPUMOD,IS138                                          80945002
+         LABEL 'LSAR CHECK','I/F CONTROL CHECK',                       X80950002
+               'I/F CONTROL CHECK'                                      80955002
+         LINE                                                           80960002
+         BIN   CHCTRG02                                          XM5997 81040002
+         BIN   CHCTRG10                                                 81120002
+         BIN   CHCTRG18                                                 81200002
+         BIN   CHCTRG26                                                 81280002
+         ROUTINE XCPUMOD,NOT138                                         81320002
+         LABEL 'LSDR CHECK','CARD 1','FMF','CARD 1'              XM5997 81360002
+         LINE                                                           81370002
+         BIN   CHCTRG02                                                 81380002
+         BIN   CHCTRG10                                                 81390002
+         BIN   CHCTRG26                                                 81400002
+         ROUTINE XCPUMOD,IS138                                          81410002
+         LABEL 'LSDR CHECK','CARD 1','CARD 1'                           81420002
+         LINE                                                           81440002
+         BIN   CHCTRG03                                          XM5997 81520002
+         BIN   CHCTRG11                                                 81600002
+         BIN   CHCTRG19                                                 81680002
+         BIN   CHCTRG27                                                 81760002
+         ROUTINE XCPUMOD,NOT138                                         81800002
+         LABEL 'ALU OUTPUT CHECK','CARD 2','TIMING','CARD 2'     XM5997 81840002
+         LINE                                                           81850002
+         BIN   CHCTRG03                                                 81860002
+         BIN   CHCTRG11                                                 81870002
+         BIN   CHCTRG27                                                 81880002
+         ROUTINE XCPUMOD,IS138                                          81890002
+         LABEL 'ALU OUTPUT CHECK','CARD 2','CARD 2'                     81900002
+         LINE                                                           81920002
+         BIN   CHCTRG04                                                 82000002
+         BIN   CHCTRG12                                                 82080002
+         BIN   CHCTRG20                                                 82160002
+         BIN   CHCTRG28                                                 82240002
+         ROUTINE XCPUMOD,NOT138                                         82280002
+         LABEL 'MINT REQUEST','CARD 3','SER/DES','CARD 3'        XM5997 82320002
+         LINE                                                           82330002
+         BIN   CHCTRG04                                                 82340002
+         BIN   CHCTRG12                                                 82350002
+         BIN   CHCTRG28                                                 82360002
+         ROUTINE XCPUMOD,IS138                                          82370002
+         LABEL 'MINT REQUEST','CARD 3','CARD 3'                         82380002
+         LINE                                                           82400002
+         BIN   CHCTRG05                                                 82480002
+         BIN   CHCTRG13                                                 82560002
+         BIN   CHCTRG21                                                 82640002
+         BIN   CHCTRG29                                                 82720002
+         ROUTINE XCPUMOD,NOT138                                         82760002
+         LABEL 'COMMAND END','CARD 4','FBO,FTO','CARD 4'                82800002
+         LINE                                                           82810002
+         BIN   CHCTRG05                                                 82820002
+         BIN   CHCTRG13                                                 82830002
+         BIN   CHCTRG29                                                 82840002
+         ROUTINE XCPUMOD,IS138                                          82850002
+         LABEL 'COMMAND END','CARD 4','CARD 4'                          82860002
+         LINE                                                           82880002
+         BIN   CHCTRG06                                                 82960002
+         BIN   CHCTRG14                                                 83040002
+         BIN   CHCTRG22                                                 83120002
+         BIN   CHCTRG30                                                 83200002
+         ROUTINE XCPUMOD,NOT138                                         83240002
+         LABEL 'STACK INTERRUPT','CARD 9','CCB REGS','CARD 9'    XM5997 83280002
+         LINE                                                           83285002
+         BIN   CHCTRG06                                                 83290002
+         BIN   CHCTRG14                                                 83295002
+         BIN   CHCTRG30                                                 83300002
+         ROUTINE XCPUMOD,IS138                                          83305002
+         LABEL 'STACK INTERRUPT','CARD 9','CARD 9'                      83310002
+         LINE  SKIP=2                                                   83320002
+         BIN   CHCTRG07                                                 83360002
+         ROUTINE DUMMY,SKIPPER                                          83400002
+         BIN   CHCTRG23                                                 83401002
+         ROUTINE XCPUMOD,NOT138                                         83401502
+         LABEL 'I/O OP','','FED'                                        83402002
+         LINE  SKIP=2                                                   83402202
+         BIN   CHCTRG07                                                 83402402
+         ROUTINE XCPUMOD,IS138                                          83402602
+         LABEL 'I/O OP'                                                 83402802
+         LINE  (25,30),(6,30),SKIP=2                            XA00642 83403002
+         ROUTINE DUMMY,SKIPPER                                  XA00642 83404002
+         LABEL '3330 IFA CHANNEL'                              @XA06108 83405002
+         LINE  (25,30),(1,30),SKIP=1                            XA00642 83406002
+         BIN   CHANCK00                                         XA00642 83407002
+         LABEL 'CONTROL CHECK'                                  XA00642 83408002
+         LINE                                                           83409002
+         BIN   CHANCK01                                         XA00642 83410002
+         LABEL 'FMF/FCF'                                        XA00642 83411002
+         LINE                                                           83412002
+         BIN   CHANCK02                                         XA00642 83413002
+         LABEL 'FDB0/FDB1/SUBTRACTOR'                           XA00642 83414002
+         LINE                                                           83415002
+         BIN   CHANCK03                                         XA00642 83416002
+         LABEL 'BAR'                                            XA00642 83417002
+         LINE                                                           83418002
+         BIN   CHANCK04                                         XA00642 83419002
+         LABEL 'OR/COMPARATOR'                                  XA00642 83420002
+         LINE                                                           83421002
+         BIN   CHANCK05                                         XA00642 83422002
+         LABEL 'TIMING'                                         XA00642 83423002
+         LINE                                                           83424002
+         BIN   CHANCK06                                         XA00642 83425002
+         LABEL 'FBO/FTO'                                        XA00642 83426002
+         LINE  ,,SKIP=2                                         XA00642 83427002
+         BIN   CHANCK07                                         XA00642 83428002
+         LABEL 'FBI/FCM'                                        XA00642 83429002
+         LINE  ,(5,26),SKIP=2                                           83600002
+         LABEL '-----CPU CHECKS-----'                                   83680002
+         LINE  (52,1),(1,1),SKIP=2                             @XA06108 83760002
+         HEX   ZONER99                                         @XA06108 83800002
+        ROUTINE   XDUM2,NOTVIRG                                         83820002
+         LABEL 'CHECKS 0   CHECKS 1   ZONE IN ERROR'           @XA06108 83840002
+        LINE      (52,1),(1,69),SKIP=2                         @X60CAFR 83850002
+        HEX       ZONER99                                      @X60CAFR 83860002
+        ROUTINE   XDUM2,ISVIRG                                          83870002
+        LABEL 'CHECKS 0   CHECKS 1  ZONE IN ERROR','ACCELERATOR ERROR'  83880002
+         LINE  (3,11),(23,1),SKIP=1                            @XA06108 83920002
+         HEX   CHK0,1,2B                                                84000002
+         HEX   CHK1,1,2B                                                84080002
+         ROUTINE ZONER00,CYCLFLG                               @XA06108 84160002
+        ROUTINE   XDUM2,NOTVIRG                                         84165002
+         LABEL 'CYCLE STEAL FLAG (BIT 0)            '          @XA06108 84170002
+        LINE      (3,11),(23,42),SKIP=1                        @X60CAFR 84171002
+        HEX       CHK0,1,2B                                    @X60CAFR 84172002
+        HEX       CHK1,1,2B                                    @X60CAFR 84173002
+        ROUTINE   ZONER00,CYCLFLG                              @X60CAFR 84174002
+        ROUTINE   CHANTG00,TYPE02                              @X60CAFR 84175002
+        ROUTINE   XDUM2,ISVIRG                                          84176002
+         LABEL 'CYCLE STEAL FLAG (BIT 0)                  R1/R2 PARITY X84177002
+               CHK             ACC ASAR CHK                     '       84178002
+         LINE  ,                                               @XA06108 84180002
+         ROUTINE ZONER01,CYCLZON                               @XA06108 84190002
+        ROUTINE   XDUM2,NOTVIRG                                         84195002
+         LABEL 'CYCLE STEAL ZONE (BIT 1-3)          '          @XA06108 84200002
+        LINE   ,                                               @X60CAFR 84201002
+        ROUTINE   ZONER01,CYCLZON                              @X60CAFR 84202002
+        ROUTINE   CHANTG00,TYPE13                              @X60CAFR 84203002
+        ROUTINE   XDUM2,ISVIRG                                          84204002
+         LABEL 'CYCLE STEAL ZONE (BIT 1-3)                MODE REGISTERX84205002
+                CHK            PAGE CROSS CHK                   '       84206002
+         LINE  SKIP=2                                          @XA06108 84210002
+         ROUTINE ZONER03,DATAZON                               @XA06108 84220002
+         LABEL 'DATA FLOW ZONE   (BIT 5-7)          '          @XA06108 84230002
+         LINE  ,(5,1)                                                   84240002
+         LABEL '--- FLOATING POINT REGISTERS ---'                       84320002
+         LINE  (16,15),(1,1)                                            84400002
+         HEX   FP0,1,4B                                                 84480002
+         HEX   FP1,1,4B                                                 84560002
+         HEX   FP2,1,4B                                                 84640002
+         HEX   FP3,1,4B                                                 84720002
+         LABEL 'FP REGS 0,2'                                            84800002
+         LINE  (16,15),(1,1)                                            84880002
+         HEX   FP4,1,4B                                                 84960002
+         HEX   FP5,1,4B                                                 85040002
+         HEX   FP6,1,4B                                                 85120002
+         HEX   FP7,1,4B                                                 85200002
+         LABEL 'FP REGS 4,6'                                            85280002
+         LINE                                                           85360002
+         LABEL     ''                                                   85440002
+         LINE  ,(5,1)                                                   85520002
+         LABEL '--- GENERAL PURPOSE REGISTERS ---'                      85600002
+         LINE  (16,15),(1,1)                                            85680002
+         HEX   GPR0,1,4B                                                85760002
+         HEX   GPR1,1,4B                                                85840002
+         HEX   GPR2,1,4B                                                85920002
+         HEX   GPR3,1,4B                                                86000002
+         LABEL 'GP REGS 0-3'                                            86080002
+         LINE  (16,15),(1,1)                                            86160002
+         HEX   GPR4,1,4B                                                86240002
+         HEX   GPR5,1,4B                                                86320002
+         HEX   GPR6,1,4B                                                86400002
+         HEX   GPR7,1,4B                                                86480002
+         LABEL 'GP REGS 4-7'                                            86560002
+         LINE  (16,15),(1,1)                                            86640002
+         HEX   GPR8,1,4B                                                86720002
+         HEX   GPR9,1,4B                                                86800002
+         HEX   GP10,1,4B                                                86880002
+         HEX   GP11,1,4B                                                86960002
+         LABEL 'GP REGS 8-B'                                            87040002
+         LINE  (16,15),(1,1)                                            87120002
+         HEX   GP12,1,4B                                                87200002
+         HEX   GP13,1,4B                                                87280002
+         HEX   GP14,1,4B                                                87360002
+         HEX   GP15,1,4B                                                87440002
+         LABEL 'GP REGS C-F'                                            87520002
+         LINE                                                           87600002
+         LABEL     ''                                                   87680002
+         LINE  ,(5,1)                                                   87760002
+         LABEL '--- CONTROL REGISTERS ---'                              87840002
+         LINE  (16,15),(1,1)                                            87920002
+         HEX   CTR0,1,4B                                                88000002
+         HEX   CTR1,1,4B                                                88080002
+         HEX   CTR2,1,4B                                                88160002
+         HEX   CTR3,1,4B                                                88240002
+         LABEL 'CR REGS 0-3'                                            88320002
+         LINE  (16,15),(1,1)                                            88400002
+         HEX   CTR4,1,4B                                                88480002
+         HEX   CTR5,1,4B                                                88560002
+         HEX   CTR6,1,4B                                                88640002
+         HEX   CTR7,1,4B                                                88720002
+         LABEL 'CR REGS 4-7'                                            88800002
+         LINE  (16,15),(1,1)                                            88880002
+         HEX   CTR8,1,4B                                                88960002
+         HEX   CTR9,1,4B                                                89040002
+         HEX   CR10,1,4B                                                89120002
+         HEX   CR11,1,4B                                                89200002
+         LABEL 'CR REGS 8-B'                                            89280002
+         LINE  (16,15),(1,1)                                            89360002
+         HEX   CR12,1,4B                                                89440002
+         HEX   CR13,1,4B                                                89520002
+         HEX   CR14,1,4B                                                89600002
+         HEX   CR15,1,4B                                                89680002
+         LABEL 'CR REGS C-F'                                            89760002
+         DC    X'01000B8B00'                                            89840002
+         LABEL ''                                                       89920002
+         DC    X'01000B8B00'                                            90000002
+         LABEL ''                                                       90030002
+         LINE  ,(30,),SKIP=2                                            90060002
+         ROUTINE FDUM8,SKIPPER                                          90090002
+         LABEL 'MACHINE CHECK STATUS FIELD'                             90120002
+         LINE  (41,),(1,),SKIP=1                                        90150002
+         HEX   DARLNGTH,0,2B                                            90180002
+         LABEL 'MCSTATD FIELD LENGTH'                                   90210002
+         LINE  ,(5,)                                                    90240002
+         ROUTINE FDUM8,SKIPPER                                          90270002
+         LABEL '--- SYSTEM STATUS ---'                                  90300002
+         LINE  (35,35),(1,40)                                           90330002
+         BIN   SYSSTAT0                                                 90360002
+         BIN   SYSSTAT1                                                 90390002
+         LABEL 'HARDWARE RECOVERY','SOFTWARE RECOVERY'                  90420002
+         LINE                                                           90450002
+         BIN   SYSSTAT2                                                 90480002
+         BIN   SYSSTAT3                                                 90510002
+         LABEL 'TASK ABORTED','TASK SET NON-DISPATCHABLE'               90540002
+         LINE                                                           90570002
+         BIN   SYSSTAT4                                                 90600002
+         BIN   SYSSTAT5                                                 90630002
+         LABEL 'OPERATING SYSTEM TERMINATION','QUIET MODE IN EFFECT'    90660002
+         LINE  ,(5,)                                                    90690002
+         ROUTINE FDUM8,SKIPPER                                          90720002
+         LABEL '--- DAMAGE AREA ---'                                    90750002
+         LINE  ,(1,40)                                                  90780002
+         BIN   AREADT0                                                  90810002
+         BIN   AREADT1                                                  90840002
+         LABEL 'MAIN STORAGE','BUFFER'                                  90870002
+         LINE                                                           90900002
+         BIN   AREADT2                                                  90930002
+         BIN   AREADT3                                                  90960002
+         LABEL 'CONTROL STORAGE','INTERVAL TIMER'                       90990002
+         LINE                                                           91020002
+         BIN   AREADT4                                                  91050002
+         BIN   AREADT5                                                  91080002
+         LABEL 'PROCESSOR','CHANNEL ERROR'                              91110002
+         LINE                                                           91140002
+         BIN   AREADT6                                                  91170002
+         BIN   AREADT7                                                  91200002
+         LABEL 'TOD CLOCK','SYSTEM DAMAGE'                              91230002
+         LINE  ,(5,)                                                    91260002
+         ROUTINE FDUM8,SKIPPER                                          91290002
+         LABEL '--- ERROR TYPE ---'                                     91320002
+         LINE  ,(1,40)                                                  91350002
+         BIN   ERRTYPE0                                                 91380002
+         BIN   ERRTYPE1                                                 91410002
+         LABEL 'INTERMITTENT','SOLID'                                   91440002
+         LINE                                                           91470002
+         BIN   ERRTYPE2                                                 91500002
+         BIN   ERRTYPE3                                                 91530002
+         LABEL 'DATA','RESERVED'                                        91560002
+         LINE                                                           91590002
+         BIN   ERRTYPE4                                                 91620002
+         BIN   ERRTYPE5                                                 91650002
+         LABEL 'RESERVED','PROTECT'                                     91680002
+         LINE  ,(5,)                                                    91710002
+         ROUTINE FDUM8,SKIPPER                                          91740002
+         LABEL '--- RMS ACTION DATA ---'                                91770002
+         LINE  ,(1,40)                                                  91800002
+         BIN   RMSACTN0                                                 91830002
+         BIN   RMSACTN1                                                 91860002
+         LABEL 'LOOP TIME OUT','REPAIR'                                 91890002
+         LINE                                                           91920002
+         BIN   RMSACTN2                                                 91950002
+         BIN   RMSACTN3                                                 91980002
+         LABEL 'STORAGE RECONFIGURE','BUFFER RECONFIGURE'               92010002
+         LINE  ,(5,)                                                    92040002
+         ROUTINE FDUM8,SKIPPER                                          92070002
+         LABEL '--- RMS INFORMATION STATUS ---'                         92100002
+         LINE  ,(1,40)                                                  92130002
+         BIN   RMSINFO0                                                 92160002
+         BIN   RMSINFO1                                                 92190002
+         LABEL 'RESERVED','INVALID MCI CODE'                            92220002
+         LINE                                                           92250002
+         BIN   RMSINFO2                                                 92280002
+         BIN   RMSINFO3                                                 92310002
+         LABEL 'INVALID FAILING STORAGE ADDRESS','PROGRAM CHECK IN MCH' 92340002
+         LINE  (15,),(5,),SKIP=1                                        92370002
+         ROUTINE FDUM8,SKIPPER                                          92580002
+         LABEL '--- HISTORY OF TRANSIENT MODULES ---'                   92610002
+         LINE  (1,15)                                                   92640002
+         HEX   TRNSMOD0,1,4B                                            92670002
+         HEX   TRNSMOD1,1,4B                                            92700002
+         HEX   TRNSMOD2,1,4B                                            92730002
+         HEX   TRNSMOD3,1,4B                                            92760002
+         LABEL ''                                                       92790002
+         LINE  ,,SKIP=2                                                 92820002
+         HEX   TRNSMOD4,1,4B                                            92850002
+         HEX   TRNSMOD5,1,4B                                            92880002
+         HEX   TRNSMOD6,1,4B                                            92910002
+         HEX   TRNSMOD7,1,4B                                            92940002
+         LABEL ''                                                       92970002
+         LINE  ,(5,),SKIP=1                                             93000002
+         LABEL '--- PDAR ACTION ---'                                    93030002
+         LINE  (35,35),(1,40)                                           93060002
+         BIN   MCHPDR00                                                 93090002
+         BIN   MCHPDR01                                                 93120002
+         LABEL 'TERMINATION OF CURRENT TASK','RETRY POSSIBLE'           93150002
+         LINE                                                           93180002
+         BIN   MCHPDR02                                                 93210002
+         BIN   MCHPDR03                                                 93240002
+         LABEL 'BYPASS(AFFECTED TASK) POSSIBLE','REPAIR UNSUCCESSFUL'   93270002
+         LINE                                                           93300002
+         BIN   MCHPDR04                                                 93330002
+         BIN   MCHPDR05                                                 93360002
+         LABEL 'INDETERMINATE INSTRUCTION COUNTER','RESERVED'           93390002
+         LINE  ,(5,)                                                    93420002
+         LABEL '--- FAILURE TYPE ---'                                   93450002
+         LINE ,(1,40)                                                   93480002
+         BIN   MCHPDR10                                                 93510002
+         BIN   MCHPDR11                                                 93540002
+         LABEL 'SOLID STORAGE DATA ERROR','INTERMITTENT STOR. DATA ERR' 93570002
+         LINE                                                           93600002
+         BIN   MCHPDR12                                                 93630002
+         BIN   MCHPDR13                                                 93660002
+         LABEL 'SOLID SPF KEY ERROR','INTERMITTENT SPF KEY ERROR'       93690002
+         LINE  ,(5,)                                                    93720002
+         LABEL '--- OPERATING SYSTEM STATUS ---'                        93750002
+         LINE ,(1,40)                                                   93780002
+         BIN   MCHPDR20                                                 93810002
+         BIN   MCHPDR21                                                 93840002
+         LABEL 'WAIT PSEUDO TASK','PAGE SUPERVISOR TASK'                93870002
+         LINE                                                           93900002
+         BIN   MCHPDR22                                                 93930002
+         BIN   MCHPDR23                                                 93960002
+         LABEL 'MASTER SCHEDULER TASK','SYSTEM TASK'                    93990002
+         LINE                                                           94020002
+         BIN   MCHPDR24                                                 94050002
+         BIN   MCHPDR25                                                 94080002
+         LABEL 'PROBLEM PROGRAM TASK','CURRENT PSW DISABLED FOR I/O'    94110002
+         LINE  ,(5,)                                                    94140002
+         LABEL '--- LOCATION OF FAILURE ---'                            94170002
+         LINE ,(1,40)                                                   94200002
+         BIN   MCHPDR30                                                 94230002
+         BIN   MCHPDR31                                                 94260002
+         LABEL 'NUCLEUS','SQA AREA'                                     94290002
+         LINE                                                           94320002
+         BIN   MCHPDR32                                                 94350002
+         BIN   MCHPDR33                                                 94380002
+         LABEL 'LSQA AREA','PQA'                                        94410002
+         LINE                                                           94440002
+         BIN   MCHPDR34                                                 94470002
+         BIN   MCHPDR35                                                 94500002
+         LABEL 'PAGEABLE AREA','FIXED PAGE AREA'                        94530002
+         LINE                                                           94560002
+         BIN   MCHPDR36                                                 94590002
+         BIN   MCHPDR37                                                 94620002
+         LABEL 'V=R ADDRESS AREA','CRITICAL AREA'                       94650002
+         LINE  ,(5,)                                                    94680002
+         LABEL '--- REQUESTED OPERATOR AWARENESS ---'                   94710002
+         LINE ,(1,40)                                                   94740002
+         BIN   MCHPDR50                                                 94770002
+         BIN   MCHPDR51                                                 94800002
+         LABEL 'SUPERVISOR DAMAGE MESSAGE','TASK ABNORM TERMINATION MSGC94830002
+               '                                                        94860002
+         LINE                                                           94890002
+         BIN   MCHPDR52                                                 94920002
+         BIN   MCHPDR53                                                 94950002
+         LABEL 'DAMAGED PAGE NOW UNAVAILABLE MSG','DAMAGED PAGE NOW DELC94980002
+               ETED MSG'                                                95010002
+         LINE                                                           95040002
+         BIN   MCHPDR54                                                 95070002
+         BIN   MCHPDR55                                                 95100002
+         LABEL 'TASK NON-DISPATCHABLE MESSAGE','SOFTWARE RECOVERY MESSAC95130002
+               GE'                                                      95160002
+         LINE  ,(5,)                                                    95190002
+         LABEL '--- FOOTPRINTS ---'                                     95220002
+         LINE ,(1,40)                                                   95250002
+         BIN   MCHPDR60                                                 95280002
+         BIN   MCHPDR61                                                 95310002
+         LABEL 'CHANGE BIT ACTIVE','KEY IN EXTERNAL PAGE TABLE'         95340002
+         LINE                                                           95370002
+         BIN   MCHPDR62                                                 95400002
+         BIN   MCHPDR63                                                 95430002
+         LABEL 'PAGE RECURSION','PAGE FIX ACTIVE IN LOW END'            95460002
+         LINE                                                           95490002
+         BIN   MCHPDR64                                                 95520002
+         BIN   MCHPDR65                                                 95550002
+         LABEL 'TRANSLATE ERROR','NO PAGE EXISTS'                       95580002
+         LINE                                                           95610002
+         BIN   MCHPDR66                                                 95640002
+         BIN   MCHPDR67                                                 95670002
+         LABEL 'RELOCATE OFF','LOW END INTERFACE ACTIVE'                95700002
+         DC    X'01000B8B00'                                            95730002
+         LABEL ''                                                       95760002
+         LINE  ,(5,)                                                    95790002
+         LABEL '--- FOOTPRINTS - INTERFACES ---'                        95820002
+         LINE ,(1,40)                                                   95850002
+         BIN   MCHPDR70                                                 95880002
+         BIN   MCHPDR71                                                 95910002
+         LABEL 'ABTERM INTERFACE ACTIVE','TRANSLATE INTERFACE ACTIVE'   95940002
+         LINE                                                           95970002
+         BIN   MCHPDR72                                                 96000002
+         BIN   MCHPDR73                                                 96030002
+         LABEL 'FIND PAGE INTERFACE ACTIVE','PAGE DEQUEUE INTERFACE ACTC96060002
+               .'                                                       96090002
+         LINE                                                           96120002
+         BIN   MCHPDR74                                                 96150002
+         BIN   MCHPDR75                                                 96180002
+         LABEL 'PAGE ENQUEUE INTERFACE ACTIVE',                        C96210002
+               'STAT FUNCTION INTERFACE ACT.'                           96240002
+         LINE  ,,SKIP=2                                                 96270002
+         BIN   MCHPDR76                                                 96300002
+         BIN   MCHPDR77                                                 96330002
+         LABEL 'V=R RELEASE INTERFACE ACTIVE','POST INTERFACE ACTIVE'   96360002
+         LINE  (45,1),(1,),SKIP=1                                       96390002
+         HEX   MCHFSAR,0,4B                                             96420002
+         LABEL 'FAILING STORAGE REAL ADDRESS'                           96450002
+         LINE                                                           96480002
+         HEX   MCHFSAV,0,4B                                             96510002
+         LABEL 'BEGINNING FAILING STORAGE VIRTUAL ADDRESS'              96540002
+         LINE                                                           96570002
+         HEX   MCHFSEAV,0,4B                                            96600002
+         LABEL 'ENDING FAILING STORAGE VIRTUAL ADDRESS'                 96630002
+         LINE                                                           96660002
+         HEX   MCHPDARI,0,4B                                            96690002
+         LABEL 'INSTRUCTION ADDRESS AT FAILURE'                         96720002
+         LINE  ,,SKIP=2                                                 96750002
+         HEX   MCHTCBCU,0,4B                                            96780002
+         LABEL 'CURRENT TCB POINTER'                                    96810002
+DUMPCODE DC    X'FF'                                                    97680002
+DUMPSIZE DC    XL2'190'                 SIZE OF LOGOUT                  97760002
+         DC    XL2'30'                  HEADER                          97840002
+ADDRLABL DC    XL2'E8'           RECORD ADDRESS                @XA06108 97920002
+         LABEL     ''                                                   98000002
+SHORTREC DC    X'FF'                                                    98080002
+         DC    XL2'40'                                                  98160002
+         DC    XL2'30'                                                  98240002
+         DC    XL2'0'                                                   98320002
+LABAREA  EQU   *                                                        98400002
+         LSTART                                                         98480002
+         END                                                            98560002

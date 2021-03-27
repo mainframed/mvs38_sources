@@ -1,0 +1,920 @@
+         TITLE '     IKTCAS40 - CONSOLE COMMUNICATION DRIVER'           00001000
+IKTCAS40 CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'IKTCAS40  78.336'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  STM   @14,@12,12(@13)                                     0001 00009000
+         BALR  @12,0                                               0001 00010000
+@PSTART  DS    0H                                                  0001 00011000
+         USING @PSTART,@12                                         0001 00012000
+         ST    @13,@SA00001+4                                      0001 00013000
+         LA    @14,@SA00001                                        0001 00014000
+         ST    @14,8(,@13)                                         0001 00015000
+         LR    @13,@14                                             0001 00016000
+         EJECT                                                          00017000
+*  /******************************************************************/ 00018000
+*  /*                                                                */ 00019000
+*  /*  THIS PROGRAM IS ORGANIZED AS FOLLOWS:                         */ 00020000
+*  /*                                                                */ 00021000
+*  /*      A - HOUSEKEEPING                                          */ 00022000
+*  /*                                                                */ 00023000
+*  /*      B - MAINLINE, WHICH CONSISTS OF THE FOLLOWING:            */ 00024000
+*  /*          1)  WAIT ON A LIST OF ECB'S                           */ 00025000
+*  /*          2)  PROCESS AN OPERATOR COMMAND (IF ENTERED)          */ 00026000
+*  /*          3)  PROCESS THE SYNCHRONOUS QUEUE                     */ 00027000
+*  /*          4)  PROCESS MY STOP QUEUE (VIA IKTCAS41)              */ 00028000
+*  /*          5)  PROCESS MY MODIFY QUEUE (VIA IKTCAS42)            */ 00029000
+*  /*          6)  IF A STOP SUB-TASK COMMAND HAS NOT BEEN           */ 00030000
+*  /*              GENERATED, GO BACK AND WAIT ON THE ECB'S          */ 00031000
+*  /*                                                                */ 00032000
+*  /*      C - CLEANUP AND RETURN                                    */ 00033000
+*  /*                                                                */ 00034000
+*  /******************************************************************/ 00035000
+*  TWAPTR = R1;                            /*PICK UP WORK AREA PTR   */ 00036000
+         LR    TWAPTR,R1                                           0039 00037000
+*  RESPECIFY (R1) UNRESTRICTED;            /*FREE UP R1              */ 00038000
+*  GOSW = '1'B;                            /*INITIALIZE GO SWITCH    */ 00039000
+         OI    GOSW,B'10000000'                                    0041 00040000
+*  TWACSKIP = 'N';                         /*INITIALIZE SKIP SWITCH  */ 00041000
+         MVI   TWACSKIP(TWAPTR),C'N'                               0042 00042000
+*  ECBADDR1 = CHECBP;                      /*SET UP                  */ 00043000
+         L     @10,CSCBPTR(,TWAPTR)                                0043 00044000
+         L     @15,CHECBP(,@10)                                    0043 00045000
+         ST    @15,ECBADDR1                                        0043 00046000
+*  ECBADDR2 = ADDR(TWACECB);               /* ECB                    */ 00047000
+         LA    @15,TWACECB(,TWAPTR)                                0044 00048000
+         ST    @15,ECBADDR2                                        0044 00049000
+*  ECBEND = '80'X;                         /*  WAIT LIST             */ 00050000
+         MVI   ECBEND,X'80'                                        0045 00051000
+*  TWACEIFC(1) = 1;                        /*SET UP ESTAE            */ 00052000
+         MVI   TWACEIFC(TWAPTR),X'01'                              0046 00053000
+*  TWACERA(1) = 0;                         /* FOOTPRINTS             */ 00054000
+         SLR   @15,@15                                             0047 00055000
+         STCM  @15,7,TWACERA(TWAPTR)                               0047 00056000
+*  TWACERRS(1) = 0;                        /*  LIST                  */ 00057000
+         ST    @15,TWACERRS(,TWAPTR)                               0048 00058000
+*  RFY R2 RSTD;                                                    0049 00059000
+*  R2=ADDR(CHCIBP) ;                       /* LOAD CIB PTR           */ 00060000
+         LA    R2,CHCIBP(,@10)                                     0050 00061000
+*  GEN ;                                                           0051 00062000
+  QEDIT  ORIGIN=(R2),CIBCTR=3                                           00063000
+*  RFY R2 UNRSTD ;                                                 0052 00064000
+*  DO WHILE (GOSW = '1'B);                 /*MAINLINE CODE           */ 00065000
+         B     @DE00053                                            0053 00066000
+@DL00053 DS    0H                                                  0054 00067000
+*      CALL CHKECBS;                       /*CHK FOR OPERATOR CMND   */ 00068000
+         BAL   @14,CHKECBS                                         0054 00069000
+*      CALL CHKSYNCQ;                      /*PROCESS SYNC Q          */ 00070000
+         BAL   @14,CHKSYNCQ                                        0055 00071000
+*      CALL IKTCAS41;                      /*PROCESS STOP Q          */ 00072000
+         L     @15,@CV00059                                        0056 00073000
+         BALR  @14,@15                                             0056 00074000
+*      CALL IKTCAS42;                      /*PROCESS MODIFY Q        */ 00075000
+         L     @15,@CV00060                                        0057 00076000
+         BALR  @14,@15                                             0057 00077000
+*      TWACSKIP = 'N';                     /*TURN OFF SKIP SWITCH    */ 00078000
+         MVI   TWACSKIP(TWAPTR),C'N'                               0058 00079000
+*      IF GOSW='1'B                        /* IF CONT SW IS ON       */ 00080000
+*         THEN DO ;                        /* YES,CONTINUE           */ 00081000
+         TM    GOSW,B'10000000'                                    0059 00082000
+         BNO   @RF00059                                            0059 00083000
+*              GEN SETS(ECBLIST) ;                                 0061 00084000
+         WAIT  ECBLIST=ECBLIST    WAIT ON ECB LIST FOR WORK             00085000
+*              END ;                                               0062 00086000
+*  END;                                    /*GO BACK TO SLEEP        */ 00087000
+@RF00059 DS    0H                                                  0063 00088000
+@DE00053 TM    GOSW,B'10000000'                                    0063 00089000
+         BO    @DL00053                                            0063 00090000
+*  TWACEIFC(1) = 0;                        /*CLEAR ESTAE FOOTPRINTS  */ 00091000
+         MVI   TWACEIFC(TWAPTR),X'00'                              0064 00092000
+*  RETURN CODE(0);                         /*FINISHED                */ 00093000
+         SLR   @15,@15                                             0065 00094000
+         L     @13,4(,@13)                                         0065 00095000
+         L     @14,12(,@13)                                        0065 00096000
+         LM    @00,@12,20(@13)                                     0065 00097000
+         BR    @14                                                 0065 00098000
+         EJECT                                                          00099000
+*CHKECBS: PROC OPTIONS (SAVE (14));                                0066 00100000
+@EL00001 L     @13,4(,@13)                                         0066 00101000
+@EF00001 DS    0H                                                  0066 00102000
+@ER00001 LM    @14,@12,12(@13)                                     0066 00103000
+         BR    @14                                                 0066 00104000
+CHKECBS  ST    @14,@SA00002                                        0066 00105000
+*  /******************************************************************/ 00106000
+*  /*                                                                */ 00107000
+*  /*  THIS SUBROUTINE HANDLES THE COMMAND(S) ENTERED BY THE         */ 00108000
+*  /*  OPERATOR (IF ANY).  THE MAIN PROCESSING IS AS FOLLOWS:        */ 00109000
+*  /*                                                                */ 00110000
+*  /*  -   ZERO OUT TWACECB (ECB USED BY OTHER TASKS TO POST ME)     */ 00111000
+*  /*  -   IF OPERATOR COMMAND ECB NOT POSTED, EXIT                  */ 00112000
+*  /*  -   ZERO OUT OPERATOR COMMAND ECB                             */ 00113000
+*  /*  -   IF CIB Q IS EMPTY, EXIT                                   */ 00114000
+*  /*  -   USING THE FIRST CIB IN THE Q, BUILD THE PROPER TYPE OF    */ 00115000
+*  /*      W.E.                                                      */ 00116000
+*  /*  -   PUT THE W.E. ON THE PROPER ASYNCHRONOUS Q                 */ 00117000
+*  /*  -   DEQUEUE THE CIB USING THE QEDIT MACRO                     */ 00118000
+*  /*  -   GO BACK UP AND SEE IF THE CIB Q IS NOW EMPTY              */ 00119000
+*  /*                                                                */ 00120000
+*  /******************************************************************/ 00121000
+*  TWACECB = TWACECB && TWACECB;           /*CLEAR MY WAIT ECB       */ 00122000
+         XC    TWACECB(4,TWAPTR),TWACECB(TWAPTR)                   0067 00123000
+*      GEN (MODESET KEY=ZERO,MODE=SUP)                             0068 00124000
+*          REFS(R0,R1,R14,R15);                                    0068 00125000
+         MODESET KEY=ZERO,MODE=SUP                                      00126000
+*      OPRTRECB = OPRTRECB && OPRTRECB;    /*CLEAR OPERATOR ECB      */ 00127000
+         L     @10,CSCBPTR(,TWAPTR)                                0069 00128000
+         L     @10,CHECBP(,@10)                                    0069 00129000
+         XC    OPRTRECB(4,@10),OPRTRECB(@10)                       0069 00130000
+*      GEN (MODESET KEY=NZERO,MODE=PROB)                           0070 00131000
+*          REFS(R0,R1,R14,R15);                                    0070 00132000
+         MODESET KEY=NZERO,MODE=PROB                                    00133000
+*      DO WHILE (CIBPTR ^= 0);             /*PROCESS CIB Q           */ 00134000
+         B     @DE00071                                            0071 00135000
+@DL00071 DS    0H                                                  0072 00136000
+*          IF CIBVERB = '40'X THEN         /*IS THIS A STOP CIB      */ 00137000
+         L     @10,CSCBPTR(,TWAPTR)                                0072 00138000
+         L     @10,CIBPTR(,@10)                                    0072 00139000
+         CLI   CIBVERB(@10),X'40'                                  0072 00140000
+         BNE   @RF00072                                            0072 00141000
+*              CALL BLDSTPWE;              /*YES - BUILD STOP W.E.   */ 00142000
+         BAL   @14,BLDSTPWE                                        0073 00143000
+*          ELSE                            /*NO - TRY ANOTHER CODE   */ 00144000
+*              IF CIBVERB = '44'X THEN     /*IS THIS A MODIFY CIB    */ 00145000
+         B     @RC00072                                            0074 00146000
+@RF00072 L     @10,CSCBPTR(,TWAPTR)                                0074 00147000
+         L     @10,CIBPTR(,@10)                                    0074 00148000
+         CLI   CIBVERB(@10),X'44'                                  0074 00149000
+         BNE   @RF00074                                            0074 00150000
+*                  CALL BLDMODWE;          /*YES - BUILD MODIFY W.E. */ 00151000
+         BAL   @14,BLDMODWE                                        0075 00152000
+*          RESPECIFY (R2,R3) RESTRICTED;   /*FREEZE FOR QEDIT MACRO  */ 00153000
+@RF00074 DS    0H                                                  0076 00154000
+@RC00072 DS    0H                                                  0077 00155000
+*          R2 = ADDR(CHCIBP);              /*ADDR OF CIB PTR         */ 00156000
+         L     @10,CSCBPTR(,TWAPTR)                                0077 00157000
+         LA    R2,CHCIBP(,@10)                                     0077 00158000
+*          R3 = CHCIBP;                    /*ADDR OF CIB TO BE FREED */ 00159000
+         L     R3,CHCIBP(,@10)                                     0078 00160000
+*          GEN (QEDIT ORIGIN=(R2),BLOCK=(R3)) /*FREE CIB             */ 00161000
+*              REFS (R0,R1,R2,R3,R14,R15);                         0079 00162000
+         QEDIT ORIGIN=(R2),BLOCK=(R3)                                   00163000
+*          RESPECIFY (R2,R3) UNRESTRICTED;                         0080 00164000
+*      END;                                                        0081 00165000
+@DE00071 L     @10,CSCBPTR(,TWAPTR)                                0081 00166000
+         L     @10,CIBPTR(,@10)                                    0081 00167000
+         LTR   @10,@10                                             0081 00168000
+         BNZ   @DL00071                                            0081 00169000
+*END CHKECBS;                                                      0082 00170000
+@EL00002 DS    0H                                                  0082 00171000
+@EF00002 DS    0H                                                  0082 00172000
+@ER00002 L     @14,@SA00002                                        0082 00173000
+         BR    @14                                                 0082 00174000
+         EJECT                                                          00175000
+*BLDSTPWE: PROC OPTIONS (SAVE (14));                               0083 00176000
+BLDSTPWE ST    @14,@SA00003                                        0083 00177000
+*  /******************************************************************/ 00178000
+*  /*                                                                */ 00179000
+*  /*  THIS SUBROUTINE WILL GET THE SPACE FOR A STOP W.E., BUILD     */ 00180000
+*  /*  IT, AND THEN Q IT ON THE STOP Q                               */ 00181000
+*  /*                                                                */ 00182000
+*  /******************************************************************/ 00183000
+*  LENGTH = 16;                            /*LENGTH OF W.E.          */ 00184000
+         LA    LENGTH,16                                           0084 00185000
+*  SUBPL = 4;                              /*SUBPOOL NUMBER          */ 00186000
+         LA    SUBPL,4                                             0085 00187000
+*  CALL GETSPACE;                          /*GET SPACE               */ 00188000
+         BAL   @14,GETSPACE                                        0086 00189000
+*  WECODE1T = TCCONSLE;                    /*MY TASK                 */ 00190000
+         L     @10,WEPTR                                           0087 00191000
+         MVI   WECODE1T(@10),X'04'                                 0087 00192000
+*  WECODE2T = TCCONSLE;                    /* CODE                   */ 00193000
+         MVI   WECODE2T(@10),X'04'                                 0088 00194000
+*  WECODE1F = FCCSTOP;                     /*STOP FUNCTION           */ 00195000
+         MVI   WECODE1F(@10),X'11'                                 0089 00196000
+*  WECODE2F = FCCSTOP;                     /* CODE                   */ 00197000
+         MVI   WECODE2F(@10),X'11'                                 0090 00198000
+*  WERC = 0;                               /*ZERO OUT                */ 00199000
+         SLR   @05,@05                                             0091 00200000
+         STH   @05,WERC(,@10)                                      0091 00201000
+*  WELEN = LENGTH;                         /*LENGTH OF W.E.          */ 00202000
+         STH   LENGTH,WELEN(,@10)                                  0092 00203000
+*LOOP1:                                    /*COMPARE AND SWAP LOOP   */ 00204000
+*  TEMPPTR = TWACSTPQ;                     /*CURRENT POINTER         */ 00205000
+LOOP1    L     TEMPPTR,TWACSTPQ(,TWAPTR)                           0093 00206000
+*  WENEXT = TEMPPTR;                       /*SET UP CHAIN FIELD      */ 00207000
+         L     @10,WEPTR                                           0094 00208000
+         ST    TEMPPTR,WENEXT(,@10)                                0094 00209000
+*  CS(TEMPPTR,ADDRESS,TWACSTPQ);           /*TRY TO ADD ANOTHER W.E. */ 00210000
+         L     @10,ADDRESS                                         0095 00211000
+         CS    TEMPPTR,@10,TWACSTPQ(TWAPTR)                        0095 00212000
+*  BC(7,LOOP1);                            /*DIDN'T WORK - TRY AGAIN */ 00213000
+         BC    7,LOOP1                                             0096 00214000
+*END BLDSTPWE;                                                     0097 00215000
+@EL00003 DS    0H                                                  0097 00216000
+@EF00003 DS    0H                                                  0097 00217000
+@ER00003 L     @14,@SA00003                                        0097 00218000
+         BR    @14                                                 0097 00219000
+         EJECT                                                          00220000
+*BLDMODWE: PROC OPTIONS (SAVE (14));                               0098 00221000
+BLDMODWE ST    @14,@SA00004                                        0098 00222000
+*  /******************************************************************/ 00223000
+*  /*                                                                */ 00224000
+*  /*  THIS SUBROUTINE WILL GET THE SPACE FOR A MODIFY W.E., BUILD   */ 00225000
+*  /*  IT, AND THEN Q IT ON THE MODIFY Q                             */ 00226000
+*  /*                                                                */ 00227000
+*  /******************************************************************/ 00228000
+*                                          /*CALCULATE THE SIZE OF   */ 00229000
+*                                          /*THE W.E. BY ADDING 12   */ 00230000
+*                                          /*(FOR THE SIZE OF THE    */ 00231000
+*                                          /*FIXED PART), CIBDATLN+4 */ 00232000
+*                                          /*(FOR THE SIZE OF THE    */ 00233000
+*                                          /*VARIABLE PART) AND      */ 00234000
+*                                          /*ROUNDING UP TO THE      */ 00235000
+*                                          /*NEXT DOUBLEWORD         */ 00236000
+*  LENGTH = ((12+CIBDATLN+4)+7)/8*8;                               0099 00237000
+         L     @10,CSCBPTR(,TWAPTR)                                0099 00238000
+         L     @10,CIBPTR(,@10)                                    0099 00239000
+         LA    @00,23                                              0099 00240000
+         AH    @00,CIBDATLN(,@10)                                  0099 00241000
+         SRDA  @00,32                                              0099 00242000
+         D     @00,@CF00065                                        0099 00243000
+         SLA   @01,3                                               0099 00244000
+         LR    LENGTH,@01                                          0099 00245000
+*  SUBPL = 4;                              /*SUBPOOL NUMBER          */ 00246000
+         LA    SUBPL,4                                             0100 00247000
+*  CALL GETSPACE;                          /*GET SPACE               */ 00248000
+         BAL   @14,GETSPACE                                        0101 00249000
+*  WECODE1T = TCCONSLE;                    /*MY TASK                 */ 00250000
+         L     @10,WEPTR                                           0102 00251000
+         MVI   WECODE1T(@10),X'04'                                 0102 00252000
+*  WECODE2T = TCCONSLE;                    /* CODE                   */ 00253000
+         MVI   WECODE2T(@10),X'04'                                 0103 00254000
+*  WECODE1F = FCCMODFY;                    /*MODIFY FUNCTION         */ 00255000
+         MVI   WECODE1F(@10),X'21'                                 0104 00256000
+*  WECODE2F = FCCMODFY;                    /* CODE                   */ 00257000
+         MVI   WECODE2F(@10),X'21'                                 0105 00258000
+*  WERC = 0;                               /*ZERO OUT                */ 00259000
+         SLR   @05,@05                                             0106 00260000
+         STH   @05,WERC(,@10)                                      0106 00261000
+*  WELEN = LENGTH;                         /*LENGTH OF W.E.          */ 00262000
+         STH   LENGTH,WELEN(,@10)                                  0107 00263000
+*  WEDATA(1:CIBDATLN+4) = BLANKS;          /*SPACE OUT               */ 00264000
+         L     @01,CSCBPTR(,TWAPTR)                                0108 00265000
+         L     @04,CIBPTR(,@01)                                    0108 00266000
+         LH    @15,CIBDATLN(,@04)                                  0108 00267000
+         LA    @14,3                                               0108 00268000
+         ALR   @14,@15                                             0108 00269000
+         EX    @14,@SM00398                                        0108 00270000
+*  IF CIBDATLN > 0 THEN                    /*IF PARMS ENTERED THEN   */ 00271000
+         CR    @15,@05                                             0109 00272000
+         BNH   @RF00109                                            0109 00273000
+*     MVC(WEDATA(1:CIBDATLN),CIBDATA);     /*SAVE PARAMETERS FROM    */ 00274000
+         L     @01,CSCBPTR(,TWAPTR)                                0110 00275000
+         L     @01,CIBPTR(,@01)                                    0110 00276000
+         LH    @05,CIBDATLN(,@01)                                  0110 00277000
+         BCTR  @05,0                                               0110 00278000
+         EX    @05,@SM00400                                        0110 00279000
+*                                          /*MODIFY COMMAND          */ 00280000
+*LOOP2:                                    /*COMPARE AND SWAP LOOP   */ 00281000
+*  TEMPPTR = TWACMODQ;                     /*CURRENT POINTER         */ 00282000
+@RF00109 DS    0H                                                  0111 00283000
+LOOP2    L     TEMPPTR,TWACMODQ(,TWAPTR)                           0111 00284000
+*  WENEXT = TEMPPTR;                       /*SET UP CHAIN FIELD      */ 00285000
+         L     @10,WEPTR                                           0112 00286000
+         ST    TEMPPTR,WENEXT(,@10)                                0112 00287000
+*  CS(TEMPPTR,ADDRESS,TWACMODQ);           /*TRY TO ADD ANOTHER W.E. */ 00288000
+         L     @10,ADDRESS                                         0113 00289000
+         CS    TEMPPTR,@10,TWACMODQ(TWAPTR)                        0113 00290000
+*  BC(7,LOOP2);                            /*DIDN'T WORK - TRY AGAIN */ 00291000
+         BC    7,LOOP2                                             0114 00292000
+*END BLDMODWE;                                                     0115 00293000
+@EL00004 DS    0H                                                  0115 00294000
+@EF00004 DS    0H                                                  0115 00295000
+@ER00004 L     @14,@SA00004                                        0115 00296000
+         BR    @14                                                 0115 00297000
+         EJECT                                                          00298000
+*CHKSYNCQ: PROC OPTIONS (SAVE (14));                               0116 00299000
+CHKSYNCQ ST    @14,@SA00005                                        0116 00300000
+*  /******************************************************************/ 00301000
+*  /*                                                                */ 00302000
+*  /*  THIS SUBROUTINE PROCESSES THE W.E.'S FOUND ON THE             */ 00303000
+*  /*  SYNCHRONOUS QUEUE.  THE MAIN PROCESSING IS AS FOLLOWS:        */ 00304000
+*  /*                                                                */ 00305000
+*  /*  -   IF THE Q IS EMPTY, EXIT                                   */ 00306000
+*  /*  -   IF THE FIRST W.E. IS NOT FOR ME, POST THE OWNER, EXIT,    */ 00307000
+*  /*      AND GO BACK TO SLEEP                                      */ 00308000
+*  /*  -   PROCESS THE W.E., AND DEQUEUE IT                          */ 00309000
+*  /*  -   IF THE Q IS NOW EMPTY, POST ALL OF THE OTHER SUB-TASKS    */ 00310000
+*  /*      AND EXIT                                                  */ 00311000
+*  /*  -   IF THE TOP W.E. IS FOR ME, GO BACK UP TO THE PROCESS W.E. */ 00312000
+*  /*      LINE AND LOOP BACK THRU                                   */ 00313000
+*  /************************** ***************O********************* */ 00314000
+*  RESPECIFY (WESTD) BASED (TWASYNQH);     /*SET UP NEW BASE FOR W.E */ 00315000
+*  IF TWASYNQH ^= 0 THEN                   /*IS SYNC Q NON-EMPTY     */ 00316000
+         L     @10,TWASYNQH(,TWAPTR)                               0118 00317000
+         LTR   @10,@10                                             0118 00318000
+         BZ    @RF00118                                            0118 00319000
+*      DO;                                 /*YES-PROCESS AND DEQUEUE */ 00320000
+*                                          /*W.E.'S WHILE Q NOT EMPTY*/ 00321000
+*                                          /*AND TOP W.E. IS MINE    */ 00322000
+*          DO WHILE (TWASYNQH ^= 0 & WECODE1T = TCCONSLE);         0120 00323000
+         B     @DE00120                                            0120 00324000
+@DL00120 DS    0H                                                  0121 00325000
+*              ADDRESS = TWASYNQH;         /*SAVE FOR PRCSSYNE       */ 00326000
+         L     @10,TWASYNQH(,TWAPTR)                               0121 00327000
+         ST    @10,ADDRESS                                         0121 00328000
+*              TEMPPTR = WENEXT;           /*PT TO NEXT W.E. ON CHAIN*/ 00329000
+         L     TEMPPTR,WENEXT(,@10)                                0122 00330000
+*              CS(TWASYNQH,TEMPPTR,TWASYNQH);  /*DEQUEUE TOP W.E.    */ 00331000
+         L     @10,TWASYNQH(,TWAPTR)                               0123 00332000
+         CS    @10,@02,TWASYNQH(TWAPTR)                            0123 00333000
+         BZ    @BC00123                                            0123 00334000
+         ST    @10,TWASYNQH(,TWAPTR)                               0123 00335000
+@BC00123 DS    0H                                                  0124 00336000
+*              CALL PRCSSYNE;              /*PROCESS JUST DEQUED W.E.*/ 00337000
+         BAL   @14,PRCSSYNE                                        0124 00338000
+*          END;                            /*LOOP BACK THRU          */ 00339000
+@DE00120 L     @10,TWASYNQH(,TWAPTR)                               0125 00340000
+         LTR   @10,@10                                             0125 00341000
+         BZ    @DC00120                                            0125 00342000
+         CLI   WECODE1T(@10),X'04'                                 0125 00343000
+         BE    @DL00120                                            0125 00344000
+@DC00120 DS    0H                                                  0126 00345000
+*          IF TWASYNQH = 0 THEN            /*IS Q EMPTY              */ 00346000
+         L     @10,TWASYNQH(,TWAPTR)                               0126 00347000
+         LTR   @10,@10                                             0126 00348000
+         BNZ   @RF00126                                            0126 00349000
+*              DO;                         /*YES - POST EVERYBODY    */ 00350000
+*              RESPECIFY (R1) RESTRICTED;  /*FREEZE FOR POSTS        */ 00351000
+*              R1 = ADDR(TWAMECB);         /*ADDR OF ECB TO POST     */ 00352000
+         LA    R1,TWAMECB(,TWAPTR)                                 0129 00353000
+*              GEN (POST  (1))             /*POST MAIN TASK          */ 00354000
+*                  REFS (R0,R1,R14,R15);                           0130 00355000
+         POST  (1)                                                      00356000
+*              R1 = ADDR(TWAVECB);         /*ADDR OF ECB TO POST     */ 00357000
+         LA    R1,TWAVECB(,TWAPTR)                                 0131 00358000
+*              GEN (POST  (1))             /*POST VTAM SUB-TASK      */ 00359000
+*                  REFS (R0,R1,R14,R15);                           0132 00360000
+         POST  (1)                                                      00361000
+*              R1 = ADDR(TWAUECB);         /*ADDR OF ECB TO POST     */ 00362000
+         LA    R1,TWAUECB(,TWAPTR)                                 0133 00363000
+*              GEN (POST  (1))             /*POST USER SUB-TASK      */ 00364000
+*                  REFS (R0,R1,R14,R15);                           0134 00365000
+         POST  (1)                                                      00366000
+*              RESPECIFY (R1) UNRESTRICTED; /*FREE UP R1             */ 00367000
+*              END;                                                0136 00368000
+*          ELSE                                                    0137 00369000
+*              DO;                         /*NO                      */ 00370000
+         B     @RC00126                                            0137 00371000
+@RF00126 DS    0H                                                  0138 00372000
+*              CALL POSTIT;                /*POST PROPER TASK        */ 00373000
+         BAL   @14,POSTIT                                          0138 00374000
+*              TWACSKIP = 'Y';             /* AND GO BACK TO SLEEP   */ 00375000
+         MVI   TWACSKIP(TWAPTR),C'Y'                               0139 00376000
+*              END;                                                0140 00377000
+*      END;                                                        0141 00378000
+*  RESPECIFY (WESTD);                      /*REVERT TO OLD BASE      */ 00379000
+*END CHKSYNCQ;                                                     0143 00380000
+@EL00005 DS    0H                                                  0143 00381000
+@EF00005 DS    0H                                                  0143 00382000
+@ER00005 L     @14,@SA00005                                        0143 00383000
+         BR    @14                                                 0143 00384000
+         EJECT                                                          00385000
+*POSTIT: PROC OPTIONS (SAVE (14));                                 0144 00386000
+POSTIT   ST    @14,@SA00006                                        0144 00387000
+*  /******************************************************************/ 00388000
+*  /*                                                                */ 00389000
+*  /*  THIS SUBROUTINE WILL POST THE TASK WHOSE W.E. IS ON TOP OF    */ 00390000
+*  /*  THE SYNC Q.                                                   */ 00391000
+*  /*                                                                */ 00392000
+*  /******************************************************************/ 00393000
+*  RESPECIFY (WESTD) BASED (TWASYNQH);     /*SET UP NEW BASE FOR W.E.*/ 00394000
+*  RESPECIFY (R1) RESTRICTED;              /*FREEZE FOR POSTS        */ 00395000
+*  IF WECODE1T = TCMAIN THEN               /*W.E. FOR MAIN TASK      */ 00396000
+         L     @10,TWASYNQH(,TWAPTR)                               0147 00397000
+         CLI   WECODE1T(@10),X'01'                                 0147 00398000
+         BNE   @RF00147                                            0147 00399000
+*      DO;                                 /*YES                     */ 00400000
+*      R1 = ADDR(TWAMECB);                 /*ADDR OF ECB TO POST     */ 00401000
+         LA    R1,TWAMECB(,TWAPTR)                                 0149 00402000
+*      GEN (POST  (1))                     /*POST HIM                */ 00403000
+*          REFS (R0,R1,R14,R15);                                   0150 00404000
+         POST  (1)                                                      00405000
+*      END;                                                        0151 00406000
+*  ELSE                                    /*NO                      */ 00407000
+*      IF WECODE1T = TCVTAM THEN           /*W.E. FOR VTAM SUB-TASK  */ 00408000
+         B     @RC00147                                            0152 00409000
+@RF00147 L     @10,TWASYNQH(,TWAPTR)                               0152 00410000
+         CLI   WECODE1T(@10),X'02'                                 0152 00411000
+         BNE   @RF00152                                            0152 00412000
+*          DO;                             /*YES                     */ 00413000
+*          R1 = ADDR(TWAVECB);             /*ADDR OF ECB TO POST     */ 00414000
+         LA    R1,TWAVECB(,TWAPTR)                                 0154 00415000
+*          GEN (POST  (1))                 /*POST HIM                */ 00416000
+*              REFS (R0,R1,R14,R15);                               0155 00417000
+         POST  (1)                                                      00418000
+*          END;                                                    0156 00419000
+*      ELSE                                /*NO - FOR USER SUB-TASK  */ 00420000
+*          DO;                                                     0157 00421000
+         B     @RC00152                                            0157 00422000
+@RF00152 DS    0H                                                  0158 00423000
+*          R1 = ADDR(TWAUECB);             /*ADDR OF ECB TO POST     */ 00424000
+         LA    R1,TWAUECB(,TWAPTR)                                 0158 00425000
+*          GEN (POST  (1))                 /*POST HIM                */ 00426000
+*              REFS (R0,R1,R14,R15);                               0159 00427000
+         POST  (1)                                                      00428000
+*          END;                                                    0160 00429000
+*  RESPECIFY (WESTD);                      /*REVERT TO OLD BASE      */ 00430000
+*  RESPECIFY (R1) UNRESTRICTED;            /*FREE UP                 */ 00431000
+*END POSTIT;                                                       0163 00432000
+@EL00006 DS    0H                                                  0163 00433000
+@EF00006 DS    0H                                                  0163 00434000
+@ER00006 L     @14,@SA00006                                        0163 00435000
+         BR    @14                                                 0163 00436000
+         EJECT                                                          00437000
+*PRCSSYNE: PROC OPTIONS (SAVE (14));                               0164 00438000
+PRCSSYNE ST    @14,@SA00007                                        0164 00439000
+*  /******************************************************************/ 00440000
+*  /*                                                                */ 00441000
+*  /*  THE PURPOSE OF THIS SUBROUTINE IS TO PROCESS A W.E. FROM THE  */ 00442000
+*  /*  SYNC Q.  THE MAIN PROCESSING IS AS FOLLOWS:                   */ 00443000
+*  /*                                                                */ 00444000
+*  /*  -   IF THE W.E. IS A NORMAL RETURN W.E., FREE UP THE SPACE    */ 00445000
+*  /*      STARTING WITH THE ADDRESS OF THE W.E., USING THE LENGTH   */ 00446000
+*  /*      FOUND IN 'WELEN', AND IN SUBPOOL 4.  IN ADDITION, IF THIS */ 00447000
+*  /*      W.E. WAS PLACED HERE BY STOP PROCESSING, TURN 'GOSW' OFF  */ 00448000
+*  /*      AND TURN ON 'TWACSKIP'.                                   */ 00449000
+*  /*  -   IF THE W.E. IS AN END OF TASK W.E., TURN OFF 'GOSW' AND   */ 00450000
+*  /*      TURN ON 'TWACSKIP'.                                       */ 00451000
+*  /*  -   IF THE W.E. IS AN ABNORMAL RETURN MODIFY W.E., ISSUE AN   */ 00452000
+*  /*      APPROPRIATE ERROR MESSAGE                                 */ 00453000
+*  /*  -   EXIT                                                      */ 00454000
+*  /*                                                                */ 00455000
+*  /******************************************************************/ 00456000
+*  IF WECODE1F = FCRETURN THEN             /*NORMAL RETURN W.E.      */ 00457000
+         L     @10,WEPTR                                           0165 00458000
+         CLI   WECODE1F(@10),X'FF'                                 0165 00459000
+         BNE   @RF00165                                            0165 00460000
+*      DO;                                 /*YES                     */ 00461000
+*      IF WECODE2F = FCCSTOP THEN          /*SET UP BY STOP COMMAND  */ 00462000
+         CLI   WECODE2F(@10),X'11'                                 0167 00463000
+         BNE   @RF00167                                            0167 00464000
+*          DO;                             /*YES                     */ 00465000
+*          TWACSKIP = 'Y';                 /*TURN ON SKIP SW         */ 00466000
+         MVI   TWACSKIP(TWAPTR),C'Y'                               0169 00467000
+*          GOSW = '0'B;                    /*TURN OFF LOOP SW        */ 00468000
+         NI    GOSW,B'01111111'                                    0170 00469000
+*          END;                                                    0171 00470000
+*      LENGTH = WELEN;                     /*LENGTH OF FREE SPACE    */ 00471000
+@RF00167 L     @10,WEPTR                                           0172 00472000
+         LH    LENGTH,WELEN(,@10)                                  0172 00473000
+*      SUBPL = 4;                          /*SUBPOOL NUMBER          */ 00474000
+         LA    SUBPL,4                                             0173 00475000
+*      CALL FRESPACE;                      /*FREE THE SPACE          */ 00476000
+         BAL   @14,FRESPACE                                        0174 00477000
+*      RETURN;                             /*EXIT                    */ 00478000
+@EL00007 DS    0H                                                  0175 00479000
+@EF00007 DS    0H                                                  0175 00480000
+@ER00007 L     @14,@SA00007                                        0175 00481000
+         BR    @14                                                 0175 00482000
+*      END;                                                        0176 00483000
+*  IF WECODE1F = FCCEOT THEN               /*END OF TASK W.E.        */ 00484000
+@RF00165 L     @10,WEPTR                                           0177 00485000
+         CLI   WECODE1F(@10),X'03'                                 0177 00486000
+         BNE   @RF00177                                            0177 00487000
+*      DO;                                 /*YES                     */ 00488000
+*      TWACSKIP = 'Y';                     /*TURN ON SKIP SW         */ 00489000
+         MVI   TWACSKIP(TWAPTR),C'Y'                               0179 00490000
+*      GOSW = '0'B;                        /*TURN OFF LOOP SW        */ 00491000
+         NI    GOSW,B'01111111'                                    0180 00492000
+*      END;                                                        0181 00493000
+*  ELSE                                    /*NO                      */ 00494000
+*      IF WECODE1F = FCCMODFY THEN         /*ABNRML RETURN MODFY W.E.*/ 00495000
+         B     @RC00177                                            0182 00496000
+@RF00177 L     @10,WEPTR                                           0182 00497000
+         CLI   WECODE1F(@10),X'21'                                 0182 00498000
+         BNE   @RF00182                                            0182 00499000
+*          DO;                             /*YES                     */ 00500000
+*          IF WECODE2T = TCVTAM THEN       /*REJECTED BY VTAM INTER  */ 00501000
+         CLI   WECODE2T(@10),X'02'                                 0184 00502000
+         BNE   @RF00184                                            0184 00503000
+*              DO;                         /*YES                     */ 00504000
+*              RESPECIFY (R1) RESTRICTED;                          0186 00505000
+*              R1 = 11;                    /*MESSAGE NUMBER          */ 00506000
+         LA    R1,11                                               0187 00507000
+*              CALL MSGBLK;                /*ADDR OF LIST FORM OF MSG*/ 00508000
+         L     @15,TWAMSG(,TWAPTR)                                 0188 00509000
+         BALR  @14,@15                                             0188 00510000
+*              MVC(IKT011I(1:MSGLNGTH),MSGDATA); /*MOVE LIST FORM    */ 00511000
+         L     @10,MSGLNGTH(,R1)                                   0189 00512000
+         BCTR  @10,0                                               0189 00513000
+         EX    @10,@SM00403                                        0189 00514000
+*              R1 = ADDR(IKT011I);         /*ADDR OF LIST FORM       */ 00515000
+         LA    R1,IKT011I                                          0190 00516000
+*              IF WECODE2F = FCVQUSCE THEN /*MOVE                    */ 00517000
+         L     @10,WEPTR                                           0191 00518000
+         CLI   WECODE2F(@10),X'13'                                 0191 00519000
+         BNE   @RF00191                                            0191 00520000
+*                  IKT011IA = 'QUIESCE';   /* IN                     */ 00521000
+         MVC   IKT011IA(7),@CC00388                                0192 00522000
+*              ELSE                        /*  PROPER                */ 00523000
+*                  IKT011IA = 'START  ';   /*   IDENTIFIER           */ 00524000
+         B     @RC00191                                            0193 00525000
+@RF00191 MVC   IKT011IA(7),@CC00389                                0193 00526000
+*              GEN (WTO   MF=(E,(1)))      /*ISSUE WTO               */ 00527000
+*                  REFS (R0,R1,R14,R15);                           0194 00528000
+@RC00191 DS    0H                                                  0194 00529000
+         WTO   MF=(E,(1))                                               00530000
+*              RESPECIFY (R1) UNRESTRICTED;                        0195 00531000
+*              END;                                                0196 00532000
+*          END;                                                    0197 00533000
+*END PRCSSYNE;                                                     0198 00534000
+         B     @EL00007                                            0198 00535000
+         EJECT                                                          00536000
+*FRESPACE: PROC OPTIONS (SAVE (14));                               0199 00537000
+FRESPACE ST    @14,@SA00008                                        0199 00538000
+*  /******************************************************************/ 00539000
+*  /*                                                                */ 00540000
+*  /*  THIS SUBROUTINE DOES A FREEMAIN FOR THE NUMBER OF BYTES       */ 00541000
+*  /*  SPECIFIED IN 'LENGTH', USING THE ADDRESS FOUND IN 'ADDRESS'   */ 00542000
+*  /*  AS A STARTING ADDRESS, AND USING THE VALUE FOUND IN 'SUBPL'   */ 00543000
+*  /*  AS THE SUBPOOL NUMBER                                         */ 00544000
+*  /*                                                                */ 00545000
+*  /******************************************************************/ 00546000
+*  RESPECIFY (R2,R3) RESTRICTED;                                   0200 00547000
+*  R2 = LENGTH;                                                    0201 00548000
+         LR    R2,LENGTH                                           0201 00549000
+*  R3 = SUBPL;                                                     0202 00550000
+         LR    R3,SUBPL                                            0202 00551000
+*  GEN (FREEMAIN EU,LV=(R2),A=ADDRESS,SP=(R3))                     0203 00552000
+*      REFS (ADDRESS,R0,R1,R2,R3,R14,R15);                         0203 00553000
+         FREEMAIN EU,LV=(R2),A=ADDRESS,SP=(R3)                          00554000
+*  RESPECIFY (R2,R3) UNRESTRICTED;                                 0204 00555000
+*END FRESPACE;                                                     0205 00556000
+@EL00008 DS    0H                                                  0205 00557000
+@EF00008 DS    0H                                                  0205 00558000
+@ER00008 L     @14,@SA00008                                        0205 00559000
+         BR    @14                                                 0205 00560000
+         EJECT                                                          00561000
+*GETSPACE: PROC OPTIONS (SAVE (14));                               0206 00562000
+GETSPACE ST    @14,@SA00009                                        0206 00563000
+*  /******************************************************************/ 00564000
+*  /*                                                                */ 00565000
+*  /*  THIS SUBROUTINE DOES A GETMAIN FOR THE NUMBER OF BYTES        */ 00566000
+*  /*  SPECIFIED IN 'LENGTH' (SHOULD BE A DOUBLEWORD MULTIPLE),      */ 00567000
+*  /*  FROM THE SUBPOOL SPECIFIED IN 'SUBPL', AND THEN PLACES THE    */ 00568000
+*  /*  STARTING ADDRESS OF THE GETMAIN'ED AREA IN 'ADDRESS'.         */ 00569000
+*  /*                                                                */ 00570000
+*  /******************************************************************/ 00571000
+*  RESPECIFY (R2,R3) RESTRICTED;                                   0207 00572000
+*  R2 = LENGTH;                                                    0208 00573000
+         LR    R2,LENGTH                                           0208 00574000
+*  R3 = SUBPL;                                                     0209 00575000
+         LR    R3,SUBPL                                            0209 00576000
+*  GEN (GETMAIN EU,LV=(R2),A=ADDRESS,SP=(R3))                      0210 00577000
+*      REFS (ADDRESS,R0,R1,R2,R3,R14,R15);                         0210 00578000
+         GETMAIN EU,LV=(R2),A=ADDRESS,SP=(R3)                           00579000
+*  RESPECIFY (R2,R3) UNRESTRICTED;                                 0211 00580000
+*END GETSPACE;                                                     0212 00581000
+@EL00009 DS    0H                                                  0212 00582000
+@EF00009 DS    0H                                                  0212 00583000
+@ER00009 L     @14,@SA00009                                        0212 00584000
+         BR    @14                                                 0212 00585000
+         EJECT                                                          00586000
+*END IKTCAS40                                                      0213 00587000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.      * 00588000
+*/*%INCLUDE SYSLIB  (IEECHAIN)                                        * 00589000
+*/*%INCLUDE SYSLIB  (IEZCIB  )                                        * 00590000
+*/*%INCLUDE SYSLIB  (IKTCASWA)                                        * 00591000
+*;                                                                 0213 00592000
+@DATA    DS    0H                                                       00593000
+@SM00398 MVC   WEDATA(0,@10),BLANKS                                     00594000
+@SM00400 MVC   WEDATA(0,@10),CIBDATA(@04)                               00595000
+@SM00403 MVC   IKT011I(0),MSGDATA(R1)                                   00596000
+         DS    0F                                                       00597000
+@SA00001 DS    18F                                                      00598000
+@SA00002 DS    1F                                                       00599000
+@SA00005 DS    1F                                                       00600000
+@SA00003 DS    1F                                                       00601000
+@SA00004 DS    1F                                                       00602000
+@SA00009 DS    1F                                                       00603000
+@SA00007 DS    1F                                                       00604000
+@SA00006 DS    1F                                                       00605000
+@SA00008 DS    1F                                                       00606000
+         DS    0F                                                       00607000
+@CF00065 DC    F'8'                                                     00608000
+@CV00059 DC    V(IKTCAS41)                                              00609000
+@CV00060 DC    V(IKTCAS42)                                              00610000
+         DS    0D                                                       00611000
+ADDRESS  DS    A                                                        00612000
+@CC00388 DC    C'QUIESCE'                                               00613000
+@CC00389 DC    C'START  '                                               00614000
+BLANKS   DC    CL48' '                                                  00615000
+         DS    CL2                                                      00616000
+ECBLIST  DS    CL8                                                      00617000
+         ORG   ECBLIST                                                  00618000
+ECBADDR1 DS    FL4                                                      00619000
+ECBADDR2 DS    FL4                                                      00620000
+         ORG   ECBADDR2                                                 00621000
+ECBEND   DS    FL1                                                      00622000
+@NM00001 DS    FL3                                                      00623000
+         ORG   ECBLIST+8                                                00624000
+SWITCHES DS    CL1                                                      00625000
+         ORG   SWITCHES                                                 00626000
+GOSW     DS    BL1                                                      00627000
+@NM00002 EQU   SWITCHES+0                                               00628000
+         ORG   SWITCHES+1                                               00629000
+         DS    CL3                                                      00630000
+IKT011I  DS    CL96                                                     00631000
+         ORG   IKT011I                                                  00632000
+@NM00004 DS    CL28                                                     00633000
+IKT011IA DS    CL7                                                      00634000
+@NM00005 DS    CL61                                                     00635000
+         ORG   IKT011I+96                                               00636000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00637000
+@01      EQU   01                                                       00638000
+@02      EQU   02                                                       00639000
+@03      EQU   03                                                       00640000
+@04      EQU   04                                                       00641000
+@05      EQU   05                                                       00642000
+@06      EQU   06                                                       00643000
+@07      EQU   07                                                       00644000
+@08      EQU   08                                                       00645000
+@09      EQU   09                                                       00646000
+@10      EQU   10                                                       00647000
+@11      EQU   11                                                       00648000
+@12      EQU   12                                                       00649000
+@13      EQU   13                                                       00650000
+@14      EQU   14                                                       00651000
+@15      EQU   15                                                       00652000
+TEMPPTR  EQU   @02                                                      00653000
+SUBPL    EQU   @05                                                      00654000
+LENGTH   EQU   @04                                                      00655000
+R0       EQU   @00                                                      00656000
+R1       EQU   @01                                                      00657000
+R2       EQU   @02                                                      00658000
+R3       EQU   @03                                                      00659000
+TWAPTR   EQU   @11                                                      00660000
+R14      EQU   @14                                                      00661000
+R15      EQU   @15                                                      00662000
+OPRTRECB EQU   0                                                        00663000
+MSGBLK   EQU   0                                                        00664000
+@NM00003 EQU   0                                                        00665000
+MSGLNGTH EQU   @NM00003                                                 00666000
+MSGDATA  EQU   @NM00003+4                                               00667000
+WESTD    EQU   0                                                        00668000
+WECODE1T EQU   WESTD                                                    00669000
+WECODE1F EQU   WESTD+1                                                  00670000
+WECODE2T EQU   WESTD+2                                                  00671000
+WECODE2F EQU   WESTD+3                                                  00672000
+WENEXT   EQU   WESTD+4                                                  00673000
+WERC     EQU   WESTD+8                                                  00674000
+WELEN    EQU   WESTD+10                                                 00675000
+WEDATA   EQU   WESTD+12                                                 00676000
+CHAIN    EQU   0                                                        00677000
+CHFLG    EQU   CHAIN+4                                                  00678000
+CHSTS    EQU   CHFLG+2                                                  00679000
+CHACT    EQU   CHFLG+3                                                  00680000
+CHKEY    EQU   CHAIN+8                                                  00681000
+CHPARM   EQU   CHKEY                                                    00682000
+CHPKE    EQU   CHAIN+28                                                 00683000
+CHTJID   EQU   CHAIN+30                                                 00684000
+CHPROCSN EQU   CHAIN+32                                                 00685000
+CHACT1   EQU   CHPROCSN+3                                               00686000
+CHASM    EQU   CHAIN+40                                                 00687000
+CHECBP   EQU   CHASM                                                    00688000
+CHCIBP   EQU   CHASM+4                                                  00689000
+CHRGNSZ  EQU   CHASM+8                                                  00690000
+CHSTEP   EQU   CHASM+24                                                 00691000
+CHSWT    EQU   CHSTEP                                                   00692000
+CHSHORT  EQU   CHASM+32                                                 00693000
+CIBNAME  EQU   0                                                        00694000
+CIBVERB  EQU   CIBNAME+4                                                00695000
+CIBASID  EQU   CIBNAME+10                                               00696000
+CIBDATLN EQU   CIBNAME+14                                               00697000
+CIBDATA  EQU   CIBNAME+16                                               00698000
+TWAR     EQU   0                                                        00699000
+TWASYNQH EQU   TWAR+4                                                   00700000
+TWACSCB  EQU   TWAR+16                                                  00701000
+TWAMSG   EQU   TWAR+48                                                  00702000
+TWAMECB  EQU   TWAR+64                                                  00703000
+TWAMFL   EQU   TWAR+80                                                  00704000
+TWAVFL   EQU   TWAR+81                                                  00705000
+TWAUFL   EQU   TWAR+82                                                  00706000
+TWACFL   EQU   TWAR+83                                                  00707000
+TWAM     EQU   TWAR+84                                                  00708000
+TWAME    EQU   TWAM+68                                                  00709000
+TWAMEI   EQU   TWAME                                                    00710000
+TWAV     EQU   TWAR+184                                                 00711000
+TWAVE    EQU   TWAV+68                                                  00712000
+TWAVEI   EQU   TWAVE                                                    00713000
+TWAVI    EQU   TWAR+284                                                 00714000
+TWAVECB  EQU   TWAVI                                                    00715000
+TWAU     EQU   TWAR+300                                                 00716000
+TWAUE    EQU   TWAU+68                                                  00717000
+TWAUEI   EQU   TWAUE                                                    00718000
+TWAUI    EQU   TWAR+400                                                 00719000
+TWAUECB  EQU   TWAUI                                                    00720000
+TWAC     EQU   TWAR+408                                                 00721000
+TWACE    EQU   TWAC+68                                                  00722000
+TWACEI   EQU   TWACE                                                    00723000
+TWACEIFC EQU   TWACEI                                                   00724000
+TWACERA  EQU   TWACEI+1                                                 00725000
+TWACERRS EQU   TWACE+4                                                  00726000
+TWACI    EQU   TWAR+508                                                 00727000
+TWACECB  EQU   TWACI                                                    00728000
+TWACSTPQ EQU   TWACI+4                                                  00729000
+TWACMODQ EQU   TWACI+8                                                  00730000
+TWACSKIP EQU   TWACI+12                                                 00731000
+CIBPTR   EQU   CHCIBP                                                   00732000
+CSCBPTR  EQU   TWACSCB                                                  00733000
+WEPTR    EQU   ADDRESS                                                  00734000
+CHAINS01 EQU   CHASM                                                    00735000
+CHTYPE   EQU   CHAINS01+124                                             00736000
+CHTRSTAT EQU   CHAINS01+125                                             00737000
+CHCSYSO  EQU   CHAINS01+134                                             00738000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00739000
+CHLAST   EQU   CHAINS01+136                                             00740000
+CHSPA    EQU   CHAINS01+135                                             00741000
+CHUSERID EQU   CHCSYSO                                                  00742000
+CHJB     EQU   CHCSYSO                                                  00743000
+CHDUMP   EQU   CHCSYSO                                                  00744000
+CHQUE    EQU   CHCSYSO                                                  00745000
+CHHOLD   EQU   CHCSYSO                                                  00746000
+CHOUT    EQU   CHCSYSO                                                  00747000
+CHINN    EQU   CHCSYSO                                                  00748000
+CHALL    EQU   CHCSYSO                                                  00749000
+CHINC    EQU   CHAINS01+132                                             00750000
+CHPEND   EQU   CHAINS01+128                                             00751000
+CHARID   EQU   CHAINS01+127                                             00752000
+CHCNID   EQU   CHAINS01+126                                             00753000
+@NM00009 EQU   CHTRSTAT                                                 00754000
+CHTSL    EQU   CHTRSTAT                                                 00755000
+CHTS     EQU   CHTRSTAT                                                 00756000
+CHINITL  EQU   CHTRSTAT                                                 00757000
+CHINIT   EQU   CHTRSTAT                                                 00758000
+CHJOBSL  EQU   CHTRSTAT                                                 00759000
+CHJOBS   EQU   CHTRSTAT                                                 00760000
+CHDEF    EQU   CHTYPE                                                   00761000
+CHHIAR   EQU   CHTYPE                                                   00762000
+CHARSV29 EQU   CHTYPE                                                   00763000
+CHARSV28 EQU   CHTYPE                                                   00764000
+CHARSV27 EQU   CHTYPE                                                   00765000
+CHARSV26 EQU   CHTYPE                                                   00766000
+CHARSV25 EQU   CHTYPE                                                   00767000
+CHDSTAT  EQU   CHTYPE                                                   00768000
+CHBUF    EQU   CHAINS01                                                 00769000
+TWAEND   EQU   TWAR+536                                                 00770000
+TWAWORKE EQU   TWAR+524                                                 00771000
+@NM00016 EQU   TWACI+13                                                 00772000
+TWACRTFC EQU   TWAC+60                                                  00773000
+TWACABFC EQU   TWAC+56                                                  00774000
+TWACTWA  EQU   TWAC+52                                                  00775000
+TWACEWA  EQU   TWAC+4                                                   00776000
+TWACID   EQU   TWAC                                                     00777000
+TWAUACQH EQU   TWAUI+4                                                  00778000
+TWAUERRS EQU   TWAUE+4                                                  00779000
+TWAUERA  EQU   TWAUEI+1                                                 00780000
+TWAUEIFC EQU   TWAUEI                                                   00781000
+TWAURTFC EQU   TWAU+60                                                  00782000
+TWAUABFC EQU   TWAU+56                                                  00783000
+TWAUTWA  EQU   TWAU+52                                                  00784000
+TWAUEWA  EQU   TWAU+4                                                   00785000
+TWAUID   EQU   TWAU                                                     00786000
+TWAVACQH EQU   TWAVI+12                                                 00787000
+TWAVTHQH EQU   TWAVI+8                                                  00788000
+TWAVTEQH EQU   TWAVI+4                                                  00789000
+TWAVERRS EQU   TWAVE+4                                                  00790000
+TWAVERA  EQU   TWAVEI+1                                                 00791000
+TWAVEIFC EQU   TWAVEI                                                   00792000
+TWAVRTFC EQU   TWAV+60                                                  00793000
+TWAVABFC EQU   TWAV+56                                                  00794000
+TWAVTWA  EQU   TWAV+52                                                  00795000
+TWAVEWA  EQU   TWAV+4                                                   00796000
+TWAVID   EQU   TWAV                                                     00797000
+TWAMERRS EQU   TWAME+4                                                  00798000
+TWAMERA  EQU   TWAMEI+1                                                 00799000
+TWAMEIFC EQU   TWAMEI                                                   00800000
+TWAMRTFC EQU   TWAM+60                                                  00801000
+TWAMABFC EQU   TWAM+56                                                  00802000
+TWAMTWA  EQU   TWAM+52                                                  00803000
+TWAMEWA  EQU   TWAM+4                                                   00804000
+TWAMID   EQU   TWAM                                                     00805000
+@NM00015 EQU   TWACFL                                                   00806000
+TWACFL4  EQU   TWACFL                                                   00807000
+TWACFL2  EQU   TWACFL                                                   00808000
+TWACFL1  EQU   TWACFL                                                   00809000
+@NM00014 EQU   TWAUFL                                                   00810000
+TWAUFL4  EQU   TWAUFL                                                   00811000
+TWAUFL3  EQU   TWAUFL                                                   00812000
+TWAUFL2  EQU   TWAUFL                                                   00813000
+TWAUFL1  EQU   TWAUFL                                                   00814000
+@NM00013 EQU   TWAVFL                                                   00815000
+TWAVFL6  EQU   TWAVFL                                                   00816000
+TWAVFL5  EQU   TWAVFL                                                   00817000
+TWAVFL4  EQU   TWAVFL                                                   00818000
+TWAVFL3  EQU   TWAVFL                                                   00819000
+TWAVFL2  EQU   TWAVFL                                                   00820000
+TWAVFL1  EQU   TWAVFL                                                   00821000
+@NM00012 EQU   TWAMFL                                                   00822000
+TWAMFL1  EQU   TWAMFL                                                   00823000
+TWACCOMP EQU   TWAR+76                                                  00824000
+TWAUCOMP EQU   TWAR+72                                                  00825000
+TWAVCOMP EQU   TWAR+68                                                  00826000
+TWACTCB  EQU   TWAR+60                                                  00827000
+TWAUTCB  EQU   TWAR+56                                                  00828000
+TWAVTCB  EQU   TWAR+52                                                  00829000
+TWADEQAS EQU   TWAR+44                                                  00830000
+TWAEESR  EQU   TWAR+40                                                  00831000
+TWAPPSR  EQU   TWAR+36                                                  00832000
+TWATCSR  EQU   TWAR+32                                                  00833000
+TWATTSR  EQU   TWAR+28                                                  00834000
+TWAINIT  EQU   TWAR+24                                                  00835000
+TWATCAST EQU   TWAR+20                                                  00836000
+TWAASCB  EQU   TWAR+12                                                  00837000
+TWAPASQH EQU   TWAR+8                                                   00838000
+TWARSON  EQU   TWAR+2                                                   00839000
+TWACOMP  EQU   TWAR                                                     00840000
+@NM00011 EQU   CIBNAME+13                                               00841000
+CIBCONID EQU   CIBNAME+12                                               00842000
+CIBTJID  EQU   CIBASID                                                  00843000
+@NM00010 EQU   CIBNAME+6                                                00844000
+CIBLEN   EQU   CIBNAME+5                                                00845000
+CIBNEXT  EQU   CIBNAME                                                  00846000
+CHARSV16 EQU   CHSHORT+100                                              00847000
+CHARSV15 EQU   CHSHORT+96                                               00848000
+CHJSCBVS EQU   CHSHORT+92                                               00849000
+CHUSCVS  EQU   CHSHORT+88                                               00850000
+@NM00008 EQU   CHSHORT+84                                               00851000
+@NM00007 EQU   CHSHORT+80                                               00852000
+CHSQA    EQU   CHSHORT+44                                               00853000
+CHQPA    EQU   CHSHORT+8                                                00854000
+CHJCL    EQU   CHSHORT+4                                                00855000
+CHSPC    EQU   CHSHORT                                                  00856000
+CHSPB    EQU   CHSTEP+4                                                 00857000
+CHTCB    EQU   CHSTEP+1                                                 00858000
+CHARSV23 EQU   CHSWT                                                    00859000
+CHARSV22 EQU   CHSWT                                                    00860000
+CHARSV21 EQU   CHSWT                                                    00861000
+CHAC     EQU   CHSWT                                                    00862000
+CHPSF    EQU   CHSWT                                                    00863000
+CHPSD    EQU   CHSWT                                                    00864000
+CHJCT    EQU   CHSWT                                                    00865000
+CHARSV20 EQU   CHSWT                                                    00866000
+CHCECB   EQU   CHASM+20                                                 00867000
+CHECB    EQU   CHASM+16                                                 00868000
+CHRGNAD  EQU   CHASM+12                                                 00869000
+CHARSV18 EQU   CHRGNSZ+1                                                00870000
+CHRPRTY  EQU   CHRGNSZ                                                  00871000
+@NM00006 EQU   CHCIBP                                                   00872000
+CHEND    EQU   CHCIBP                                                   00873000
+CHDER    EQU   CHPROCSN+4                                               00874000
+CHARSV10 EQU   CHACT1                                                   00875000
+CHARSV09 EQU   CHACT1                                                   00876000
+CHARSV08 EQU   CHACT1                                                   00877000
+CHARSV07 EQU   CHACT1                                                   00878000
+CHARSV06 EQU   CHACT1                                                   00879000
+CHARSV05 EQU   CHACT1                                                   00880000
+CHARSV04 EQU   CHACT1                                                   00881000
+CHRDWTR  EQU   CHACT1                                                   00882000
+CHARSV30 EQU   CHPROCSN+2                                               00883000
+CHQID    EQU   CHPROCSN                                                 00884000
+CHASID   EQU   CHTJID                                                   00885000
+CHUCMP   EQU   CHAIN+29                                                 00886000
+CHTRKID  EQU   CHPKE                                                    00887000
+CHCIBCTR EQU   CHAIN+27                                                 00888000
+CHUNIT   EQU   CHAIN+24                                                 00889000
+CHCLS    EQU   CHAIN+16                                                 00890000
+CHPCOI   EQU   CHPARM                                                   00891000
+CHIFY    EQU   CHACT                                                    00892000
+CHAIFX   EQU   CHACT                                                    00893000
+CHCLD    EQU   CHACT                                                    00894000
+CHCL     EQU   CHACT                                                    00895000
+CHDSI    EQU   CHACT                                                    00896000
+CHDISC   EQU   CHACT                                                    00897000
+CHTERM   EQU   CHACT                                                    00898000
+CHSWAP   EQU   CHACT                                                    00899000
+CHABTERM EQU   CHSTS                                                    00900000
+CHFC     EQU   CHSTS                                                    00901000
+CHDL     EQU   CHSTS                                                    00902000
+CHAD     EQU   CHSTS                                                    00903000
+CHQSPC   EQU   CHSTS                                                    00904000
+CHSOUT   EQU   CHSTS                                                    00905000
+CHSYS    EQU   CHSTS                                                    00906000
+CHAP     EQU   CHSTS                                                    00907000
+CHSZE    EQU   CHFLG+1                                                  00908000
+CHVCD    EQU   CHFLG                                                    00909000
+CHPTR    EQU   CHAIN                                                    00910000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00911000
+@RF00118 EQU   @EL00005                                                 00912000
+@RC00126 EQU   @EL00005                                                 00913000
+@RC00152 EQU   @EL00006                                                 00914000
+@RC00147 EQU   @EL00006                                                 00915000
+@RF00182 EQU   @EL00007                                                 00916000
+@RC00177 EQU   @EL00007                                                 00917000
+@RF00184 EQU   @EL00007                                                 00918000
+@ENDDATA EQU   *                                                        00919000
+         END   IKTCAS40,(C'PLS1006',0702,78336)                         00920000

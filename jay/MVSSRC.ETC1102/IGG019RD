@@ -1,0 +1,1223 @@
+         TITLE '''IGG019RD'' - BUFFERED TERMINAL SCHEDULER'             00100010
+IGG019RD CSECT                                                          00200010
+*A-000000-999999                                               @X31X8I0 00200110
+         SPACE 3                                                        00200310
+*CHANGE ACTIVITY=AS FOLLOWS:                                            00200410
+******************** MICROFICHE FLAGS *********************** SUPT CODE 00200510
+*A231000,337100,337600,339150,339350,339415,354000,369000,375000 S21101 00200610
+*A380000,409000,422000,445000,470000,584000,635000,639000,642000 S21101 00200710
+*A660000,697000,821000,845000,850000,851000,852000               S21101 00200810
+*C151300,197000-227000,280000-309000,333000-334000,402000,409000 S21101 00200910
+*C505000,532300,566000                                           S21101 00201010
+*D329000,337200-337300,355000-366000,376000-377000,382000,410000 S21101 00201110
+*D419000,446000,448000-452600,454000-456000,478000-482000,485000 S21101 00201210
+*D510000,636000-638000,661000-668000,698000-703000,780000,844000 S21101 00201310
+*D846000-849000                                                  S21101 00201410
+*C458000,586000-587000                                           A48267 00201510
+*A608000                                                         A48267 00201610
+*A127000,169000,279180,279390,339350,368000,372300,611000,617000 S22025 00201710
+*A639200,841500                                                  S22025 00201810
+*C151300,177500,196160,279350,279390,422044,468000-469000,634000 S22025 00201910
+*C673000,681000,821400,821600-821650,826000,826600               S22025 00202010
+*D196280,279200-279280,279360,369000-369900,483000-487000        S22025 00202110
+*D639210-639230                                                  S22025 00202210
+*C532400                                                        SA52985 00202310
+*A371400                                                        SA56605 00202410
+*A279240,639223                                                 SA56606 00202510
+*D735000,815000                                                 SA61794 00202610
+*A732025-732525,A805025-805025                                   Y05331 00202710
+*A584200                                                        SA52515 00205710
+*A660600                                                        SA68697 00207710
+*D532100-532500                                                @SA70320 00208010
+*A657000,669000                                                 OX03968 00208510
+*C673000                                                        OX03968 00209310
+*A002000,842700                                                @Z30X8IM 00209410
+*C008000,169400,265000,391200,422082,422086,498200,573000      @Z30X8IM 00209510
+*D169600-169800,266000-267000,391400-391600,422084,422088      @Z30X8IM 00209610
+*D498400-498600,571000,574000,639064-639066                    @Z30X8IM 00209710
+*C639063                                                       @Z30X8IM 00209810
+*A165000,676200,842700                                         @XA08074 00209910
+*D732150,732200-732275,733000                                  @OY12394 00210010
+*A584400,704000,706000,717000                                  @OX12490 00210110
+*C322600,338000,339650,413600,470200,505600,726600,777600      @OY14092 00220110
+*C504800                                                       @OX17153 00230110
+*                                                                       00240110
+         SPACE 4                                                        00270110
+*                                                                       00276110
+         DC    AL2(TAG-IGG019RD)        DESTINATION SCHEDULER           00300010
+*                                       LOGIC OFFSET                    00400010
+         SPACE 4                                                        00500010
+*********************************************************************** 00600010
+*                                                                     * 00650010
+*TITLE: 'IGG019RD' BUFFERED TERMINAL SCHEDULER                        * 00700010
+*                                                                     * 00710010
+* MODULE NAME=IGG019RD                                                * 00720010
+*                                                                     * 00730010
+* DESCRIPTIVE NAME=BUFFERED TERMINAL SCHEDULER                        * 00740010
+*                                                                     * 00750010
+* COPYRIGHT='NONE'                                                    * 00760010
+*                                                                     * 00770010
+*  STATUS=CHANGE LEVEL 8                                       @Z30X8IM 00800010
+*                                                                     * 00850010
+*FUNCTION:                                                            * 00900010
+*   THE PURPOSE OF THIS MODULE IS TO SCHEDULE SEND AND RECIEVE        * 01000010
+*   OPERATIONS FOR BUFFERED TERMINALS,E.G., 2740 MODEL 2 AND 2770.    * 01100010
+*   IN GENERAL, IT PERFORMS IN A MANNER ANALOGOUS TO THE SEND AND     * 01200010
+*   RECIEVE SCHEDULERS FOR NON-BUFFERED TERMINALS.  THE SEND FUNCTION * 01300010
+*   IS DIFFERENT DUE TO THE TERMINAL'S HAVING A HARDWARE BUFFER.      * 01400010
+*   WHEN A BLOCK OF TEXT IS SENT TO A BUFFERED TERMINAL, THE          * 01500010
+*   TRANSMISSION IS COMPLETE.  HOWEVER, TCAM MUST OBSERVE A TIME      * 01600010
+*   DELAY EQUIVALENT TO THE TIME REQUIRED FOR THE TERMINAL TO EMPTY   * 01700010
+*   ITS BUFFER ONTO ITS OUTPUT DEVICE.  THIS SCHEDULER MUST TRY TO    * 01800010
+*   UTILIZE THE LINE FOR SENDING TO OR RECIEVING FROM OTHER TERMINALS * 01900010
+*   ON THE LINE DURING THE TIME DELAY FOR THE TERMINAL TO WHICH THE   * 02000010
+*   LAST BLOCK OF TEXT WAS SENT.  FLAGS IN THE DESTINATION QCBSTAT    * 02100010
+*   INDICATE WHETHER THE TERMINAL IS IN SEND OR RECIEVE MODE.  THESE  * 02200010
+*   STATES ARE MUTUALLY EXCLUSIVE.                                    * 02300010
+*                                                                     * 02400010
+*   THIS ROUTINE WAITS IN THE DESTINATION QCB AND THE LCB.  THERE IS  * 02500010
+*   A PHYSICAL STCB FOR EACH DESTINATION QCB AND LCB.  WHEN A BUFFER  * 02600010
+*   IS POSTED TO THE DESTINATION QCB, THE BTS PASSES IT TO THE DESTI- * 02700010
+*   NATION SCHEDULER(IEDQHM).  WHEN IEDQHM RECOGNIZES END-OF-MSG,     * 02800010
+*   IT BRANCHES TO AN ENTRY POINT IN BTS(TAG).  IF THE LINE IS FREE,  * 02900010
+*   THE LCB IS POSTED TO ITSELF UNING DSPPOSTR.  IF NOT AND AFTER     * 03000010
+*   RETURN FROM THE DISPATCHER, THE QCB'S STCB FOR BTS IS LINKED INTO * 03100010
+*   THE LCB'S STCB CHAIN.  THIS ACTION INDICATES THAT THERE IS A      * 03200010
+*   MESSAGE FOR THE ASSOCIATED TERMINAL.  IF AUTOPOLL IS IN PROGRESS, * 03300010
+*   IT IS STOPPED AND EXIT IS MADE TO IEDQHM.  IF NOT, AN EXIT IS MADE* 03400010
+*   TO IEDQHM.                                                        * 03500010
+*                                                                     * 03600010
+*   WHEN THE LCB IS POSTED TO BTS, A TEST IS MADE FOR TYPE OF LAST    * 03700010
+*   OPERATION.  IF THE LAST OPERATION WAS A RECIEVE, A TEST IS MADE   * 03800010
+*   FOR SCHEDULING PRIORITY.  IF EQUAL PRIORITY IS SPECIFIED, A TEST  * 03900010
+*   IS MADE FOR END OF INVITATION LIST.  IF NOT THE END, THE ERB IS   * 04000010
+*   SET UP TO RECIEVE FROM THE NEXT ENTRY IN THE LIST, AND THE ERB IS * 04100010
+*   POSTED TO THE BUFFER REQUEST QCB.                                 * 04200010
+*                                                                     * 04300010
+*   IF END OF INVITATION LIST, THE CURRENT INVLIST POINTER IS RESET   * 04400010
+*   TO THE BEGINNING AND A TEST IS MADE FOR SOMETHING TO SEND TO A    * 04500010
+*   TERMINAL ON THE LINE.  IF THE PRIORITY TEST INDICATED SEND PRTY,  * 04600010
+*   A SEND TEST IS ALSO MADE.  IF NOTHING TO SEND, BTS INITIATES A    * 04700010
+*   RECIEVE OPERATION ON THE FIRST ENTRY IN THE INVITATION LIST.      * 04800010
+*                                                                     * 04900010
+*   IF THERE IS SOMETHING TO SEND, THE NEXT BTS STCB IN THE LCB'S     * 05000010
+*   STCB CHAIN IS DISPATCHED.  IF THE QCB REFLECTS AN EMPTY STATUS,   * 05100010
+*   THE STCB IS REMOVED FROM THE LCB'S STCB CHAIN, QCBSEND IS TURNED  * 05200010
+*   OFF, AND BTS EXITS TO THE DISPATCHER BY POSTING THE LCB TO ITSELF.* 05300010
+*                                                                     * 05400010
+*   IF THE QCB IS NOT EMPTY, A TEST IS MADE FOR SEND STATUS(QCBRECEV= * 05500010
+*   0).  IF NON-ZERO, THE LOOP FOR TESTING FOR SOMETHING TO SEND IS   * 05600010
+*   REENTERED.  IF NOT RECIEVE, QCBSEND IS TURNED ON.  THE ERB TO     * 05700010
+*   INITIATE THE SENDING OPERATION IS MADE, AND BTS EXITS TO THE      * 05800010
+*   DISPATCHER BY POSTING THE ERB TO DISK I/O QCB.                    * 05900010
+*                                                                     * 06000010
+*   IF THE LAST OPERATION ON THE LINE WAS A SEND, BTS MUST OBSREVE A  * 06100010
+*   TIME DELAY FOR THE DESTINATION OF THE LAST BLOCK.  THE TIME DELAY * 06200010
+*   IS STORED IN THE QCB, AND ITS STCB IS DELINKED FROM THE LCB'S STCB* 06300010
+*   CHAIN.  THE QCB IS PASSED VIA BALR TO THE TIME DELAY ROUTINE      * 06400010
+*   BRANCH ENTRY POINT(IEDQHG01).  THE 'SOMETHING-ELSE-TO-SEND' LOOP  * 06500010
+*   IS ENTERED NOW.                                                   * 06600010
+*                                                                     * 06700010
+*   WHEN THE TIME DELAY EXPIRES, IEDQHG POSTS THE QCB TO A QCB IN THE * 06800010
+*   BTS CSECT(BTSTDQCB).  BTS RETURNS THE QCB'S BTS STCB TO THE LCB'S * 06900010
+*   STCB CHAIN.  IF THE LINE IS FREE, IT POSTS THE LCB TO ITSELF AND  * 07000010
+*   EXITS TO THE DISPATCHER.  IF NOT, IT MERELY EXITS TO DISPATCHER.  * 07100010
+*ENTRY POINT:                                                         * 07200010
+*        IGG019RD                                                     * 07300010
+*INPUT:                                                               * 07400010
+*   1  - LINE CONTROL BLOCK OR BUFFER ADDRESS                         * 07500010
+*   3  - SUBTASK CONTROL BLOCK ADDRESS                                * 07600010
+*   7  - QUEUE CONTROL BLOCK ADDRESS                                  * 07700010
+*   11 - DISPATCHER'S ADDRESS                                         * 07800010
+*   13 - AVTSAVE2 ADDRESS                                             * 07900010
+*   15 - ENTRY POINT ADDRESS                                          * 08000010
+*OUTPUT:                                                              * 08100010
+*        NONE                                                         * 08200010
+*EXTERNAL ROUTINES:                                                   * 08300010
+*        DSPPOSTR                                                     * 08400010
+*        IEDQHG01 - TIME DELAY SUBTASK                                * 08500010
+*EXITS-NORMAL:                                                        * 08600010
+*        DSPBYPAS                                                     * 08700010
+*        DSPPOST                                                      * 08800010
+*        DSPDISP                                                      * 08900010
+*EXIT-ERROR:                                                          * 09000010
+*           NONE                                                      * 09100010
+*TABLES/WORKAREAS:                                                    * 09200010
+*        AVT                                                          * 09300010
+*        LCB                                                          * 09400010
+*        QCB                                                          * 09500010
+*        SCB                                                          * 09600010
+*        DCB                                                          * 09700010
+*        DEB                                                          * 09800010
+*        ILIST                                                        * 09900010
+*        TERMINAL ENTRY                                               * 10000010
+*ATTRIBUTES: RE-ENTRANT, REFRESHABLE, PROBLEM PROGRAM MODE            * 10100010
+*NOTES:  THE OPERATION OF THIS MODULE DEPENDS UPON AN INTERNAL        * 10200010
+*   REPRESENTATION OF THE EXTERNAL CHARACTER SET WHICH IS EQUIVALENT  * 10300010
+*   TO THE ONE USED AT ASSEMBLY TIME.  THE CODING HAS BEEN ARRANGED   * 10400010
+*   SO THAT REDEFINITION OF 'CHARACTER' CONSTANTS, BY REASSEMBLY,     * 10500010
+*   WILL RESULT IN A CORRECT MODULE FOR THE NEW DEFINITIONS.          * 10600010
+*********************************************************************** 10700010
+         EJECT                                                          10800010
+*                                                                     * 10900010
+*           S Y M B O L I C     R E G I S T E R S                     * 11000010
+*                                                                     * 11100010
+RZERO    EQU   0                        WORK REGISTER                   11200010
+RPARM    EQU   1                        PARAMETER REGISTER              11300010
+RTEMP    EQU   2                        WORK REGISTER                   11400010
+RSTCB    EQU   3                        SUBTASK CONTROL BLOCK           11500010
+RILIST   EQU   4                        INVITATION LIST                 11600010
+RPQCB    EQU   5                        PRIORITY LEVEL QCB              11700010
+RSCB     EQU   9                        STATION CONTROL BLOCK           11800010
+RQCB     EQU   7                        QUEUE CONTROL BLOCK             11900010
+RDCB     EQU   8                        DATA CONTROL BLOCK              12000010
+RTERM    EQU   6                        TERMINAL ENTRY                  12100010
+RLCB     EQU   10                       LINE CONTROL BLOCK              12200010
+RDISP    EQU   11                       DISPATCHER BASE REGISTER        12300010
+RBASE    EQU   12                       CSECT BASE REGISTER             12400010
+RAVT     EQU   13                       AVT BASE REGISTER               12500010
+RETURN   EQU   14                       RETURN ADDRESS                  12600010
+RENTRY   EQU   15                       ENTRY POINT ADDRESS             12700010
+         SPACE 3                                                        12730010
+CLEAR0F  EQU   X'0F'                    TO CLEAR HBFNO           S22025 12760010
+         SPACE 2                                                        12800010
+*                                                                     * 12900010
+*        ESTABLISH CSECT AND CONTROL BLOCK ADDRESSABILITY             * 13000010
+*                                                                     * 13100010
+         BALR  RBASE,RZERO              ESTABLISH CSECT                 13200010
+         USING *,RBASE                            ADDRESSABILITY        13300010
+         USING IEDQDISP,RDISP           TCAM DISPATCHER                 13400010
+         USING IEDQAVTD,RAVT            ADDRESS VECTOR TABLE            13500010
+         USING IEDQQCB,RQCB             QUEUE CONTROL BLOCK             13600010
+         USING IEDQSCB,RSCB             STATION CONTROL BLOCK           13700010
+         USING IEDQLCB,RLCB             LINE CONTROL BLOCK              13800010
+         USING IEDQTRM,RTERM            TERMINAL TABLE ENTRY            13900010
+         USING IHADCB,RDCB              DATA CONTROL BLOCK              14000010
+         USING IEDQSTCB,RSTCB           SUBTASK CONTROL BLOCK           14100010
+         EJECT                                                          14200010
+         CLI   RECBPRI-IEDQRECB(RPARM),PRILNFRE IS ELEMENT AN LCB       14300010
+         BE    LASTOPN                  BRANCH IF YES                   14400010
+*                                                                     * 14500010
+*   PASSED ELEMENT IS A BUFFER POSTED TO A DESTINATION QCB.  IT       * 14600010
+*   MUST NOW BE PASSED TO THE DESTINATION SCHEDULER FOR PROCESSING.   * 14700010
+*                                                                     * 14800010
+         L     RSTCB,QCBSLINK-1         ADDR OF DEST SCHED STCB         14900010
+         B     DSPBYPAS                 ACTIVATE DEST SCHED             15000010
+IGG019RD IEDHJN SELF,HJN                                                15060010
+         SPACE 2                                                        15200010
+LASTOPN  DS    0H                                                       15300010
+         LA    RPARM,0(0,RPARM)         CLEAR HIGH-ORDER BYTE           15400010
+         LA    RQCB,0(0,RQCB)           CLEAR HIGH-ORDER BYTE           15500010
+         CR    RPARM,RQCB               IS POSTED ELEMENT AN LCB        15600010
+         BE    LCBGO                    BRANCH IF YES                   15700010
+*                                                                     * 15800010
+*        INPUT ELEMENT IS AN ERB WITH RECALLED BUFFER                 * 15900010
+*                                                                     * 16000010
+         LA    RTEMP,LCBERB-IEDQLCB     ERB OFFSET INTO LCB             16100010
+         SR    RPARM,RTEMP              COMPUTE LCB ADDRESS             16200010
+         LR    RLCB,RPARM               LCB ADDRESSABILITY              16300010
+         L     RSCB,LCBSCBA-1           SCB ADDRESSABILITY              16400010
+         L     RDCB,LCBDCBPT            LINE GROUP DCB ADDRESS          16500010
+         TM    LCBERBST,LCBRDERR        LOGICAL READ ERROR     @XA08074 16530010
+         BO    ABEND045                 BRANCH IF YES          @XA08074 16560010
+         L     RTEMP,LCBERBCH-1         RECALLED BUFFER ADDRESS         16600010
+         OI    PRFSTAT1-IEDQPRF(RTEMP),PRFCNCLN SET CANCEL MSG FLAG     16700010
+         MVC   LCBISZE(1),PRFSCAN+1-IEDQPRF(RTEMP) SET IDLE COUNT       16800010
+         MVC   LCBTTBIN,SCBDCHDR        SET UP TNT OFFSET               16900010
+         NI    SCBHBFNO,CLEAR0F         RESET HBFNO              S22025 16910010
+         LA    RPARM,AVTINOUT           INMSG/OUTMSG DELIMITER          16920010
+         STCM  RPARM,ADR,SCBMACR        RESET MACRO ADDRESS    @Z30X8IM 16940010
+         MVC   SCBUNTCT(1),SCBDEOB                                      17020010
+         MVC   SCBDEOB(4),LCBCPA        RESTORE AFTER RECALL            17050010
+         TM    LCBERBST,LCBEOMSG        EOM IN RECALLED BUFFER          17200010
+         BNO   BUILDERB                 BRANCH IF NO                    17300010
+         LA    RTEMP,AVTACTIB           ACTIVATE ROUTINE QCB ADDR       17400010
+         B     ACTIVATE                 GO SEND EOM BUFFER              17500010
+         EJECT                                                          17550010
+LCBGO    EQU   *                                                        17600010
+         LR    RLCB,RPARM               GET LCB ADDRESS                 17700010
+         NI    LCBSTAT2,AVTEFF-LCBSNDPR TURN OFF SEND PRIORITY   S22025 17750010
+         L     RSCB,LCBSCBA-1           SCB ADDRESS                     17800010
+*                                                                     * 17900010
+*        FIND TERMNAME TABLE OFFSET FOR CURRENT INVLIST ENTRY         * 18000010
+*                                                                     * 18100010
+         L     RDCB,LCBDCBPT            LINE GROUP DCB ADDRESS          18200010
+         L     RTEMP,LCBINVPT-1         CURRENT ILIST ENTRY ADDR        18300010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          18400010
+         IC    RPARM,LCBUCBX            RLN-1                           18500010
+         SLL   RPARM,2                  MULTIPLY BY FOUR                18600010
+         L     RILIST,DCBINVLI(RPARM)   INVITATION LIST ADDRESS         18700010
+         TM    LCBSTAT1,LCBSENDN        LAST OPERATION A SEND           18800010
+         BO    DELAY                    BRANCH IF YES                   18900010
+         L     RPARM,DCBDEBAD           DEB ADDRESS                     19000010
+         TM    DEBOPATB-DEBNMSUB(RPARM),OUTONLY OUTPUT ONLY LINE        19100010
+         BO    FREE                     BRANCH IF YES                   19200010
+         CLI   0(RTEMP),FE              END OF ILIST                    19300010
+         BE    PRITST                   BRANCH IF YES                   19400010
+         CLI   1(RTEMP),FE              END OF LIST                     19500010
+         BE    PRITST                   BRANCH IF YES                   19600010
+         SPACE                                                          19602010
+         TM    LCBSTAT2,LCBNEGRP        DID THE STATION HAVE     S21101 19604010
+*                                         ANYTHING TO ENTER      S21101 19606010
+         BO    PRITST                   NO, BRANCH               S21101 19608010
+         L     RTEMP,LCBINVPT-1         GET CURRENT ENTRY        S21101 19610010
+         LA    RTEMP,AVTEZERO(,RTEMP)   CLEAR HI BYTE            S21101 19612010
+         BAL   RPQCB,GETQCBAD           GET QCB ADD FOR ENTRY    S21101 19614010
+         SPACE 2                                                        19616010
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S21101 19618010
+         SPACE                                                          19620010
+         TM    SCBQTYPE,SCBBFMM         IS THIS MIDDLE OF MESSAGES21101 19622010
+*                                         TO A BUFFERED TERMINAL S21101 19624010
+         BZ    PRITST                   BRANCH NO                S21101 19626010
+         L     RTEMP,LCBINVPT-1         CURRENT ENTRY RESET      S21101 19630010
+         BAL   RPQCB,NEXTENT            BUMP ILIST PINTER,WEDONT S21101 19632010
+*                                         WANT TO RE-POLL SAME   S21101 19634010
+         EJECT                                                          22900010
+PRITST   EQU   *                                                        23000010
+*                                                                     * 23100010
+         NI    LCBSTAT2,AVTEFF-LCBNEGRP RESET RESPONSE SWITCH    S21101 23150010
+*        DECIDE WHETHER TO TRY TO SEND OR RECEIVE NOW                 * 23200010
+*                                                                     * 23300010
+         TM    DCBCPRI,EQPRI            EQUAL PRIORITY SPECIFIED        23400010
+         BO    INVLTST                  BRANCH IF YES                   23500010
+*                                                                     * 23600010
+*    SINCE SEND PRIORITY IS SPECIFIED, MUST TEST FOR A QCB            * 23700010
+*    FROM WHICH WE CAN SEND.                                          * 23800010
+*                                                                     * 23900010
+QCBCHECK EQU   *                                                        24000010
+         CLC   LCBRSLNK,AVTDELAD+1      IS THERE A DEST QCB LINKED      24100010
+*                                       TO THIS LCB, I.E., IS THERE     24200010
+*                                       A BLOCK OF DATA TO BE SENT      24300010
+         BNE   SENDTST                  BRANCH IF YES                   24400010
+         EJECT                                                          24500010
+INVLTST  EQU   *                                                        24600010
+*                                                                     * 24700010
+*     CHECK FOR END OF INVITATION LIST.  IF YES, RESET LCBINVPT       * 24800010
+*     TO BEGINNING TO RESTART THE POLLING PASS AND SEE IF THERE       * 24900010
+*     IS A BLOCK OF DATA TO BE SENT.                                  * 25000010
+*                                                                     * 25100010
+         SPACE 2                                                        25200010
+         L     RTEMP,LCBINVPT-1         GET CURRENT ILIST ENTRY         25300010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          25400010
+         IC    RPARM,LCBUCBX            RLN-1                           25500010
+         SLL   RPARM,2                  MULTIPLY BY FOUR                25600010
+         L     RILIST,DCBINVLI(RPARM)   INVITATION LIST ADDRESS         25700010
+         CLI   EOL(RTEMP),FE            END OF ILIST                    25800010
+         BE    RESET                    BRANCH IF YES                   25900010
+         CLI   1(RTEMP),FE              END OF LIST FOR BISYNC          26000010
+         BNE   RCV                      BRANCH IF NO                    26100010
+RESET    EQU   *                                                        26200010
+         LA    RTEMP,ILISTPRF(0,RILIST) BUMP PAST ILIST PREFIX TO       26300010
+*                                       FIRST ENTRY IN ILIST            26400010
+         STCM  RTEMP,ADR,LCBINVPT       RESET NEW CURRNT ENTRY @Z30X8IM 26500010
+         CLI   1(RILIST),0              ANY ACTIVE ENTRIES              26800010
+         BE    FREE                     BRANCH IF NO                    26900010
+         CLC   LCBRSLNK,AVTDELAD+1      MSG TO SEND                     26910010
+         BNE   SENDTST                  BRANCH IF YES                   26920010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          26930010
+         IC    RPARM,DCBINTVL           POLLING DELAY FROM DCB          26940010
+         LTR   RPARM,RPARM              DELAY SPECIFIED                 26950010
+         BNZ   SETDELAY                 BRANCH IF YES                   26960010
+         B     QCBCHECK                 CHECK FOR BLOCK TO SEND         27000010
+         EJECT                                                          27100010
+RCV      EQU   *                                                        27200010
+*                                                                     * 27300010
+*      BUILD ERB TO INITIATE A RECEIVE OPERATION ON THE LINE          * 27400010
+*                                                                     * 27500010
+         TM    LCBINSRC+2,LCBDLY        LCB IN TIME DELAY               27530010
+         BO    FREE                     BRANCH IF YES                   27560010
+         SPACE 2                                                        27900010
+         L     RPARM,DCBDEBAD           GET DEB ADDRESS          S21101 27901010
+         TM    DEBOPATB-DEBNMSUB(RPARM),OUTONLY       IS THIS AN S21101 27902010
+*                                         OUTPUT ONLY LINE       S21101 27903010
+         BO    FREE                     BRANCH IF YES            S21101 27904010
+         SPACE                                                          27905010
+         TM    AVTBIT1,AVTDLAYN+AVTCLOSN    IS THIS CLOSEDOWN OR S22025 27905110
+*                                         SYSTEM DELAY           S22025 27905210
+         BNZ   SETINDEX                 YES, BRANCH              S22025 27905310
+         TM    LCBSTAT1,LCBOCNI         REQUEST FOR STOPLINE     S22025 27905410
+         BZ    SETLOOP                  NO, BRANCH               S22025 27905510
+SETINDEX EQU   *                                                 S22025 27905610
+         OI    LCBSTAT2,LCBSNDPR        SET THE PRIORITY BIT     S22025 27905710
+SETLOOP  EQU   *                                                 S22025 27905810
+         L     RTEMP,LCBINVPT-1         CURRENT ENTRY            S21101 27906010
+         LA    RTEMP,AVTEZERO(,RTEMP)   CLEAR THE HIGH ORDER BYTES21101 27907010
+         ST    RTEMP,AVTDOUBL           SAVE FOR LOOP CONTROL    S21101 27908010
+         B     STLOOP                   ENTER LOOP               S21101 27909010
+         SPACE                                                          27910010
+LOOPEXIT EQU   *                                                 S21101 27911010
+         C     RTEMP,AVTDOUBL           WRAPPED ILIST ENTRIES    S21101 27912010
+         BE    FREE                     BRANCH IF YES            S21101 27913010
+         SPACE                                                          27914010
+STLOOP   EQU   *                                                 S21101 27915010
+         BAL   RPQCB,GETQCBAD           QCB ADDRESS FOR ENTRY    S21101 27916010
+         TM    QCBSTAT,QCBSEND          SENDING TO THIS          S21101 27917010
+         BO    GETNEXT                  YES, GO TO NEXT ENTRY    S21101 27918010
+         SPACE                                                          27919010
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S22025 27924010
+         TM    LCBSTAT1,LCBOCNI         REQUEST FOR STOPLINE?   SA56606 27924110
+         BO    GETNEXT                  BRANCH YES              SA56606 27924210
+         SPACE 2                                                        27924510
+         TM    SCBQTYPE,SCBBFMM         IS THIS MIDDLE OF MSG TO S22025 27925010
+*                                         THIS STATION           S22025 27925510
+         BO    GORCV                    YES, BRANCH              S22025 27926010
+         TM    LCBSTAT2,LCBSNDPR        IS THIS AN UNUSUAL       S22025 27926510
+*                                         CONDITION              S22025 27927010
+         BZ    GORCV                    NO, BRANCH               S22025 27927510
+         EJECT                                                          27928010
+GETNEXT  EQU   *                                                 S21101 27929010
+         SR    RZERO,RZERO              CLEAR WORK REGISTER      S21101 27930010
+         LR    RPARM,RTEMP              COPY ILIST POINTER       S21101 27931010
+         IC    RZERO,ILSTSIZE(,RILIST)  SIZE OF EACH ENTRY       S21101 27932010
+         AR    RPARM,RZERO              NEXT ENTRY               S21101 27933010
+         CLI   AVTEZERO(RPARM),FE       END OF LIST              S21101 27934010
+         BE    SETIT                    YES, BRANCH              S22025 27935010
+         CLI   1(RPARM),FE              END OF LIST              S21101 27937010
+         BNE   CONT                     NO, CONTINUE SCAN        S21101 27938010
+         EJECT                                                          27939010
+SETIT    EQU   *                                                 S21101 27940010
+*        ENSURE THAT WHEN WE ARE AT END OF LIST THAT A SEND      S21101 27941010
+* OPERATION IS ALLOWED.  IF NOT AND EQUAL PRIORITY IS SPECIFIED, S21101 27942010
+* IT IS POSSIBLE THAT AN OUPUT OPERATION WILL NOT BE PERFORMED   S21101 27943010
+         CLC   LCBRSLNK,AVTDELAD+1      SOMETHING TO SEND        S21101 27944010
+         BE    CONT                     BRANCH IF NO             S21101 27945010
+         SPACE 1                                                 S21101 27946010
+         BAL   RPQCB,NEXTENT            NOW RESET ILIST POINTER  S21101 27947010
+         B     SENDTST                  ATTEMPT TO SEND          S21101 27948010
+         SPACE 1                                                 S21101 27949010
+CONT     EQU   *                                                 S21101 27950010
+         BAL   RPQCB,NEXTENT            GET THE NEXT ILIST ENTRY S21101 27951010
+         B     LOOPEXIT                 SCAN THE NEXT ENTRY      S21101 27952010
+         SPACE 1                                                 S21101 27953010
+GORCV    EQU   *                                                 S21101 27954010
+         MVC   LCBTTBIN,AVTDOUBL+4      SET TNT OFFSET           S21101 27955010
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S21101 27956010
+         SPACE                                                          27957010
+         ST    RSCB,LCBSCBA-1           STORE IT IN THE LCB      S21101 27958010
+         TM    5(RILIST),AUTO           AUTOPOLL REQUESTED              31000010
+         BNO   NOAUTO                   BRANCH IF NO                    31100010
+         NI    3(RILIST),AVTEFF-STRTAUTO                                31200010
+         NC    4(1,RILIST),4(RILIST)    SENDING TO A STATION            31300010
+         BNZ   NOAUTO                   BRANCH IF YES                   31400010
+         OI    3(RILIST),STRTAUTO       SET AUTOPOLL FLAG               31500010
+         EJECT                                                          31600010
+NOAUTO   EQU   *                                                        31700010
+*                                                                     * 31800010
+*           COMPLETE ERB INITIALIZATION                               * 31900010
+*                                                                     * 32000010
+         LA    RTEMP,AVTBFREB           BUFFER REQUEST QUEUE ADDR       32100010
+         ST    RTEMP,LCBERB             STORE IN QCB FIELD OF ERB       32200010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 32260010
+         OI    LCBSTAT1,LCBRECVN        SET RECEIVE STATUS IN LCB       32320010
+         MVI   LCBERBPY,PRIINTRQ        INITIAL REQUEST PRIORITY        32400010
+         SR    RTEMP,RTEMP              CLEAR REGISTER TO ZERO          32500010
+         IC    RTEMP,DCBBUFIN           INITIAL BUFFER COUNT            32600010
+         SRL   RTEMP,4                  ISOLATE FOUR HI ORDER BITS      32700010
+         STC   RTEMP,LCBERBCT           ESTABLISH INIT REQUEST          32800010
+         XC    LCBRECAD,LCBRECAD                                        33000010
+         XC    LCBRECOF,LCBRECOF                                        33100010
+         LA    RPARM,LCBERB             PREPARE TO POST ERB             33200010
+         B     FULLQ                    PROCEED WITH RECEIVE     S21101 33300010
+FREE     EQU   *                                                        33500010
+         CLC   LCBRSLNK,AVTDELAD+1      SOMETHING TO SEND NOW           33600010
+         BNE   SENDTST                  BRANCH IF YES TO SEND LOGIC     33700010
+FREETST  EQU   *                                                        33710010
+         TM    AVTBIT1,AVTCLOSN+AVTDLAYN     IS THIS CLOSE OR    S21101 33712010
+*                                            SYSTEM DELAY        S21101 33714010
+         BNZ   NOSEND                   BRANCH IF EITHER OR BOTH S21101 33716010
+         TM    LCBSTAT1,LCBOCNI         STOPLINE REQUESTED              33740010
+         BO    NOSEND                   BRANCH IF YES                   33750010
+SETFREE  EQU   *                                                        33760010
+         OI    LCBSTAT2,LCBNEGRP        SET SWITCH               S21101 33780010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 33800010
+         OI    LCBSTAT1,LCBFREEN        SET LINE FREE                   33840010
+         B     DSPDISP                  EXIT TO DISPATCHER              33900010
+FULLQ    EQU   *                                                        33905010
+         TM    AVTBIT3,AVTRECVN+AVTRFULN QUEUE THRESHOLD CONDITION      33910010
+         BZ    DSPPOST                  BRANCH IF NO                    33915010
+         TM    SCBQTYPE,SCBBFMM         IS THIS ALSO MIDDLE      S21101 33915510
+*                                         OF MESSAGE             S21101 33916010
+         BO    SETTIME                  YES, SET DELAY TIME      S21101 33916510
+         CLC   LCBRSLNK,AVTDELAD+1      SOMETHING TO SEND               33920010
+         BNE   SENDTST                  BRANCH IF YES                   33925010
+         CLI   4(RILIST),0              SENDING TO A STATION            33930010
+         BNE   SETFREE                  BRANCH IF YES                   33935010
+         EJECT                                                          33935210
+SETTIME  EQU   *                                                 S21101 33935510
+         LA    RPARM,1                  ONE-SECOND DELAY                33940010
+SETDELAY EQU   *                                                        33940510
+         TM    LCBINSRC+2,LCBDLY        LCB IN TIME DELAY               33941010
+         BO    FREE                     BRANCH IF YES                   33941510
+         OI    LCBSTAT2,LCBNEGRP        SET SWITCH               S21101 33941710
+         OI    LCBINSRC+2,LCBDLY        SET LCB IN TIME DELAY           33942010
+         STH   RPARM,LCBEOLTD           TIME DELAY PARAMETER            33945010
+         MVI   LCBTDL,LCBINSRC-1-IEDQLCB TIME DELAY INDEX               33950010
+         ST    RLCB,LCBQCBA-1           SET UP QCB ADDRESS              33957010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 33965010
+         OI    LCBSTAT1,LCBFREEN        SET LINE FREE                   33970010
+         LR    RPARM,RLCB               TIME DELAY PARAMETER            33975010
+         L     RENTRY,AVTHG01           TIME DELAY SUBTASK              33981010
+         BALR  RETURN,RENTRY            PUT LCB IN TIME DELAY           33987010
+         B     DSPDISP                  EXIT TO DISPATCHER              33993010
+         EJECT                                                          34000010
+SENDTST  EQU   *                                                        34100010
+*                                                                     * 34200010
+*         THERE IS A DEST QCB IN THE CHAIN OF WAITING QCB'S FOR       * 34300010
+*      THIS LCB. PREPARE THE ERB FOR A SEND OPERATION IF THERE        * 34400010
+*      IS UNSENT DATA ON THE QCB.  IF THERE IS NO DATA ON THE         * 34500010
+*      QCB, REMOVE QCB FROM CHAIN AND POST LCB TO ITSELF.             * 34600010
+*                                                                     * 34700010
+         SPACE 2                                                        34800010
+         L     RSTCB,STCBLINK-1         ADDR OF A BUFFERED TERMINAL     34900010
+*                                       SCHEDULER'S STCB THAT IS        35000010
+*                                       ASSOCIATED WITH A DEST QCB      35100010
+         LA    RPARM,QCBSTVTO-IEDQQCB   STCB OFFSET INTO QCB            35200010
+         LR    RQCB,RSTCB               COMPUTE STARTING ADDRESS        35300010
+         SR    RQCB,RPARM                 OF DEST QCB                   35400010
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S21101 35430010
+         SPACE                                                          35460010
+         ST    RSCB,LCBSCBA-1           STORE ADDRESS OF CURRENT        36800010
+         TM    SCBQTYPE,SCBBFMM         IS THIS STATION IN       S22025 36900010
+*                                         MIDDLE OF MESSAGE      S22025 36920010
+         BZ    TRYSEND                  NO, BRANCH               S22025 36940010
+         TM    QCBSTAT,QCBSEND          IS A SEND OPERATION IN   S22025 36960010
+*                                         PROGRESS               S22025 36980010
+         BO    TRYSEND                  YES, BRANCH              S22025 37000010
+         L     RTEMP,STCBLINK-1         GET THE ADDRESS OF THE   S21101 37020010
+*                                         NEXT STCB ON THE CHAIN S21101 37050010
+         CLI   STCBPRIT(RTEMP),AVTEZERO IS THIS THE LAST ELEMENT S21101 37080010
+*                                         ON THE STCB CHAIN      S21101 37110010
+         BNE   SENDTST                  BRANCH NO                S21101 37140010
+         TM    LCBSTAT1,LCBOCNI        IS IT STOPLINE           SA56606 37143010
+         BO    TSTSTOPL                BR YES                   SA56606 37146010
+         TM    LCBINSRC+2,LCBDLY       LCB IN END POLL DELAY    SA56605 37150010
+         BO    SETFREE                  YES-DONT TRY TO POLL    SA56605 37160010
+         L     RTEMP,LCBINVPT-1         GET CURRENT ILIST ENTRY SA56606 37160910
+         SR    RPARM,RPARM             CLEAR REG TO ZERO        SA56606 37161810
+         IC    RPARM,LCBUCBX            RLN-1                   SA56606 37162710
+         SLL   RPARM,TWO                MULTIPLY BY 4           SA56606 37163610
+         L     RILIST,DCBINVLI(RPARM)   INVLIST ADDRESS         SA56606 37164510
+         CLI   ONE(RILIST),ZERO         ANY ACTIVE ENTRIES      SA56606 37165410
+         BNE   RSETSTCB                 YES, TRY TO RECEIVE     SA56606 37166310
+         TM    AVTBIT1,AVTCLOSN         FLUSH OR QUICK CLOSE    SA56606 37167210
+         BO    POSTOPC                  YES-NOTIFY OP CNTRL     SA56606 37168110
+         B     SETTIME                 PUT LCB IN TIME DELAY    SA56606 37169010
+RSETSTCB EQU   *                                                SA56606 37169510
+         SPACE                                                          37170010
+         LA    RSTCB,LCBRSKEY          RESET STCB BASE           S21101 37200010
+         B     INVLTST                  FINISH RECEVIE OPERATION S21101 37230010
+         EJECT                                                          37240010
+TRYSEND  EQU   *                                                 S21101 37260010
+         TM    AVTBIT1,AVTCLOSN+AVTQUCKN  FLUSH CLOSE                   37400010
+         BM    BYPASS                   BRANCH IF YES                   37500010
+         BO    NOSEND                   BRANCH IF QUICK CLOSE    S21101 37520010
+         TM    AVTBIT1,AVTDLAYN         IS IT SYSTEM DELAY       S21101 37540010
+         BO    NOSEND                   YES, BRANCH              S21101 37560010
+         TM    LCBSTAT1,LCBOCNI         STOPLINE                        37800010
+         BO    NOSEND                   BRANCH IF YES                   37900010
+BYPASS   EQU   *                                                        38000010
+         EJECT                                                          38002010
+         SPACE 2                                                        38100010
+         TM    SCBQTYPE,SCBBFMM         ARE WE READY TO SEND A          38300010
+*                                       SUBSEQUENT(NON-HEADER)          38400010
+*                                       BLOCK TO THIS DESTINATION       38500010
+         BNO   INITIAL                  BRANCH IF NO TO PERFORM         38600010
+*                                       SCAN AND SCB INITIALIZATION     38700010
+         EJECT                                                          38800010
+SENDSEG  EQU   *                                                        38850010
+*        DO SPECIAL PROCESSING FOR THE MULTI-BLOCK MESSAGE SITUATION  * 38900010
+*                                                                     * 39000010
+         SPACE 2                                                        39100010
+         STCM  RQCB,ADR,SCBDESTQ        SET UP QCB ADDRESS     @Z30X8IM 39120010
+         NC    SCBDEOB,SCBDEOB          NEED TO DO A RECALL             39200010
+*                                       FOR EMBEDDED EOB BUFFER         39300010
+         BZ    BUILDERB                 BRANCH IF NO TO SET UP          39400010
+*                                       REQUEST FOR NEXT BUFFER         39500010
+         SPACE                                                          39600010
+*                                                                     * 39700010
+*        PREPARE ERB TO RECALL BUFFER WITH EMBEDDED EOB               * 39800010
+*                                                                     * 39900010
+*              SEE IF LAST BUFFER OF MESSAGE HAS BEEN READ FROM DISK  * 40000010
+         TM    SCBQTYPE,SCBCOREQ        CORE QUEUEING                   40100010
+         BO    COREONLY                 BRANCH IF YES                   40200010
+         TM    SCBSTAT1,PRFNLSTN        EOM BUFFER                      40300010
+         BO    NOTLAST                  BRANCH IF NO                    40400010
+         CLC   SCBDEOB+1(3),SCBCRCD     SENDING LAST SEGMENT            40500010
+         BNL   COREONLY                                         SA60792 40600010
+         NC    SCBXTRA(THREE),SCBXTRA                           SA60792 40610010
+         BZ    RSET                                             SA60792 40620010
+         CLC   SCBDEOB+ONE(THREE),SCBXTRA                       SA60792 40630010
+         BNL   COREONLY                                         SA60792 40640010
+RSET     EQU   *                                                SA60792 40650010
+         OI    SCBSTAT1,PRFNLSTN        FLAG AS NOT LAST YET            40700010
+NOTLAST  EQU   *                                                        40800010
+         XC    SCBXTRA(3),SCBXTRA       CLEAR FOR RECALL         S21101 40840010
+         XC    SCBNTXT(3),SCBNTXT       CLEAR FOR RECALL         S21101 40880010
+COREONLY EQU   *                                                 S21101 40920010
+         MVZ   SCBHBFNO,SCBQTYPE        SET QTYPE FLGS FOR FA   SA52971 40930010
+         MVC   LCBCPA(4),SCBDEOB        SAVE OVER RECALL                40950010
+         NI    QCBSTAT,AVTEFF-QCBBUFRD  TURN OFF HEADER FLAG            41100010
+         LA    RTEMP,AVTDSIOB           DISK I/O QCB ADDRESS            41200010
+         ST    RTEMP,LCBERB             SET QCB ADDR IN ERB             41300010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 41360010
+         OI    LCBSTAT1,LCBSENDN        SET LCB IN SEND STATE           41420010
+         MVI   LCBERBPY,PRIDKEOB        RECALL PRIORITY                 41500010
+         MVI   LCBERBCT,1               RECALL BUFFER COUNT             41600010
+         MVI   LCBERBCT+1,AVTEZERO      CLEAR DISABLED COUNT            41650010
+         OI    LCBSTAT1,LCBRCLLN        SET RECALL BIT IN LCB           41700010
+         ST    RLCB,LCBRCQCB            SET UP ERB RETURN ADDRESS       41800010
+         LA    RPARM,LCBERB             ERB ADDR FOR DISPATCHER         42000010
+         B     DSPPOST                  POST ERB FOR RECALL             42100010
+         EJECT                                                          42200010
+GETQCBAD EQU   *                                                 S21101 42200210
+*        SUBROUTINT WILL COMPUTE ADDRESS OF QCB BASED ON ILIST   S21101 42200410
+* POINSTER IN RTEMP                                              S21101 42200610
+*        RILIST POINTS TO ILIST CONTROL WORDS                    S21101 42200810
+*        QCB IS SET IN RQCB                                      S21101 42201010
+*        TNT OFFSET IS SET AT AVTDOUBL+4                         S21101 42201210
+         SR    RPARM,RPARM              CLEAR WORK REGISTER      S21101 42201410
+         IC    RPARM,ILSTSIZE(,RILIST)  GET THE SIZE OF EACH     S21101 42201610
+*                                         INVITATION LIST ENTRY  S21101 42201810
+         BCTR  RPARM,RZERO              DECREMENT TO INDEX BYTE  S21101 42202010
+         IC    RPARM,0(RTEMP,RPARM)     GET INDEX BYTE           S21101 42202210
+         AR    RPARM,RPARM              DOUBLE FOR NEG INDEX     S21101 42202410
+         LR    RTERM,RILIST             COPY ILIST ADDRESS       S21101 42202610
+         SR    RTERM,RPARM              ADDRESS OF TNTOFFSET     S21101 42202810
+         LH    RPARM,AVTEZERO(,RTERM)   DET TNT OFFSET           S21101 42203010
+         STH   RPARM,AVTDOUBL+4         SAVE TNT OFFSET          S21101 42203210
+         L     RENTRY,AVTRNMPT          TNT CONVERSION           S21101 42203410
+         BALR  RETURN,RENTRY            LINK TO IT               S21101 42203610
+         L     RQCB,TRMDESTQ-1-IEDQTRM(RPARM)     LOAD THE       S21101 42203810
+*                                         DESTINATION QCB ADDR   S21101 42204010
+         BR    RPQCB                    RETURN                   S21101 42204210
+         EJECT                                                          42204410
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S21101 42204610
+*                                                             *  S21101 42204810
+*        THIS SUBROUTINE WILL GET THE ADDRESS OF THE NEXT     *  S21101 42205010
+*        INVITATION LIST ENTRY.  RTEMP POINTS TO THE          *  S21101 42205210
+*                            CURRENT ENTRY                    *  S21101 42205410
+*                                                             *  S21101 42205610
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S21101 42205810
+NEXTENT  EQU   *                                                 S21101 42206010
+         SR    RPARM,RPARM              CLEAR WORK REGISTER      S21101 42206210
+         IC    RPARM,ILSTSIZE(,RILIST)  SIZE OF EACH             S21101 42206410
+         AR    RTEMP,RPARM              BUMP TO NEXT             S21101 42206610
+         CLI   AVTEZERO(RTEMP),FE       END OF LIST              S21101 42206810
+         BE    RESETIT                  BRANCH YES TO RESET      S21101 42207010
+         CLI   1(RTEMP),FE              END OF BSC LIST          S21101 42207210
+         BNE   SETINVPT                 NO, BRANCH               S21101 42207410
+RESETIT  EQU   *                                                 S21101 42207610
+         LA    RTEMP,ILISTPRF(,RILIST)  TO FIRST ENTRY           S21101 42207810
+SETINVPT EQU   *                                                 S21101 42208010
+         STCM  RTEMP,ADR,LCBINVPT       STORE THE ADDRESS OF   @Z30X8IM 42208210
+*                                         THE NEXT ILIST ENTRY @Z30X8IM 42208610
+         BR    RPQCB                    RETURN                   S21101 42209010
+         EJECT                                                          42209210
+INITIAL  EQU   *                                                        42300010
+*                                                                     * 42400010
+*        FIND PRIORITY LEVEL QCB WITH A MESSAGE TO BE SENT            * 42500010
+*                                                                     * 42600010
+         USING IEDQPQCB,RPQCB           PRIORITY LEVEL QCB              42700010
+         L     RPARM,DCBDEBAD           DEB ADDRESS                     42800010
+         TM    DEBOPATB-DEBNMSUB(RPARM),OUTPUT OPEN FOR OUTPUT          42900010
+         BNO   DEQ                      BRANCH IF NO                    43000010
+        TM    QCBSTAT,QCBTRMHO         IS TERMINAL HELD                 43100010
+         BO    DEQ                      BRANCH IF YES                   43200010
+         TM    QCBDSFLG,QCBHELD         REUSABILITY RUNNING             43230010
+         BO    DEQ                      BRANCH IF YES                   43260010
+         SR    RTEMP,RTEMP              INITIALIZE PQCB COUNTER         43300010
+         LA    RPQCB,IEDQPQCB-IEDQQCB(0,RQCB) ADDR OF FIRST PRTY QCB    43400010
+LOOP     EQU   *                                                        43500010
+         NC    QCBFFEFO,QCBFFEFO        IS THERE AN UNSENT MESSAGE      43600010
+*                                       FOR THIS PRTY LEVEL QCB         43700010
+         BNZ   BUILDSCB                 BRANCH IF YES TO COMPLETE       43800010
+*                                       SCB INITIALIZATION              43900010
+         CLI   QCBPRIPQ,0               LAST PRTY LEVEL QCB             44000010
+         BE    DEQ                      BRANCH IF YES TO REMOVE         44100010
+*                                       THIS QCB FROM LCB CHAIN         44200010
+         LA    RPQCB,QCBPEND            ADDR OF NEXT PRTY LEVEL QCB     44300010
+         LA    RTEMP,1(0,RTEMP)         INCREMENT PQCB COUNTER          44400010
+         B     LOOP                     TEST THIS PRTY LEVEL QCB        44500010
+         EJECT                                                          44510010
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S21101 44520010
+*                                                             *  S21101 44530010
+*        REMOVE THE QCB FROM THE STCB CHAIN OF THE LCB        *  S21101 44540010
+*                                                             *  S21101 44550010
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S21101 44560010
+DEQ      EQU   *                                                        44700010
+         SPACE 4                                                        45300010
+         NI    QCBSTAT,X'FF'-QCBSEND    TURN OFF SEND MODE FLAG         45700010
+         BAL   RETURN,SEARCH            FIND AND REMOVE STCB     A48267 45800010
+         MVC   13(3,RQCB),9(RQCB)       PUT DEST SCHED ON BOTTOM        45900010
+         LA    RPARM,8(0,RQCB)          ADDRESS OF BTS STCB             46000010
+         ST    RPARM,8(0,RQCB)          PUT BTS STCB ON TOP OF QCB      46100010
+         MVI   8(RQCB),X'1A'            RESTORE BTS VTO                 46200010
+         SR    RTEMP,RTEMP              CLEAR REG TO ZERO               46300010
+         IC    RTEMP,LCBUCBX            RLN-1                           46400010
+         SLL   RTEMP,2                  MULTIPLE BY FOUR                46500010
+         L     RILIST,DCBINVLI(RTEMP)   INVITATION LIST ADDRESS         46600010
+         SR    RTEMP,RTEMP              CLEAR REG TO ZERO               46700010
+         IC    RTEMP,4(RILIST)          SUBTRACT ONE FROM COUNT  S22025 46800010
+         BCTR  RTEMP,0                  OF TERMINALS CURRENTLY   S22025 46870010
+         STC   RTEMP,4(RILIST)          SENDING                  S22025 46940010
+         ST    RLCB,LCBQCBA-1           POST ADDRESS             S21101 47010010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 47020010
+         OI    LCBSTAT2,LCBNEGRP        TURN ON THE NEGATIVE     S21101 47030010
+*                                         RESPONSE BIT           S21101 47040010
+         OI    LCBSTAT1,LCBRECVN        SET LCB STATE            S21101 47050010
+         LR    RPARM,RLCB               SET UP DISPATCHER PARM REG      47100010
+         B     DSPPOST                  POST LCB TO ITSELF              47200010
+         EJECT                                                          47300010
+*                                                                     * 47400010
+*              COMPLETE SCB AND ERB INITIALIZATION                    * 47500010
+*                                                                     * 47600010
+BUILDSCB EQU   *                                                        47700010
+         MVI   LCBTTCIN+ONE,ONE                                 SA60792 48200010
+         OI    QCBSTAT,QCBSEND          SET SEND MODE FLAG              48800010
+         MVC   SCBSCHDR,QCBFFEFO        MOVE REL REC NO OF CURRENT      48900010
+*                                       HEADER INTO SCB                 49000010
+         MVC   SCBSCSEG,QCBFFEFO        MOVE REL REC NO OF CURRENT      49100010
+*                                       SEGMENT INTO SCB                49200010
+         OI    SCBQTYPE,SCBBFMM         SET MID-MESSAGE FLAG            49300010
+         STC   RTEMP,SCBPRI             PUT PRTY LEVEL QCB INDEX        49400010
+*                                       INTO SCB                        49500010
+         OI    QCBSTAT,QCBBUFRD         TURN ON HEADER FLAG             49600010
+         OI    QCBFLAG,QCBSDFFO                                         49700010
+         XC    SCBFEFO(3),SCBFEFO                                       49800010
+         STCM  RQCB,ADR,SCBDESTQ        PUT QCB ADDR IN SCB    @Z30X8IM 49820010
+         SPACE 2                                                        49900010
+BUILDERB EQU   *                                                        50000010
+         LA    RTEMP,AVTDSIOB           GET ADDRESS OF DISK I/O         50100010
+*                                       QCB FROM AVT                    50200010
+ACTIVATE EQU   *                                                        50300010
+         ST    RTEMP,LCBERB             SET QCB ADDR IN ERB             50400010
+         NI    QCBELCHN+2,AVTEFF-QCBCNTEN TURN OFF BUFFER BUSY @OX17153 50480010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 50560010
+         OI    LCBSTAT1,LCBSENDN        SET LCB IN SEND STATE           50620010
+         MVI   LCBERBPY,PRIINTRQ        INITIAL REQUEST PRIORITY        50700010
+         MVC   LCBERBCT(1),DCBBUFOU     INITIAL BUFFER COUNT            50800010
+         NI    LCBERBCT,X0F             CLEAR LOW-ORDER FOUR BITS       50900010
+         XC    LCBRECAD,LCBRECAD                                        51100010
+         XC    LCBRECOF,LCBRECOF                                        51200010
+         LA    RPARM,LCBERB             PUT ERB ADDR IN PARM REG        51300010
+*                                       FOR DISPATCHER                  51400010
+         B     DSPPOST                  POST ERB TO DISK I/O            51500010
+         EJECT                                                          51600010
+DELAY    EQU   *                                                        51700010
+*                                                                     * 51800010
+*        SINCE THE LAST OPERATION WAS A 'SEND', THE DESTINATION       * 51900010
+*        QCB MUST BE PLACED IN THE TIME DELAY QUEUE FOR THE TIME      * 52000010
+*        INTERVAL SPECIFIED IN THE TERMINAL ENTRY FOR THE LAST        * 52100010
+*        SENT BLOCK.                                                  * 52200010
+*                                                                     * 52300010
+         MVC   SCBDCHDR(2),LCBTTCIN     SAVE TNT OFFSET                 52400010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          52500010
+         LH    RPARM,LCBTTCIN           TNT OFFSET OF TERMINAL          52600010
+*                                       TO WHICH WE JUST SENT           52700010
+         N     RPARM,AVTCLRHI           CLEAR HI-ORDER HALF             52800010
+         L     RENTRY,AVTRNMPT          ADDR OF CONVERSION LOGIC        52900010
+         BALR  RETURN,RENTRY            COMPUTE TERMINAL ENTRY ADDR     53000010
+         LR    RTERM,RPARM              DSECT ADDRESSABILITY            53100010
+         L     RQCB,TRMDESTQ-1          DESTINATION QCB ADDRESS         53200010
+*                                                                       53300010
+*              FIND BUFFERED TERMINAL TIME DELAY VALUE                  53400010
+*                                                                       53500010
+         LA    RPARM,TRMOPNO            GET THE ADDRESS OF THE   S22025 53530010
+*                                         FIRST DEVICE DEP FIELD S22025 53560010
+         TM    TRMSTATE,TRMOPTFN        OPTION FIELDS SPECIFIED         53600010
+         BZ    SCAN                     NO, BRANCH               S22025 53700010
+         SPACE 2                                                        54100010
+COMPOPTF EQU   *                                                        54200010
+         SR    RETURN,RETURN            CLEAR REGISTER TO ZERO          54300010
+         IC    RETURN,TRMOPNO           NUMBER OF OPTION FIELDS         54400010
+         LA    RPARM,THREE(RETURN,RPARM) BUMP THE DEVICE DEP.    S22025 54500010
+*                                         FIELD POINTER PAST THE S22025 54600010
+*                                         OPTION OFFSETS         S22025 54700010
+SCAN     EQU   *                                                        54800010
+         LH    RETURN,TRMDEVFL          GET THE DEVICE DEPENDENT S22025 54900010
+*                                         FIELD FLAGS            S22025 55000010
+         SLL   RETURN,FIFTEEN           SHIFT FLAGS TO THE LEFT  S22025 55100010
+         LA    RENTRY,SIX               TEST 6 DEV DEP FLAGS     S22025 55200010
+         SR    RTERM,RTERM              CLEAR A LENGTH REGISTER  S22025 55300010
+SHIFT    EQU   *                                                        55400010
+         SLL   RETURN,ONE               TEST THE NEXT FLAG       S22025 55500010
+         LTR   RETURN,RETURN            IS THIS FIELD PRESENT    S22025 55570010
+         BNM   BUMP                     NO, BRANCH               S22025 55640010
+         IC    RTERM,ZERO(RPARM)        GET THE LENGTH OF THE    S22025 55710010
+*                                         CURRENT FIELD          S22025 55780010
+         LA    RPARM,ONE(RTERM,RPARM)   BUMP TO THE NEXT OPTION  S22025 55850010
+*                                         FIELD                  S22025 55920010
+BUMP     EQU   *                                                        56000010
+         BCT   RENTRY,SHIFT            IS THIS THE BFDLY FIELD   S22025 56100010
+*                                         IF NOT, CONTINUE SCAN  S22025 56300010
+         SPACE 3                                                        56600010
+MOVETIME EQU   *                                                        56700010
+         MVC   QCBEOLDT(2),1(RPARM)     MOVE TIME DELAY INTO QCB        56800010
+         MVI   QCBEOLDT+2,0             TIME DELAY INTERFACE INDEX      56900010
+         MVI   QCBPRI,X'EC'             SET QCB PRIORITY                57000010
+         LA    RTEMP,BTSTDQCB           BTS TIME DELAY INTERRUPT        57200010
+         STCM  RTEMP,ADR,QCBELCHN       HANDLER QCB ADDRESS    @Z30X8IM 57300010
+*                                                                    *  57408010
+*        CHECK FOR SPECIAL CASE OF TIME DELAY OF 12 OR MORE HOURS    *  57416010
+*                                                                    *  57424010
+         CLC   QCBEOLDT(2),TWELVE       DELAY GREATER THAN 12 HOURS     57432010
+         BL    LOWER                    BRANCH IF NO                    57440010
+         LH    RTEMP,QCBEOLDT           GET LARGE TIME DELAY            57448010
+         N    RTEMP,AVTCLRHI            CLEAR HIGH-ORDER HALFWORD       57456010
+         SH    RTEMP,TWELVE             DECREMENT BY 12 HOURS           57464010
+         OI    QCBSTAT,QCBTIME          SET FLAG FOR TIME DELAY         57472010
+         STH   RTEMP,QCBEOLDT           SET NEW DELAY VALUE             57480010
+LOWER    EQU   *                                                        57488010
+         EJECT                                                          57500010
+*                                                                     * 57600010
+*              REMOVE QCB FROM STCB CHAIN OF LCB                      * 57700010
+*                                                                     * 57800010
+NODECR   EQU   *                                                        58400010
+         TM    SCBQTYPE,SCBBFMM         IS THIS MIDDLE OF MSG    S21101 58410010
+         BO    NODECR01                 YES, BRANCH              S21101 58420010
+         TM    QCBSTAT,QCBTRMHO         IS TERMINAL HELD        SA52515 58423010
+         BO    NEXTTEST                 BRANCH IF YES           SA52515 58426010
+         NI    QCBSTAT,AVTEFF-QCBSEND   TURN OFF THE SEND BIT IN S21101 58430010
+*                                         THE DESTINATION QCB    S21101 58440010
+         SR    RTEMP,RTEMP              CLEAR REG TO ZERO      @OX12490 58441010
+         IC    RTEMP,LCBUCBX            RLN-1                  @OX12490 58442010
+         SLL   RTEMP,2                  MULTIPLE BY FOUR       @OX12490 58443010
+         L     RILIST,DCBINVLI(RTEMP)   INVITATION LIST ADDRESS@OX12490 58444010
+         SR    RTEMP,RTEMP              CLEAR REG TO ZERO      @OX12490 58445010
+         IC    RTEMP,4(RILIST)          SUBTRACT ONE FROM COUNT@OX12490 58446010
+         BCTR  RTEMP,0                  OF TERMINALS CURRENTLY @OX12490 58447010
+         STC   RTEMP,4(RILIST)          SENDING                @OX12490 58448010
+NODECR01 EQU   *                                                 S21101 58450010
+         LR    RPARM,RQCB               PARM FOR TIME DELAY             58500010
+         BAL   RETURN,SEARCH            FIND AND REMOVE STCB     A48267 58600010
+         XC    13(3,RQCB),13(RQCB)                                      58750010
+         L     RENTRY,AVTHG01           TIME DELAY LOGIC ADDRESS        58800010
+         BALR  RETURN,RENTRY            POST QCB TO TIME DELAY          58900010
+         LA    RSTCB,LCBSTCBA-1         RESTORE STCB ADDRESS            58950010
+         SPACE 2                                                        59000010
+NEXTTEST EQU   *                                                        59100010
+*                                                                     * 59200010
+*        IF THERE IS SOMETHING TO SEND, SEND IT.  IF NOT, AND         * 59300010
+*        THERE IS AN ACTIVE ENTRY IN THE ILIST, TRY TO RECEIVE.       * 59400010
+*        OTHERWISE, SET THE LINE FREE AND EXIT TO DISPATCHER.         * 59500010
+*                                                                     * 59600010
+         L     RDCB,LCBDCBPT            LINE GROUP DCB ADDRESS          59700010
+         NI    LCBSTAT1,X'FF'-LCBSENDN  SET LCB NOT SENDING             59800010
+         CLC   LCBRSLNK,AVTDELAD+1      ANOTHER QCB IN LCB CHAIN        59900010
+         BNE   SENDTST                  BRANCH IF YES TO TRY TO         60000010
+*                                       SEND ANOTHER BLOCK              60100010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          60200010
+         IC    RPARM,LCBUCBX            RLN-1                           60300010
+         SLL   RPARM,2                  MULTIPLY BY FOUR                60400010
+         L     RILIST,DCBINVLI(RPARM)   INVITATION LIST ADDRESS         60500010
+         CLI   0(RILIST),0              ANY ACTIVE ENTRIES              60600010
+         BNE   INVLTST                  BRANCH IF YES                   60700010
+         B     FREETST                                                  60800010
+         SPACE  2                                                       60810010
+SEARCH   EQU   *                                                 A48267 60820010
+         LA    RSTCB,QCBSTVTO           ADDRESS OF SEND SCHEDULARA48267 60830010
+*                                         TO BE REMOVED          A48267 60840010
+         ST    RSTCB,AVTDOUBL                                    A48267 60850010
+         LA    RSTCB,LCBRSKEY           ADDRESS OF RECEIVE SCH   A48267 60860010
+SCHLOOP  EQU   *                                                 A48267 60870010
+         CLC   AVTDOUBL+1(3),5(RSTCB)   IS THE NEXT SCHEDULAR    A48267 60880010
+*        THE ONE TO BE REMOVED                                   A48267 60890010
+         BE    DELINK                   BRANCH IF YES            A48267 60900010
+         L     RSTCB,4(RSTCB)           NEXT SCHEDULAR           A48267 60910010
+         B     SCHLOOP                  CONTINUE                 A48267 60920010
+DELINK   EQU   *                                                 A48267 60930010
+         L     RTEMP,4(RSTCB)           ADDRESS OF SCH TO REMOVE A48267 60940010
+         MVC   5(3,RSTCB),5(RTEMP)      DELINK STCB FROM CHAIN   A48267 60950010
+         BR    RETURN                   RETURN                   A48267 60960010
+         EJECT                                                          61000010
+NOSEND   EQU   *                                                        61100010
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S22025 61150010
+*                                                                     * 61200010
+*        RECIEVE OPERATIONS ARE HALTED.  IF FLUSH CLOSE AND THERE     * 61300010
+*        ARE MESSAGES TO SEND, SEND THEM UNTIL THE QUEUES ARE EMPTY.  * 61400010
+*        IF QUICK CLOSE OR STOP LINE, CHECK FOR QCBSFOR WHICH THERE   * 61500010
+*        IS A PARTIAL MESSAGE TO SEND.  IF NONE, POST LCB TO OPCTL.   * 61600010
+*                                                                     * 61700010
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S22025 61730010
+         OI    LCBSTAT2,LCBSNDPR        SET A FLAG FOR LINE END  S22025 61760010
+         CLC   LCBRSLNK,AVTDELAD+1      MESSAGE TO SEND                 61800010
+         BNE   TESTOPN                  BRANCH IF YES                   61900010
+PRESTOP  EQU   *                                                        61950010
+*                                                                     * 62000010
+*        CHECK FOR QCB ON TIME DELAY QUEUE                            * 62100010
+*                                                                     * 62200010
+         L     RTEMP,AVTDELYB           DUMMY TIME QUEUE ELEMENT        62300010
+         L     RPARM,AVTTIMQ            FIRST TIME QUEUE ELEMENT        62400010
+         LA    RTEMP,0(0,RTEMP)         CLEAR HIGH-ORDER BYTE           62500010
+TQLOOP   EQU   *                                                        62600010
+         LA    RPARM,0(0,RPARM)         CLEAR HIGH-ORDER BYTE           62700010
+         CR    RTEMP,RPARM              END OF TIME QUEUE               62800010
+         BE    STOPSEND                 BRANCH IF YES                   62900010
+         CLI   QCBEOLDT+2-IEDQQCB(RPARM),AVTEZERO ELEM A QCB            63000010
+         BE    QCBTESTX                 BRANCH IF YES                   63100010
+TQNEXT   EQU   *                                                        63200010
+         L     RPARM,28(0,RPARM)        ADDR OF NEXT ELEM ON QUEUE      63300010
+         B     TQLOOP                   CHECK NEXT ELEMENT       S22025 63400010
+QCBTESTX EQU   *                                                        63500010
+         CLC   LCBDCBPT+1(3),QCBDCBAD-IEDQQCB(RPARM)             S21101 63510010
+*                                       IS THIS QCB ASSOCIATED   S21101 63520010
+*                                         WITH THIS LCB          S21101 63530010
+         BNE   TQNEXT                   NO, CHECK NEXT ELEMENT   S21101 63540010
+*                                         ON THE TIME QUEUE      S21101 63550010
+RLNTEST  EQU   *                                                        63810010
+         IC    RENTRY,QCBRELLN-IEDQQCB(RPARM)  RLN                      63820010
+         BCTR  RENTRY,RZERO             RLN-1                           63830010
+         EX    RENTRY,TESTRLN           SAME RELATIVE LINE NUMBER       63840010
+         BNE   TQNEXT                   BRANCH IF NO                    63850010
+         B     SETFREE                  EXIT IF QCB ON TIME DELAY Q     63870010
+STOPSEND EQU   *                                                        63900010
+         OI    LCBSTAT2,LCBNEGRP        SET SWITCH               S21101 63901010
+         L     RPARM,DCBDEBAD           GET DEB POINTER          S21101 63902010
+         TM    DEBOPATB-DEBNMSUB(RPARM),OUTONLY       IS THIS AN S21101 63903010
+*                                         OUTPUT ONLY LINE       S21101 63904010
+         BO    POSTHK                   BRANCH IF YES            S21101 63905010
+         SPACE                                                          63906010
+         LA    RTEMP,ILISTPRF(,RILIST)  POINT TO FIRST ENTRY IN  S21101 63906110
+*                                         THE INVITATION LIST    S21101 63906210
+         STCM  RTEMP,ADR,LCBINVPT       STORE ADDRESS OF FIRST @Z30X8IM 63906310
+*                                         ILIST ENTRY          @Z30X8IM 63908310
+         SPACE                                                          63912010
+LOOPEX   EQU   *                                                 S21101 63913010
+         CLI   AVTEZERO(RTEMP),FE       IS THIS THE LAST ENTRY   S21101 63913210
+         BE    POSTHK                   YES, BRANCH              S21101 63913410
+         CLI   1(RTEMP),FE              END OF THE BSC LIST      S21101 63913610
+         BE    POSTHK                   YES, BRANCH              S21101 63913810
+         SPACE                                                          63917010
+ENTLOOP  EQU   *                                                 S21101 63918010
+         BAL   RPQCB,GETQCBAD           GET THE QCB ADDRESS FOR  S21101 63919010
+*                                         THIS ENTRY             S21101 63920010
+         TM    QCBSTAT,QCBSEND          ARE WE CURRENTLY SENDING S22025 63921010
+         BO    NEXTSEND                 YES, BRANCH              S22025 63922010
+*                                                                S22025 63922110
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S22025 63922210
+         TM    LCBSTAT1,LCBOCNI         REQUEST FOR STOPLINE?   SA56606 63922310
+         BO    NEXTSEND                 BRANCH YES              SA56606 63922410
+         TM    SCBQTYPE,SCBBFMM         MID MESSAGE ON RECEIVE?  S22025 63922510
+         BO    GORCV                    YES, BRANCH              S22025 63922610
+NEXTSEND EQU   *                                                 S22025 63922710
+         SR    RPARM,RPARM              CLEAR A WORK REGISTER    S21101 63923210
+         IC    RPARM,ILSTSIZE(,RILIST)  SIZE OF AN ENTRY         S21101 63923410
+         AR    RTEMP,RPARM              ADDRESS OF NEXT ENTRY    S21101 63923610
+*                                         IN INVITATION LIST     S21101 63923810
+         B     LOOPEX                   SCAN NEXT ENTRY          S21101 63925010
+         SPACE                                                          63926010
+POSTHK   EQU   *                                                 S21101 63927010
+         TM    AVTBIT1,AVTDLAYN         IS THIS SYSTEM DELAY     S21101 63928010
+         BNO   TSTSTOPL                 NO, BRANCH               S21101 63929010
+         MVC   LCBQCBA(3),AVTHI+1       SET THE SYSTEM DELAY QCB S21101 63930010
+*                                         ADDRESS                S21101 63931010
+         B     SETPARM                  BRANCH TO POST LCB       S21101 63932010
+TSTSTOPL EQU   *                                                 S21101 63933010
+         TM    LCBSTAT1,LCBOCNI         STOPLINE REQUESTED              64000010
+         BNO   POSTOPC                  BRANCH IF NO                    64100010
+         MVC   LCBQCBA(3),AVTHK+1       OPERATOR CONTROL QCB            64200010
+SETPARM  EQU   *                                                 S21101 64250010
+         LR    RPARM,RLCB               DISPATCHER PARAMETER            64300010
+         B     DSPPOST                  POST LCB TO OPCTL               64400010
+POSTOPC  EQU   *                                                        64500010
+         MVI   LCBSTAT1,LCBFREEN        SET LINE FREE                   64600010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          64610010
+         IC    RPARM,LCBUCBX            RLN-1                           64620010
+         SLL    RPARM,2                 MULTIPLY BY FOUR                64630010
+         L     RILIST,DCBINVLI(RPARM)   INVITATION LIST ADDRESS         64640010
+         MVI   4(RILIST),AVTEZERO       SET LINE NOT SENDING            64650010
+         LA    RPARM,AVTOPCOB+4         OPERATOR CONTROL ECB ADDR       64700010
+         POST  (1)                                                      64800010
+         B     DSPDISP                  EXIT TO DISPATCHER              64900010
+         EJECT                                                          65000010
+TESTOPN  EQU   *                                                        65100010
+         TM    AVTBIT1,AVTCLOSN+AVTQUCKN FLUSH CLOSE                    65200010
+         BM    SENDTST                  BRANCH IF YES                   65300010
+*                                                                     * 65400010
+*        SEE IF THERE IS A PARTIAL MESSAGE TO BE SENT.                * 65500010
+*                                                                     * 65600010
+         L     RSTCB,LCBRSLNK-1         BTS STCB ADDRESS                65700010
+OPNLOOP  EQU   *                                                OX03968 65750010
+         LA    RPARM,QCBSTVTO-IEDQQCB   STCB OFFSET INTO QCB            65800010
+         LR    RQCB,RSTCB                                               65900010
+         SR    RQCB,RPARM               COMPUTE QCB ADDRESS             66000010
+         SR    RZERO,RZERO              CLEAR A WORK REGISTER    S21101 66020010
+         IC    RZERO,QCBSCBOF           GET THE SCB INDEX        S21101 66040010
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S21101 66060010
+         ST    RSCB,LCBSCBA-1           SET SCB ADDR IN LCB     SA68697 66070010
+         SPACE                                                          66080010
+         TM    SCBQTYPE,SCBBFMM         MIDDLE OF MESSAGE               66900010
+         BZ    NEXTQCB                  BRANCH IF NO            OX03968 66930010
+         TM    QCBSTAT,QCBSEND          MID MSG ON OUTPUT       OX03968 66960010
+         BO    SENDSEG                  BRANCH IF YES                   67000010
+NEXTQCB  EQU   *                                                OX03968 67300010
+         L     RTEMP,STCBLINK-1         GET NEXT STCB ADDRESS   OX03968 67340010
+         CLI   STCBPRIT(RTEMP),AVTEZERO IS THIS LAST STCB       OX03968 67380010
+         BE    PRESTOP                  BRANCH IF YES TO CHECK  OX03968 67420010
+*                                       TIME DELAY QUEUE FOR    OX03968 67460010
+*                                       TERMINALS IN MIDDLE OF  OX03968 67500010
+*                                       MESSAGE ON OUTPUT       OX03968 67540010
+         LR    RSTCB,RTEMP              SAVE STCB ADDRESS       OX03968 67580010
+         B     OPNLOOP                  AND LOOK AT NEXT STCB   OX03968 67620010
+         SPACE 2                                               @XA08074 67630010
+ABEND045 EQU   *                                               @XA08074 67640010
+         LA    RENTRY,ABEND2            PASS SUBCODE FOR LOGCAL@XA08074 67650010
+*                                        READ ERROR FOR REUS   @XA08074 67660010
+         BAL   RETURN,AVTABEND          ABEND TCAM 045-2       @XA08074 67670010
+         EJECT                                                          67700010
+BTSTDQCB DS    0F                       QCB TO WHICH TIME DELAY         67800010
+         DC    C'BFTS'                  POSTS DEST QCB AT END OF        67900010
+         DC    XL1'0A'                  TIME DELAY INTERVAL             68000010
+         DC    C'TDQ'                   IDENTIFIER               S22025 68100010
+         DC    A(*-4)                   STCB ADDRESS                    68200010
+*                                                                     * 68300010
+*        THIS SUBTASK IS ACTIVATED BY THE TIME DELAY ROUTINE          * 68400010
+*        WHEN THE TIME DELAY FOR A DESTINATION QCB HAS ELAPSED.       * 68500010
+*        IT RETURNS THE QCB TO THE LCB CHAIN.  IF THE LINE IS         * 68600010
+*        FREE, IT POSTS THE LCB TO ITSELF.  IF NOT, IT EXITS          * 68700010
+*        TO THE DISPATCHER                                            * 68800010
+*                                                                     * 68900010
+         USING *,RENTRY                 SUBTASK ADDRESSABILITY          69000010
+         LR    RQCB,RPARM               DEST QCB ADDRESS                69100010
+*                                                                     * 69200010
+*                   FIND THE LCB FOR THIS QCB                         * 69300010
+*                                                                     * 69400010
+         L     RDCB,QCBDCBAD-1          DCB ADDRESS                     69500010
+         L     RPARM,DCBDEBAD           DEB ADDRESS                     69600010
+         BAL   RPQCB,LCBFIND            FIND QCB'S LCB                  69700010
+         BAL   RPQCB,QCBRTNE            COMPUTE THE SCB ADDRESS  S21101 69730010
+         SPACE                                                          69760010
+         LA    RPARM,QCBSTVTO           ADDR OF BTS SEND STCB           70400010
+         LR    RDCB,RQCB                SAVE REG               @OX12490 70450010
+         LA    RQCB,LCBRSLNK-1          ADDRESS OF STCB CHAIN           70500010
+         BAL   RETURN,DSPPRIOR          INSERT STCB INTO LCB CHAIN      70600010
+         LR    RQCB,RDCB                RESTORE REG            @OX12490 70650010
+         L     RDCB,LCBDCBPT            DCB ADDRESS                     70700010
+         TM    DCBCPRI,EQPRI            EQUAL PRIORITY                  70800010
+         BO    NOSETX                   BRANCH IF YES                   70900010
+         OI    LCBSTAT2,LCBSNDPR        TELL LINE END THAT IT IS        71000010
+*                                       SEND PRIORITY AND THAT THERE    71100010
+*                                       IS SOMETHING TO SEND            71200010
+NOSETX   EQU   *                                                        71300010
+         SR    RPARM,RPARM              CLEAR REG TO ZERO               71400010
+         IC    RPARM,LCBUCBX                                            71500010
+         SLL   RPARM,2                                                  71600010
+         L     RILIST,DCBINVLI(RPARM)   INVITATION LIST ADDRESS         71700010
+         TM    QCBSTAT,QCBSEND          ARE WE SENDING         @OX12490 71800010
+         BO    NOBUMP                   BRANCH IF YES          @OX12490 71900010
+         IC    RTEMP,4(RILIST)                                 @OX12490 72000010
+         LA    RTEMP,1(0,RTEMP)                                @OX12490 72100010
+         STC   RTEMP,4(RILIST)                                 @OX12490 72200010
+NOBUMP   EQU   *                                                        72300010
+         CLI   LCBSTAT1,AVTEZERO        LINE STOPPED                    72330010
+         BE    DSPDISP                  BRANCH IF YES                   72360010
+         TM    LCBSTAT1,LCBFREEN        IS THE LINE FREE                72400010
+         BNO   AUTOTST                  BRANCH IF NO                    72500010
+         CLI   LCBPRI,PRILCBDL          SYSTEM INTERVAL IN EFFECT       72530010
+         BE    DSPDISP                  BRANCH IF YES                   72560010
+         ST    RLCB,LCBQCBA-1           PREPARE TO POST LCB TO LCB      72600010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 72660010
+         OI    LCBSTAT1,LCBRECVN        SET RECEIVE STATUS IN LCB       72720010
+         LR    RPARM,RLCB               DISPATCHER PARAMETER            72800010
+         B     DSPPOST                  POST LCB TO ITSELF              72900010
+AUTOTST  EQU   *                                                        73000010
+         CLI   LCBCPA+24,POLL           LINE IN AUTOPOLL                73100010
+         BNE   DSPDISP                  BRANCH IF NO                    73200010
+         ST    RLCB,AVTSAVE2            SAVE LCB POINTER         Y05331 73202510
+         L     RPARM,AVTSAVTP           POINTER TO SECONDARY AVT Y05331 73205010
+         USING IEDNSVTD,RPARM                                    Y05331 73207510
+         TM    SAVTDIAF,SAVTVIRT        IN VM ENVIRONMENT ?      Y05331 73210010
+         BNO   NOVIRT                    NO,BRANCH               Y05331 73212510
+         ST    RENTRY,AVTSAVE2+28       SAVE R15                 Y05331 73217510
+         LA    RZERO,LCBCPA+56          TIC ADDRESS              Y05331 73230010
+         L     RENTRY,SAVTDIAG          VIRTUAL DIAGNOSE ROUTINE Y05331 73232510
+         DROP  RPARM                                             Y05331 73235010
+         MVI   LCBCPA+56,CCWNOP         NOP VIRTUAL TIC          Y05331 73237510
+         BAL   RETURN,4(,RENTRY)        NOP REAL TIC,STOP AUTOPOLY05331 73240010
+         L     RENTRY,AVTSAVE2+28       SARESTORE R15            Y05331 73242510
+         NI    3(RILIST),AUTOPOLF       STOP AUTOPOLL            Y05331 73245010
+         B     DSPDISP                  EXIT TO DISPATCHER       Y05331 73247510
+         SPACE                                                          73250010
+NOVIRT   EQU   *                        NON VIRTUAL ENVIRONMENT  Y05331 73252510
+         MVI   LCBCPA+56,CCWNOP         STOP AUTOPOLL                   73400010
+         SPACE 1                                                SA61794 73500010
+         B     DSPDISP                  EXIT TO DISPATCHER              73600010
+         EJECT                                                          73700010
+TAG      EQU   *                                                        73800010
+*                                                                     * 73900010
+*        THIS LOGIC IS ACTIVATED BY DESTINATION SCHEDULER WHEN        * 74000010
+*        EOM IS POSTED TO DESTINATION QCB. (RQCB IS SET UP)           * 74100010
+*                                                                     * 74200010
+         USING *,RENTRY                 ESTABLISH ADDRESSABILITY        74300010
+         L     RDCB,QCBDCBAD-1          LINE GROUP DCB                  74400010
+         TM    DCBOFLGS,OPEN            IS THIS DCB OPEN                74500010
+         BCR   8,RETURN                 RETURN TO DEST SCHED IF NO      74600010
+         L     RPARM,DCBDEBAD           DEB ADDRESS                     74700010
+         TM    DEBOPATB-DEBNMSUB(RPARM),OUTPUT   OPEN FOR OUTPUT        74800010
+         BCR   8,RETURN                 RETURN TO DEST SCHED IF NO      74900010
+*                                                                     * 75000010
+*                   FIND THE LCB FOR THIS QCB                         * 75100010
+*                                                                     * 75200010
+         LA    RPQCB,ENDFIND                                            75300010
+LCBFIND  EQU   *                                                        75400010
+         SR    RTEMP,RTEMP              CLEAR REGISTER TO ZERO          75500010
+         IC    RTEMP,DEBNMEXT-DEBNMSUB(0,RPARM) NUMBER OF LCBS          75600010
+         SR    RPARM,RPARM              CLEAR REGISTER TO ZERO          75700010
+         IC    RPARM,QCBRELLN           QCB'S STARTING RLN              75800010
+         LR    RLCB,RPARM               SAVE THIS RLN FOR LATER         75900010
+         BCTR  RLCB,RZERO               RLN MINUS 1                     76000010
+         SR    RTEMP,RLCB               COUNT OF LCB'S TO SCAN          76100010
+         BCR   13,RETURN                RETURN TO DEST SCHED IF RLN     76200010
+*                                       LESS THAN DEBNMEXT              76300010
+         SR    RTEMP,RTEMP              CLEAR REGISTER TO ZERO          76400010
+         IC    RTEMP,DCBEIOBX           LCB SIZE                        76500010
+         MR    RPARM-1,RTEMP            STARTING LCB OFFSET             76600010
+         AL    RPARM,DCBIOBAD           POINT TO IOB OF LCB             76700010
+         LA    RTEMP,LCBFLAG1-IEDQLCB                                   76800010
+         SR    RPARM,RTEMP              ADJUST TO START OF LCB          76900010
+         LR    RLCB,RPARM               LCB ADDRESS                     77000010
+         LR    RTEMP,RETURN             SAVE RETURN ADDRESS OF          77100010
+*                                       DESTINATION SCHEDULER           77200010
+         BR    RPQCB                    RETURN TO CALLER                77300010
+ENDFIND  EQU   *                                                        77400010
+         SPACE 2                                                        77500010
+         TM    LCBSTAT1,LCBFREEN        IS THE LINE FREE NOW            77600010
+         BNO   LINKQCB                  BRANCH IF NO                    77700010
+         CLI   LCBPRI,PRILCBDL          SYSTEM INTERVAL IN EFFECT       77720010
+         BE    LINKQCB                  BRANCH IF YES                   77740010
+         NI    LCBSTAT1,LCBOCNI+LCBOCWTN PRESERVE STOPLINE BITS@OY14092 77760010
+         OI    LCBSTAT1,LCBRECVN        SET RECEIVE STATUS IN LCB       77820010
+         ST    RLCB,LCBQCBA-1           PREPARE TO POST LCB TO LCB      77900010
+         LR    RZERO,RQCB               SAVE QCB ADDRESS                78100010
+         BAL   RETURN,DSPPOSTR          POST LCB TO ITSELF              78200010
+         LR    RQCB,RZERO               RESTORE QCB ADDRESS             78300010
+         EJECT                                                          78400010
+LINKQCB  EQU   *                                                        78500010
+*                                                                     * 78600010
+*              PUT QCB INTO LCB'S CHAIN OF WAITING QCB'S              * 78700010
+*                                                                     * 78800010
+         LR    RSTCB,RLCB               ADDRESS OF QCB TO WHICH         78900010
+*                                       STCB IS TO BE LINKED            79000010
+         L     RDCB,LCBDCBPT            DCB ADDRESS                     79100010
+         TM    DCBCPRI,EQPRI            EQUAL PRIORITY                  79200010
+         BO    NOSET                    BRANCH IF YES                   79300010
+         OI    LCBSTAT2,LCBSNDPR        TELL LINE END THAT IT IS        79400010
+*                                       SEND PRIORITY AND THAT THERE    79500010
+*                                       IS SOMETHING TO SEND            79600010
+NOSET    EQU   *                                                        79700010
+         BAL   RETURN,DSPUNAVR          LINK QCB TO LCB                 79800010
+         SPACE 2                                                        79900010
+*                                                                     * 80000010
+*        IF LINE IS BEING AUTOPOLLED, STOP AUTOPOLL AND EXIT          * 80100010
+*        TO DESTINATION SCHEDULER.  IF NO, JUST EXIT TO DEST SCHED    * 80200010
+*                                                                     * 80300010
+         CLI   LCBCPA+24,POLL           LINE IN AUTOPOLL                80400010
+         BNE   OUT                      BRANCH IF NO                    80500010
+         ST    RLCB,AVTSAVE2            SAVE LCB POINTER         Y05331 80502510
+         L     RPARM,AVTSAVTP           POINTER TO SECONDARY AVT Y05331 80505010
+         USING IEDNSVTD,RPARM                                    Y05331 80507510
+         TM    SAVTDIAF,SAVTVIRT        IN VM ENVIRONMENT ?      Y05331 80510010
+         BNO   NOVIRT2                   NO,  BRANCH             Y05331 80512510
+         LA    RZERO,LCBCPA+32          TIC ADDRESS              Y05331 80515010
+         ST    RENTRY,AVTSAVE2+28       SAVE R15                 Y05331 80517510
+         L     RENTRY,SAVTDIAG          VIRTUAL DIAGNOSE ROUTINE Y05331 80520010
+         MVI   LCBCPA+32,CCWNOP         NOP VIRTUAL TIC          Y05331 80522510
+         BAL   RETURN,4(,RENTRY)        NOP REAL TIC-STOP AUTOPOLY05331 80525010
+         LA    RZERO,LCBCPA+56          TIC ADDRESS           Y05331    80527510
+         L     RPARM,AVTSAVTP           POINTER TO SECONDARY AVT Y05331 80530010
+         L     RENTRY,SAVTDIAG          VIRTUAL DIAGNOSE ROUTINE Y05331 80532510
+         DROP  RPARM                                             Y05331 80535010
+         MVI   LCBCPA+56,CCWNOP         NOP VIRTUAL TIC          Y05331 80537510
+         BAL   RETURN,4(,RENTRY)        NOP REAL TIC,STOP AUTOPOLY05331 80540010
+         L     RENTRY,AVTSAVE2+28       SARESTORE R15            Y05331 80542510
+         B     OUT                                               Y05331 80545010
+         SPACE                                                          80547510
+NOVIRT2  EQU   *                        NON VIRTUAL ENVIRONMENT  Y05331 80550010
+         MVI   LCBCPA+32,CCWNOP         NOP TIC COMMANDS AFTER          80600010
+         MVI   LCBCPA+56,CCWNOP           THE POLLS                     80700010
+         SPACE 2                                                        80800010
+OUT      EQU   *                                                        80900010
+         LR    RETURN,RTEMP             RESTORE RETURN ADDRESS          81000010
+         SR    RTEMP,RTEMP              CLEAR REG TO ZERO               81100010
+         IC    RTEMP,LCBUCBX            RLN-1                           81200010
+         SLL   RTEMP,2                  MULTIPLE BY FOUR                81300010
+         L     RILIST,DCBINVLI(RTEMP)   INVITATION LIST ADDRESS         81400010
+         SR    RTEMP,RTEMP              CLEAR REG TO ZERO               81600010
+         IC    RTEMP,4(RILIST)                                          81700010
+         LA    RTEMP,1(0,RTEMP)                                         81800010
+         STC   RTEMP,4(RILIST)                                          81900010
+         BR    RETURN                   RETURN TO DEST SCHEDULER        82000010
+         EJECT                                                          82100010
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S21101 82105010
+*                                                             *  S21101 82110010
+*        THIS SUBROUTINE WILL COMPUTE THE SCB ADDRESS         *  S21101 82115010
+*                  FOR ANY DESTINATION QCB                    *  S21101 82120010
+*                                                             *  S21101 82125010
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  S21101 82130010
+QCBRTNE  EQU   *                                                 S21101 82135010
+         SR    RZERO,RZERO              CLEAR A WORK REGISTER    S22025 82140010
+         SR    RSCB,RSCB                CLEAR ANOTHER            S21101 82145010
+         IC    RSCB,QCBSCBOF            GET THE INDEX TO THE     S21101 82150010
+*                                         RIGHT SCB              S21101 82155010
+         IC    RZERO,AVTSCBSZ           SIZE OF AN SCB           S22025 82160010
+         MR    RDCB,RZERO               COMPUTE THE OFFSET TO    S22025 82165010
+*                                         THE SCB                S21101 82170010
+         L     RDCB,LCBDCBPT            RESTORE THE DCB ADDRESS  S21101 82175010
+         AL    RSCB,LCBSCBDA-1          ADD THE OFFSET TO THE    S21101 82180010
+*                                         ABSOLUTE SCB ADDRESS   S21101 82185010
+         BR    RPQCB                    RETURN TO THE CALLER     S21101 82190010
+         EJECT                                                          82195010
+*                                                                     * 82200010
+*      S Y M B O L I C    C O N S T A N T S    A N D    E Q U A T E S * 82300010
+*                                                                     * 82400010
+         SPACE 2                                                        82500010
+HONE     DC    H'1'                     HALFWORD OF ONE          S22025 82600010
+TWELVE   DC    AL2(43200)               TWELVE-HOUR TIME DELAY          82650010
+TESTRLN  DS    0H                       INSURE HALF WORD BOUNDRY S22025 82660010
+         CLI   LCBUCBX,AVTEZERO         COMPARE RLN'S                   82670010
+AUTOPOLF EQU   X'FE'                                                    82700010
+AUTO     EQU   X'01'                                                    82800010
+STRTAUTO EQU   X'01'                                                    82900010
+EQPRI    EQU   X'02'                    DCB PRIORITY BYTE MASK          83000010
+FE       EQU   X'FE'                    END-OF-ILIST INDICATOR          83100010
+EOL      EQU   0                        OFFSET OF END-OF-ILIST          83200010
+*                                       INDICATOR IN ILIST ENTRY        83300010
+X0F      EQU   X'0F'                    LCBERBCT BIT FLIPPER            83400010
+OPEN     EQU   X'10'                    OPENED DCB FLAG                 83500010
+OUTPUT   EQU   X'01'                    LINE OPEN FOR OUTPUT            83600010
+*                                       LINE GROUP OPEN FOR OUTPUT      83700010
+POLL     EQU   X'09'                    POLL COMMAND                    83800010
+CCWNOP   EQU   X'03'                    NO-OP COMMAND                   83900010
+ILISTPRF EQU   8                        SIZE OF ILIST CONTROL AREA      84000010
+ZERO     EQU   0                                                 S22025 84030010
+ONE      EQU   1                                                        84060010
+TWO      EQU   2                        CONSTANT                SA56606 84080010
+ILSTSIZE EQU   2                        LENGTH OF AN ILIST ENTRY        84100010
+THREE    EQU   3                                                        84120010
+STCBPRIT EQU   4                                                 S21101 84150010
+FOUR     EQU   4                                                 S22025 84160010
+SIX      EQU   6                                                        84165010
+EIGHT    EQU   8                                                 S22025 84170010
+FIFTEEN  EQU   15                                                       84180010
+OUTONLY  EQU   X'03'                    LINE OPEN FOR OUTPUT ONLY       84200010
+LCBDLY   EQU   X'02'                                                    84270010
+ABEND2   EQU   2                        045 ABEND SUBCODE      @XA08074 84275010
+ADR      EQU   7                        MASK FOR ADDRESS STORE @Z30X8IM 84280010
+         EJECT                                                          84300010
+         TPRIOR                                                         84500010
+         EJECT                                                          84550010
+         TAVTD 2                                                        85000010
+         EJECT                                                          85050010
+         TQCBD                                                          85100010
+         EJECT                                                          85150010
+         TLCBD                                                          85200010
+         EJECT                                                          85250010
+         TSCBD                                                          85300010
+         TDEBD                                                          85400010
+         DCBD  DSORG=TX                                                 85500010
+         TDISPD                                                         85600010
+         TTRMD                                                          85700010
+         TRECBD                                                         85800010
+         TSTCBD                                                         85900010
+         TPRFD                                                          86000010
+         END                                                            86100010

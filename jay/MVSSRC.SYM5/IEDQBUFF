@@ -1,0 +1,313 @@
+IEDQBUFF CSECT                                                          00050082
+         TITLE 'BUFFER TRACE MACRO FUNCTION ROUTINE'                    00100082
+*000000-999999                                                 @OY19405 00150082
+*********************************************************************** 00200082
+*********************************************************************** 00250082
+*                                                                     * 00300082
+* MODULE NAME = IEDQBUFF                                              * 00350082
+*                                                                     * 00400082
+* DESCRIPTIVE NAME = BUFFER TRACE MACRO FUNCTION ROUTINE              * 00450082
+*                                                                     * 00500082
+* COPYRIGHT = NONE                                                    * 00550082
+*                                                                     * 00600082
+* STATUS = VS2 RELEASE 1.7                                            * 00650082
+*                                                                     * 00700082
+* FUNCTION = DETERMINES WHETHER IEDQFE30 MODULE IS TO BE ENTERED.     * 00750082
+*                                                                     * 00800082
+* NOTES = SEE BELOW                                                   * 00850082
+*                                                                     * 00900082
+*   DEPENDENCIES = NONE                                               * 00950082
+*                                                                     * 01000082
+*   RESTRICTIONS = NONE                                               * 01050082
+*                                                                     * 01100082
+*   REGISTER CONVENTIONS = TCAM STANDARD                              * 01150082
+*                                                                     * 01200082
+*   PATCH LABEL = PATCH                                               * 01250082
+*                                                                     * 01300082
+* MODULE TYPE = MACRO FUNCTION ROUTINE                                * 01350082
+*                                                                     * 01400082
+*   PROCESSOR = ASSEMBLER F                                           * 01450082
+*                                                                     * 01500082
+*   MODULE SIZE = N/A                                                 * 01550082
+*                                                                     * 01600082
+*   ATTRIBUTES = SERIALLY REUSEABLE                                   * 01650082
+*                                                                     * 01700082
+* ENTRY POINT = IEDBUF                                                * 01750082
+*                                                                     * 01800082
+* INPUT = BUFFER FROM MESSAGE HANDLER                                 * 01850082
+*                                                                     * 01900082
+* OUTPUT = TO MESSAGE HANDLER                                         * 01950082
+*                                                                     * 02000082
+* EXIT-NORMAL = TO MESSAGE HANDLER VIA IEDQUI                         * 02050082
+*                                                                     * 02100082
+* EXIT-ERROR = NONE                                                   * 02150082
+*                                                                     * 02200082
+* RETURN CODES = REGISTER 15 WILL CONTAIN THE RETURN CODE AS FOLLOWS: * 02250082
+*           F = TRACE TABLE NOT SPECIFIED ON INTRO, NO TRACE OCCURED  * 02300082
+*           C = NO TTCIN VALUE IN LCB, NO TRACE OCCURED               * 02350082
+*           8 = TRACESW NOT CODED FOR TERMNIAL TABLE ENTRY, NO TRACE  * 02400082
+*           4 = TRACE SWITCH IS OFF, NO TRACE OCCURED                 * 02450082
+*           1 = PARTIAL TRACE (ONE UNIT) OCCURED                      * 02500082
+*           0 = FULL BUFFER TRACE OCCURED                             * 02550082
+*                                                                     * 02600082
+* EXTERNAL REFERENCES = IEDQAE - TO LOCATE OPTION FIELDS              * 02650082
+*                       IEDQFE30 - TO MAKE THE TRACE ENTRY            * 02700082
+*                                                                     * 02750082
+*   DATA AREAS = TCAM BUFFER                                          * 02800082
+*                                                                     * 02850082
+*   CONTROL BLOCKS = AVT, DCT, LCB, QCB, TRM, PRF                     * 02900082
+*                                                                     * 02950082
+* TABLES = NONE                                                       * 03000082
+*                                                                     * 03050082
+* MACROS = NONE                                                       * 03100082
+*                                                                     * 03150082
+*********************************************************************** 03200082
+R0       EQU   0                                                        03250082
+R1       EQU   1                                                        03300082
+R2       EQU   2                                                        03350082
+RFE      EQU   2                                                        03400082
+R3       EQU   3                                                        03450082
+RSCB     EQU   3                                                        03500082
+R4       EQU   4                                                        03550082
+RLCB     EQU   4                                                        03600082
+R5       EQU   5                                                        03650082
+R6       EQU   6                                                        03700082
+RPREFIX  EQU   6                                                        03750082
+R7       EQU   7                                                        03800082
+RPARM    EQU   7                                                        03850082
+R8       EQU   8                                                        03900082
+RAVT     EQU   9                                                        03950082
+R10      EQU   10                                                       04000082
+RA       EQU   10                                                       04050082
+R11      EQU   11                                                       04100082
+RBASE    EQU   12                                                       04150082
+R13      EQU   13                                                       04200082
+R14      EQU   14                                                       04250082
+R15      EQU   15                                                       04300082
+ZERO     EQU   X'00'                    CONSTANT ZERO                   04350082
+ONE      EQU   X'01'                    CONSTANT ONE                    04400082
+FOUR     EQU   X'04'                    CONSTANT FOUR                   04450082
+EIGHT    EQU   X'08'                    CONSTANT EIGHT                  04500082
+CEE      EQU   X'0C'                    CONSTANT CHARLEY                04550082
+FOX      EQU   X'0F'                    CONSTANT FOX                    04600082
+         USING IEDQAVTD,RAVT                                            04650082
+         USING IEDQLCB,RLCB                                             04700082
+         USING IEDQPRF,RPREFIX                                          04750082
+         USING PARMLIST,RPARM                                           04800082
+         USING *,RBASE                                                  04850082
+IEDQBUFF IEDHJN CODE                                                    04900082
+         EJECT                                                          04950082
+         OC    AVTBUFTR,AVTBUFTR        BUFFER TRACE TABLE EXIST        05000082
+         BZ    EXITF                    NO, RETURN                      05050082
+         LR    RPARM,R1                 SAVE PARAMETER LIST             05100082
+         L     RPREFIX,AVTADBUF         LOAD BUFFER ADDRESS             05150082
+         L     RLCB,PRFLCB-1            LOAD LCB ADDRESS                05200082
+         L     RSCB,LCBSCBA-1           LOAD SCB ADDRESS                05250082
+         LH    R1,LCBTTCIN              GET CONNECTED INDEX             05300082
+         N     R1,AVTCLRHI              CLEAR HIGH ORDER BYTES          05350082
+         CLI   OPFL,ONE                 UNCONDIONAL TRACE               05400082
+         BE    TRACE                                                    05450082
+         LTR   R1,R1                    IS TTCIN ZERO                   05500082
+         BZ    EXITC                    BRANCH ERROR                    05550082
+         L     R15,AVTRNMPT             GET TERMINAL                    05600082
+         BALR  R14,R15                  ENTRY ADDRESS                   05650082
+         LR    R5,R1                    SAVE TERMINAL ADDRESS           05700082
+         LA    R1,AVTDOUBL              SET PARM LIST ADDRESS           05750082
+         MVC   AVTDOUBL(4),AEOPT        MOVE IEDQAE VALUES TO           05800082
+         L     R15,AVTUI                LOCATE TRACESW OPTION           05850082
+         BALR  R14,R15                  FIELD                           05900082
+         LTR   R15,R15                  TEST RETURN CODE                05950082
+         BNZ   EXIT8                    OPTION FIELD NOT CODED          06000082
+         CLI   0(R8),ONE                IS TRACE SW ON IN OPTION        06050082
+         BE    TRACE                    YES, THEN TRACE                 06100082
+         LA    R15,FOUR                 SET TRACE SW OFF RETURN CODE    06150082
+EXIT     EQU   *                                                        06200082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             06250082
+         B     FOUR(,RBASE)                EXIT                         06300082
+EXITF    LA    R15,FOX                  SET RETURN CODE                 06350082
+         B     EXIT                                                     06400082
+EXITC    LA    R15,CEE                  SET RETURN CODE                 06450082
+         B     EXIT                                                     06500082
+EXIT8    LA    R15,EIGHT                SET RETURN CODE                 06550082
+         B     EXIT                                                     06600082
+EXIT1    LA    R15,ONE                  SET RETURN CODE                 06650082
+         B     EXIT                                                     06700082
+EXIT0    LA    R15,ZERO                 SET RETURN CODE                 06750082
+         B     EXIT                                                     06800082
+         USING IEDTRBUF,R10                                             06850082
+BUMP     EQU   *                                                        06900082
+         OC    AVTAFE30,AVTAFE30        IS COMWRITE RUNNING             06950082
+         BZ    IPOST                    NO, CONTINUE WITH NEXT TABLE    07000082
+         L     R2,AVTAFE30              LOAD FE30 ADDRESS               07050082
+         BAL   RA,FOUR(RFE)             LINK TO FE30                    07100082
+         L     RA,AVTBUFTR              RESTORE TABLE POINTER           07150082
+         L     R5,CUR                   LOAD TABLE POINTER              07200082
+         L     R2,0(R5)                 LOAD POINTER TO CURRENT ENTRY   07250082
+         BR    R14                      GO TO CALLING ROUTINE           07300082
+IPOST    MVC   0(4,R5),4(R5)            UPDATE TABLE POINTERS           07350082
+         L     R2,COUNT                 UPDATE COUNT                    07400082
+         LA    R2,1(R2)                 OF TIMES TABLE                  07450082
+         ST    R2,COUNT                 HAS BEEN USED                   07500082
+         L     R2,CUR                   LOAD POINTER                    07550082
+         LA    R5,CUR1                                                  07600082
+         CR    R2,R5                    WHICH TABLE IS BEING USED NOW   07650082
+         BNE   TAB2                     TABLE TWO                       07700082
+         LA    R5,CUR2                  UPDATE POINTER TO USE           07750082
+         ST    R5,CUR                      TABLE TWO                    07800082
+         L     R2,0(R5)                 POINT TO CURRENT ENTRY          07850082
+         BR    R14                      RETURN TO CALLING ROUTINE       07900082
+TAB2     LA    R5,CUR1                  UPDATE POINTER TO               07950082
+         ST    R5,CUR                      USE TABLE ONE                08000082
+         L     R2,0(R5)                 POINT TO CURRENT ENTRY          08050082
+         BR    R14                      RETURN TO CALLING ROUTINE       08100082
+TRACE    EQU   *                                                        08150082
+         LA    R10,X'18'                FIXED DATA LENGTH IN AA TRACE   08200082
+         AH    R10,AVTKEYLE             ADD KEY LENGTH                  08250082
+         LA    R10,X'1F'(R10)           ADJUST                          08300082
+         SRL   R10,5                          ENTRY                     08350082
+         SLL   R10,5                               SIZE                 08400082
+         STH   R10,SIZE                 SAVE ENTRY SIZE                 08450082
+         L     R10,AVTBUFTR             GET TRACE TABLE                 08500082
+         USING IEDTRBUF,R10                                             08550082
+         USING IEDQLCB,R4                                               08600082
+         USING IEDQSCB,R3                                               08650082
+         L     R1,USERID                LOAD USER ID                    08700082
+         L     R5,CUR                   GET CURRENT POINTER             08750082
+         L     R2,0(R5)                 GET CURRENT ENTRY               08800082
+         ST    R1,0(R2)                 ENTER USER ID                   08850082
+         ST    R6,4(R2)                 STORE BUFFER ADDR               08900082
+         MVC   8(4,R2),SCBERRST         MOVE IN SCB ERROR BYTES         08950082
+         MVC   12(1,R2),LCBSENS0        MOVE IN LCB SENSE BYTE          09000082
+         MVC   13(1,R2),LCBFLAG1        MOVE IN                         09050082
+         MVC   14(1,R2),LCBFLAG2             THE                        09100082
+         MVC   15(1,R2),LCBFLAG3               IOS FLAGS                09150082
+         LH    R7,SIZE                  SIZE OF ONE ENTRY               09200082
+         SH    R7,HTEN                  SIZE LEFT IN THIS ENTRY         09250082
+         LA    R2,16(R2)                BUMP CURRENT DATA POINTER       09300082
+         TM    AVTBUFSW,AVTFULLT        FULL BUFFER TRACE SPECIFIED     09350082
+         BNO   PAR                      NO, TRACE 80 BYTES OF DATA      09400082
+         BAL   R14,TRACALL              GO MOVE THE DATA IF SPACE       09450082
+PAR      LA    R8,12(R6)                POINT TO DATA TO BE MOVED       09500082
+         LR    R1,R7                    SAVE ENTRY SIZE                 09550082
+         LH    R7,AVTKEYLE              DATA LENGTH TO MOVE             09600082
+         LH    R4,PRFSIZE               GET BUFFER DATA LENGTH          09650082
+         CR    R4,R7                    IS KL LESS THAN DATA COUNT      09700082
+         BH    DOKL                     YES                             09750082
+         LR    R7,R4                    NO, SWAP                        09800082
+DOKL     BCTR  R7,0                     REDUCE THE COUNT FOR EXECUTE    09850082
+         EX    R7,MOVEDATA              DO IT                           09900082
+         LA    R7,1(R7)                 RESTORE COUNT                   09950082
+         SR    R1,R7                    SIZE OF TRACE ENTRY THATS LEFT  10000082
+         LA    R2,0(R7,R2)              POINT TO DATA TARGET            10050082
+         BCTR  R1,0                     REDUCE FOR MOVE                 10100082
+         EX    R1,MOVEZERO              CLEAR ENTRY                     10150082
+         LR    R7,R1                    PUT IN R7                       10200082
+         LA    R7,1(R7)                 RESTORE PROPER COUNT            10250082
+         LA    R14,EXIT1                SET UP LINK REG                 10300082
+         LA    R2,0(R7,R2)              POINT TO NEXT ENTRY             10350082
+         CL    R2,8(R5)                 TABLE FULL                      10400082
+         BNL   BUMP                     YES, UPDATE POINTERS            10450082
+         ST    R2,0(R5)                 NO, SAVE OUR PLACE              10500082
+         B     EXIT1                    RETURN TO MH                    10550082
+TRACALL  EQU   *                                                        10600082
+         L     R4,CUR1+8                COMPUTE SIZE OF ONE TABLE       10650082
+         S     R4,CUR1+4                TO INSURE WE CAN WRITE          10700082
+         CH    R4,PRFSIZE               IS ONE TABLE LARGE ENOUGH       10750082
+         BLR   R14                      NO, THEN TRACE PARTIAL          10800082
+         LA    R14,EXIT0                SET LINK REG FOR EXIT           10850082
+         LH    R4,PRFSIZE               GET DATA COUNT TO BE TRACED     10900082
+         LA    R8,12(R6)                POINT TO DATA TO BE MOVED       10950082
+         LR    R11,R6                   SET UP UNIT POINTER             11000082
+         LH    R3,AVTKEYLE              GET DATA COUNT OF EACH UNIT     11050082
+LOOP     LR    R1,R7                    LOAD AMT TO MOVE                11100082
+         CR    R7,R3                    CORRECT SO FAR                  11150082
+         BL    OK                       YES                             11200082
+         LR    R1,R3                    NO, SWAP                        11250082
+OK       CR    R1,R4                    COMPARE WITH BUFFER COUNT       11300082
+         BL    OKAGAIN                  ALLRIGHT                        11350082
+         LR    R1,R4                    NO, SWAP                        11400082
+OKAGAIN  BCTR  R1,0                     DECREMENT FOR MOVE              11450082
+         EX    R1,MOVEDATA              MOVE DATA                       11500082
+         LA    R1,1(R1)                 BUMP CNT BACK                   11550082
+         SR    R4,R1                    DECREASE DATA LEFT TO MOVE      11600082
+         SR    R7,R1                    DECREASE DATA SPACE LEFT        11650082
+         AR    R2,R1                    UPDATE DATA POINTER             11700082
+         LTR   R4,R4                    ALL DATA BEEN MOVED             11750082
+         BNZ   UPDATE                   NO, CONTINUE                    11800082
+         LTR   R7,R7                    ANY SPACE LEFT                  11850082
+         BZ    CLEANUP                  NO, CONTINUE                    11900082
+         BCTR  R7,0                     DECREMENT FOR MOVE              11950082
+         EX    R7,MOVEZERO              MOVE ZEROS                      12000082
+         AR    R2,R7                    UPDATE THE                      12050082
+         LA    R2,1(R2)                   TRACE ENTRY POINTER           12100082
+         B     CLEANUP                  FINISHED...RETURN               12150082
+UPDATE   CR    R1,R3                    DID WE MOVE ONE UNIT            12200082
+         BE    NXTUNIT                  GET NEXT UNIT TO BE MOVED       12250082
+         SR    R3,R1                    SUBTRACT CNT ALLREADY MOVED     12300082
+         AR    R8,R1                    UPDATE BUFFER POINTER           12350082
+CLEANUP  LH    R7,SIZE                  GET DATA SPACE IN ONE UNIT      12400082
+         CL    R2,8(R5)                 LAST ENTRY IN TABLE             12450082
+         BNL   BUMP1                    YES                             12500082
+         ST    R2,0(R5)                 NO, SAVE                        12550082
+         LTR   R4,R4                    THROUGH                         12600082
+         BZR   R14                      YES EXIT                        12650082
+         B     LOOP                     CONTINUE                        12700082
+NXTUNIT  L     R11,8(R11)               POINT TO NEXT UNIT              12750082
+         LA    R8,12(R11)               POINT TO DATA TO BE MOVED       12800082
+         LH    R3,AVTKEYLE              GET DATA COUNT                  12850082
+         LTR   R7,R7                    UNIT SIZE EXHAUSTED             12900082
+         BNZ   LOOP                     NO, CONTINUE                    12950082
+         LH    R7,SIZE                  RESTORE TRACE ENTRY SIZE        13000082
+         B     LOOP                     CONTINUE                        13050082
+BUMP1    BAL   R14,BUMP                 UPDATE TABLE POINTERS AND       13100082
+*                                       RETURN                          13150082
+         LA    R14,EXIT0                SET LINK TO RETURN TO MH        13200082
+         LH    R7,SIZE                  RESTORE TABLE ENTRY LENGTH      13250082
+         LTR   R4,R4                    IS THERE MORE DATA IN BUFFER    13300082
+         BZ    EXIT0                    NO, GO TO MH                    13350082
+         B     LOOP                     YES, MOVE IT                    13400082
+MOVEDATA MVC   0(0,R2),0(R8)                                            13450082
+MOVEZERO MVC   0(0,R2),CLEAR                                            13500082
+SIZE     DC    H'0'                                                     13550082
+HTEN     DC    X'0010'                                                  13600082
+CLEAR    DC    24F'0'                                                   13650082
+IEDTRBUF DSECT                                                          13700082
+CUR      DS    AL4                                                      13750082
+TABLE1   DS    AL4                                                      13800082
+TABLE2   DS    AL4                                                      13850082
+CUR1     DS    AL4                                                      13900082
+         DS    AL4                                                      13950082
+         DS    AL4                                                      14000082
+CUR2     DS    AL4                                                      14050082
+         DS    AL4                                                      14100082
+         DS    AL4                                                      14150082
+COUNT    DS    AL4                                                      14200082
+         EJECT                                                          14250082
+PATCH    DC    20F'0'                                                   14300082
+         EJECT                                                          14350082
+PARMLIST DSECT                                                          14400082
+         DS    XL1                                                      14450082
+         DS    XL1                                                      14500082
+         DS    XL1                                                      14550082
+         DS    XL1                                                      14600082
+USERID   DS    XL4                                                      14650082
+OPFL     DS    XL1                                                      14700082
+AEOPT    DS    XL1                                                      14750082
+         DS    XL1                                                      14800082
+         DS    XL1                                                      14850082
+         DS    XL1                                                      14900082
+         EJECT                                                          14950082
+         TAVTD                                                          15000082
+         EJECT                                                          15050082
+         TDCTD                                                          15100082
+         EJECT                                                          15150082
+         TLCBD                                                          15200082
+         EJECT                                                          15250082
+         TQCBD                                                          15300082
+         EJECT                                                          15350082
+         TPRFD                                                          15400082
+         EJECT                                                          15450082
+         TSCBD                                                          15500082
+         EJECT                                                          15550082
+         TTRMD                                                          15600082
+         END                                                            15650082

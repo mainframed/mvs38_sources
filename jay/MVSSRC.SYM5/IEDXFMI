@@ -1,0 +1,508 @@
+         TITLE 'IEDXFMI, PIU TO BUFFER TRANSFORM                       *00001000
+                        '                                               00002000
+IEDXFMI  CSECT ,                                                   0001 00003000
+@PROLOG  STM   @14,@12,12(@13)                                     0001 00004000
+         BALR  @12,0                                               0001 00005000
+@PSTART  DS    0H                                                  0001 00006000
+         USING @PSTART,@12                                         0001 00007000
+IEDXFMI  IEDHJN START,HJN                                               00008000
+*                                                                  0144 00009000
+*/********************************************************************/ 00010000
+*/*                                                                  */ 00011000
+*/*     M A I N     R O U T I N E                                    */ 00012000
+*/*                                                                  */ 00013000
+*/********************************************************************/ 00014000
+*                                                                  0144 00015000
+*   PIUBFRP=RPARM;                  /* PIU BUFFER ADDRESS            */ 00016000
+         LR    PIUBFRP,RPARM                                       0144 00017000
+*   PIUSTART=ADDR(PRFPIUO)+PRFPIUO; /* ADDRESS OF PIU DATA(TH-RH-RU) */ 00018000
+         LA    PIUSTART,PRFPIUO(,IEDQPPTR)                         0145 00019000
+         SLR   @15,@15                                             0145 00020000
+         IC    @15,PRFPIUO(,IEDQPPTR)                              0145 00021000
+         ALR   PIUSTART,@15                                        0145 00022000
+*/*                                                                  */ 00023000
+*/* INITIALIZE WORK AREA                                             */ 00024000
+*                                                                  0146 00025000
+*   WAPIUO=PRFPIUO;                 /* SAVE PIU OFFSET IN WORK AREA  */ 00026000
+         STC   @15,WAPIUO                                          0146 00027000
+*   WATH=IEDTH;                     /* SAVE TH IN WORK AREA          */ 00028000
+         MVC   WATH(10),IEDTH(PIUSTART)                            0147 00029000
+*   WARH=IEDRH;                     /* SAVE 3-BYTE RH IN WORK AREA   */ 00030000
+         MVC   WARH(3),IEDRH+10(PIUSTART)                          0148 00031000
+*/*                                                                  */ 00032000
+*/* ZERO OUT HEADER PORTION OF BUFFER FROM PRFNBUNT UP TO (BUT NOT   */ 00033000
+*/* INCLUDING) PRFHQBCK. THIS IS ALL BUT THE HEADER ONLY PART OF A   */ 00034000
+*/* TCAM BUFFER.                                                     */ 00035000
+*                                                                  0149 00036000
+*   IEDQPRF(ADDR(PRFNBUNT)-ADDR(IEDQPRF)+1:ADDR(PRFHQBCK)-ADDR(IEDQPRF) 00037000
+*       )=''B;                      /* ZERO OUT HDR                  */ 00038000
+         XC    IEDQPRF+12(23,IEDQPPTR),IEDQPRF+12(IEDQPPTR)        0149 00039000
+*/*                                                                  */ 00040000
+*/* ZERO OUT THE -8 BUFFER PREFIX                                    */ 00041000
+*                                                                  0150 00042000
+*   IEDPF1=IEDPF1&&IEDPF1;          /* ZERO OUT PREFIX               */ 00043000
+         LR    @15,IEDQPPTR                                        0150 00044000
+         AL    @15,@CF00425                                        0150 00045000
+         XC    IEDPF1(8,@15),IEDPF1(@15)                           0150 00046000
+*/*                                                                  */ 00047000
+*                                                                  0151 00048000
+*   CALL COMMON;                    /* SET BUFFER FIELDS COMMON TO 0151 00049000
+*                                      BOTH FID0 AND FID1            */ 00050000
+         BAL   @14,COMMON                                          0151 00051000
+*/*                                                                  */ 00052000
+*                                                                  0152 00053000
+*   IF WATHPTR->TTHFTYPE=TTHFID0 THEN/* FID0                         */ 00054000
+         L     @15,WATHPTR                                         0152 00055000
+         TM    TTHFTYPE(@15),B'11110000'                           0152 00056000
+         BNZ   @RF00152                                            0152 00057000
+*     CALL FID0BLD;                 /* FID0 BUFFER BUILD             */ 00058000
+         BAL   @14,FID0BLD                                         0153 00059000
+*   ELSE                            /* FID1                          */ 00060000
+*     CALL FID1BLD;                 /* FID1 BUFFER BUILD             */ 00061000
+         B     @RC00152                                            0154 00062000
+@RF00152 BAL   @14,FID1BLD                                         0154 00063000
+*/*                                                                  */ 00064000
+*                                                                  0155 00065000
+*   RETURN;                         /* RETURN TO CALLER              */ 00066000
+@EL00001 DS    0H                                                  0155 00067000
+@EF00001 DS    0H                                                  0155 00068000
+@ER00001 LM    @14,@12,12(@13)                                     0155 00069000
+         BR    @14                                                 0155 00070000
+*                                                                  0156 00071000
+*/********************************************************************/ 00072000
+*/*                                                                  */ 00073000
+*/* THIS ROUTINE FILLS IN TCAM BUFFER FIELDS COMMON TO BOTH FID0 AND */ 00074000
+*/* FID1.                                                            */ 00075000
+*/*                                                                  */ 00076000
+*/********************************************************************/ 00077000
+*                                                                  0156 00078000
+*COMMON:                                                           0156 00079000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0156 00080000
+         B     @EL00001                                            0156 00081000
+COMMON   DS    0H                                                  0157 00082000
+*   PRF1RH=WARHPTR->IEDRH;          /* MOVE IN 3-BYTES OF RH         */ 00083000
+         LR    @15,IEDQPPTR                                        0157 00084000
+         SL    @15,@CF00037                                        0157 00085000
+         L     @11,WARHPTR                                         0157 00086000
+         MVC   PRF1RH(3,@15),IEDRH(@11)                            0157 00087000
+*   PRF1FORM=PRF1IDI;               /* INDICATE A SEQUENCE NUMBER OR    00088000
+*                                      ID IS STORED                  */ 00089000
+         NI    PRF1FORM(@15),B'11101111'                           0158 00090000
+         OI    PRF1FORM(@15),B'00100000'                           0158 00091000
+*   PRF1SQID=WATHPTR->TTHSNF;       /* STORE SEQ NUMBER OR ID TAG    */ 00092000
+         L     @11,WATHPTR                                         0159 00093000
+         MVC   PRF1SQID(2,@15),TTHSNF(@11)                         0159 00094000
+*   PRFSRCE=WATHPTR->TTHOAF;        /* SET SOURCE                    */ 00095000
+         MVC   PRFSRCE(2,IEDQPPTR),TTHOAF(@11)                     0160 00096000
+*   PRFSIZE=WAPIUO+LENGTH(IEDTH)+WATHPTR->TTHDCF;/* CALCULATE SIZE   */ 00097000
+         LA    @15,10                                              0161 00098000
+         SLR   @00,@00                                             0161 00099000
+         IC    @00,WAPIUO                                          0161 00100000
+         ALR   @15,@00                                             0161 00101000
+         SLR   @00,@00                                             0161 00102000
+         ICM   @00,3,TTHDCF(@11)                                   0161 00103000
+         ALR   @15,@00                                             0161 00104000
+         STH   @15,PRFSIZE(,IEDQPPTR)                              0161 00105000
+*/*                                                                  */ 00106000
+*/* CALCULATE THE NUMBER OF UNITS IN THE BUFFER                      */ 00107000
+*                                                                  0162 00108000
+*   UNITCTR=1;                      /* SET UNIT COUNTER TO 1         */ 00109000
+         LA    UNITCTR,1                                           0162 00110000
+*   UNITPTR=PIUBFRP;                /* SET UNIT POINTER TO 1ST UNIT     00111000
+*                                      OF BUFFER                     */ 00112000
+         LR    UNITPTR,PIUBFRP                                     0163 00113000
+*   DO WHILE(UNITPTR->PRFTIC^=INVALTIC);/* UNIT COUNT LOOP           */ 00114000
+         B     @DE00164                                            0164 00115000
+@DL00164 DS    0H                                                  0165 00116000
+*     UNITPTR=UNITPTR->PRFTIC;      /* GET NEXT UNIT ADDRESS         */ 00117000
+         L     UNITPTR,PRFTIC(,UNITPTR)                            0165 00118000
+*     UNITCTR=UNITCTR+1;            /* INCREMENT UNIT COUNTER        */ 00119000
+         LA    UNITCTR,1(,UNITCTR)                                 0166 00120000
+*   END;                                                           0167 00121000
+*                                                                  0167 00122000
+@DE00164 CLC   PRFTIC(4,UNITPTR),@CB00312                          0167 00123000
+         BNE   @DL00164                                            0167 00124000
+*/*                                                                  */ 00125000
+*                                                                  0168 00126000
+*   PRFNBUNT=UNITCTR;               /* SET NUMBER OF UNITS           */ 00127000
+         STC   UNITCTR,PRFNBUNT(,IEDQPPTR)                         0168 00128000
+*/*                                                                  */ 00129000
+*                                                                  0169 00130000
+*   RETURN;                         /* RETURN TO CALLER              */ 00131000
+@EL00002 DS    0H                                                  0169 00132000
+@EF00002 DS    0H                                                  0169 00133000
+@ER00002 BR    @14                                                 0169 00134000
+*   END COMMON;                                                    0170 00135000
+*                                                                  0171 00136000
+*/********************************************************************/ 00137000
+*/*                                                                  */ 00138000
+*/* THIS ROUTINE FILLS IN THE REMAINDER OF THE BUFFER FOR FID0.      */ 00139000
+*/*                                                                  */ 00140000
+*/********************************************************************/ 00141000
+*                                                                  0171 00142000
+*FID0BLD:                                                          0171 00143000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0171 00144000
+FID0BLD  DS    0H                                                  0172 00145000
+*   BDUPTR=PIUSTART+LENGTH(IEDTH)+LENGTH(IEDRH)+1;/* CALCULATE BDU 0172 00146000
+*                                      ADDRESS                       */ 00147000
+         LA    BDUPTR,14                                           0172 00148000
+         ALR   BDUPTR,PIUSTART                                     0172 00149000
+*   IF^(BDUPHASE='11'B|             /* PHASE 3 RESPONSE OR...        */ 00150000
+*       BDUERROR=ON) THEN           /* ERROR RESPONSE        @OY20815*/ 00151000
+         TM    BDUPHASE(BDUPTR),B'01100000'                        0173 00152000
+         BO    @RF00173                                            0173 00153000
+         TM    BDUERROR(BDUPTR),B'10000000'                        0173 00154000
+         BO    @RF00173                                            0173 00155000
+*     PRFNLSTN=ON;                  /* YES-MARK BUFFER 'NOT LAST'    */ 00156000
+         OI    PRFNLSTN(IEDQPPTR),B'00000010'                      0174 00157000
+*/*                                                                  */ 00158000
+*                                                                  0175 00159000
+*   IF BDUHEADR=ON THEN             /* IS A HEADER BUFFER TO BE BUILT*/ 00160000
+@RF00173 TM    BDUHEADR(BDUPTR),B'01000000'                        0175 00161000
+         BNO   @RF00175                                            0175 00162000
+*     DO;                                                          0176 00163000
+*       IF BDUCMND^=CD0CTRL THEN    /* NOT CONTROL RESP      @XM05666*/ 00164000
+         CLI   BDUCMND(BDUPTR),X'08'                               0177 00165000
+         BE    @RF00177                                            0177 00166000
+*         PRFDEST=PRFDEST&&PRFDEST; /* ZERO PRFDEST          @XM05666*/ 00167000
+         LH    @15,PRFDEST(,IEDQPPTR)                              0178 00168000
+         LR    @07,@15                                             0178 00169000
+         XR    @07,@15                                             0178 00170000
+         STH   @07,PRFDEST(,IEDQPPTR)                              0178 00171000
+*       ELSE                                                       0179 00172000
+*         PRFDEST=WATHPTR->TTHDAF;  /* OR A CONTROL COMMAND  @XM05666*/ 00173000
+         B     @RC00177                                            0179 00174000
+@RF00177 L     @15,WATHPTR                                         0179 00175000
+         MVC   PRFDEST(2,IEDQPPTR),TTHDAF(@15)                     0179 00176000
+*       PRFISIZE=WAPIUO-10;         /* CALCULATE NUMBER OF RESERVES  */ 00177000
+@RC00177 SLR   @15,@15                                             0180 00178000
+         IC    @15,WAPIUO                                          0180 00179000
+         SL    @15,@CF00206                                        0180 00180000
+         STC   @15,PRFISIZE(,IEDQPPTR)                             0180 00181000
+*/*    ZERO OUT HEADER ONLY PORTION OF BUFFER                        */ 00182000
+*                                                                  0181 00183000
+*       IEDQPRF(ADDR(PRFHQBCK)-ADDR(IEDQPRF)+1:ADDR(PRFDEST)-ADDR( 0181 00184000
+*           IEDQPRF))=''B;                                         0181 00185000
+*                                                                  0181 00186000
+         XC    IEDQPRF+35(5,IEDQPPTR),IEDQPRF+35(IEDQPPTR)         0181 00187000
+*/*                                                                  */ 00188000
+*                                                                  0182 00189000
+*     END;                                                         0182 00190000
+*   ELSE                            /* TEXT BUFFER IS TO BE BUILT    */ 00191000
+*     DO;                                                          0183 00192000
+         B     @RC00175                                            0183 00193000
+@RF00175 DS    0H                                                  0184 00194000
+*       PRFNHDRN=ON;                /* MARK BUFFER 'NOT HEADER'      */ 00195000
+         OI    PRFNHDRN(IEDQPPTR),B'00000001'                      0184 00196000
+*       PRFISIZE=WAPIUO-3;          /* CALCULATE NUMBER OF RESERVES  */ 00197000
+         SLR   @15,@15                                             0185 00198000
+         IC    @15,WAPIUO                                          0185 00199000
+         SL    @15,@CF00058                                        0185 00200000
+         STC   @15,PRFISIZE(,IEDQPPTR)                             0185 00201000
+*     END;                                                         0186 00202000
+*                                                                  0186 00203000
+*/*                                                                  */ 00204000
+*                                                                  0187 00205000
+*   RETURN;                         /* RETURN TO CALLER              */ 00206000
+@EL00003 DS    0H                                                  0187 00207000
+@EF00003 DS    0H                                                  0187 00208000
+@ER00003 BR    @14                                                 0187 00209000
+*   END FID0BLD;                                                   0188 00210000
+         B     @EL00003                                            0188 00211000
+*                                                                  0189 00212000
+*/********************************************************************/ 00213000
+*/*                                                                  */ 00214000
+*/* THIS ROUTINE SETS UP A BUFFER FOR FID1.                          */ 00215000
+*/*                                                                  */ 00216000
+*/********************************************************************/ 00217000
+*                                                                  0189 00218000
+*FID1BLD:                                                          0189 00219000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0189 00220000
+FID1BLD  DS    0H                                                  0190 00221000
+*   PRF1FIDI=ON;                    /* MARK AS FID1                  */ 00222000
+         LR    @15,IEDQPPTR                                        0190 00223000
+         SL    @15,@CF00037                                        0190 00224000
+         OI    PRF1FIDI(@15),B'10000000'                           0190 00225000
+*/*                                                                  */ 00226000
+*                                                                  0191 00227000
+*   IF WATHPTR->TTHEFI=ON THEN      /* EXPEDITED FLOW                */ 00228000
+         L     @07,WATHPTR                                         0191 00229000
+         TM    TTHEFI(@07),B'00000001'                             0191 00230000
+         BNO   @RF00191                                            0191 00231000
+*     PRF1EXPI=ON;                  /* YES-MARK IT EXPEDITED         */ 00232000
+         OI    PRF1EXPI(@15),B'01000000'                           0192 00233000
+*/*                                                                  */ 00234000
+*                                                                  0193 00235000
+*   IF WARHPTR->TRHEC=OFF THEN      /* END OF CHAIN                  */ 00236000
+@RF00191 L     @15,WARHPTR                                         0193 00237000
+         TM    TRHEC(@15),B'00000001'                              0193 00238000
+         BNZ   @RF00193                                            0193 00239000
+*     PRFNLSTN=ON;                  /* NO-MARK AS 'NOT LAST'         */ 00240000
+         OI    PRFNLSTN(IEDQPPTR),B'00000010'                      0194 00241000
+*/*                                                                  */ 00242000
+*                                                                  0195 00243000
+*   IF WARHPTR->TRHBC=ON THEN       /* IS A HEADER BUFFER TO BE BUILT*/ 00244000
+@RF00193 L     @15,WARHPTR                                         0195 00245000
+         TM    TRHBC(@15),B'00000010'                              0195 00246000
+         BNO   @RF00195                                            0195 00247000
+*     DO;                           /* YES                           */ 00248000
+*       PRFISIZE=WAPIUO-17;         /* CALCULATE NUMBER OF RESERVES  */ 00249000
+         SLR   @15,@15                                             0197 00250000
+         IC    @15,WAPIUO                                          0197 00251000
+         SL    @15,@CF00417                                        0197 00252000
+         STC   @15,PRFISIZE(,IEDQPPTR)                             0197 00253000
+*/*    ZERO OUT HEADER ONLY PORTION OF BUFFER                        */ 00254000
+*                                                                  0198 00255000
+*       IEDQPRF(ADDR(PRFHQBCK)-ADDR(IEDQPRF)+1:ADDR(PRFDEST)-ADDR( 0198 00256000
+*           IEDQPRF))=''B;                                         0198 00257000
+*                                                                  0198 00258000
+         XC    IEDQPRF+35(5,IEDQPPTR),IEDQPRF+35(IEDQPPTR)         0198 00259000
+*/*                                                                  */ 00260000
+*                                                                  0199 00261000
+*       PRFDEST=WATHPTR->TTHDAF;    /* SET DESTINATION               */ 00262000
+         L     @15,WATHPTR                                         0199 00263000
+         MVC   PRFDEST(2,IEDQPPTR),TTHDAF(@15)                     0199 00264000
+*     END;                                                         0200 00265000
+*   ELSE                            /* TEXT BUFFER TO BE BUILT       */ 00266000
+*     DO;                                                          0201 00267000
+         B     @RC00195                                            0201 00268000
+@RF00195 DS    0H                                                  0202 00269000
+*       PRFNHDRN=ON;                /* MARK AS 'NOT HEADER'          */ 00270000
+         OI    PRFNHDRN(IEDQPPTR),B'00000001'                      0202 00271000
+*       PRFISIZE=WAPIUO-10;         /* CALCULATE NUMBER OF RESERVES  */ 00272000
+         SLR   @15,@15                                             0203 00273000
+         IC    @15,WAPIUO                                          0203 00274000
+         SL    @15,@CF00206                                        0203 00275000
+         STC   @15,PRFISIZE(,IEDQPPTR)                             0203 00276000
+*     END;                                                         0204 00277000
+*                                                                  0204 00278000
+*/*                                                                  */ 00279000
+*                                                                  0205 00280000
+*   RETURN;                         /* RETURN TO CALLER              */ 00281000
+@EL00004 DS    0H                                                  0205 00282000
+@EF00004 DS    0H                                                  0205 00283000
+@ER00004 BR    @14                                                 0205 00284000
+*   END FID1BLD;                                                   0206 00285000
+         B     @EL00004                                            0206 00286000
+*   END IEDXFMI                                                    0207 00287000
+*                                                                  0207 00288000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.     */ 00289000
+*/*%INCLUDE SYSLIB  (TBDUD   )                                       */ 00290000
+*/*%INCLUDE SYSLIB  (TCD0D   )                                       */ 00291000
+*/*%INCLUDE SYSLIB  (TPIUD   )                                       */ 00292000
+*/*%INCLUDE SYSLIB  (TPRFD   )                                       */ 00293000
+*/*%INCLUDE SYSLIB  (TRHD    )                                       */ 00294000
+*/*%INCLUDE SYSLIB  (TTHD    )                                       */ 00295000
+*                                                                  0207 00296000
+*       ;                                                          0207 00297000
+@DATA    DS    0H                                                       00298000
+         DS    0F                                                       00299000
+         DS    0F                                                       00300000
+@CF00058 DC    F'3'                                                     00301000
+@CF00037 DC    F'8'                                                     00302000
+@CF00206 DC    F'10'                                                    00303000
+@CF00417 DC    F'17'                                                    00304000
+@CF00425 DC    F'-8'                                                    00305000
+         DS    0D                                                       00306000
+WATHPTR  DC    AL4(WATH)                                                00307000
+WARHPTR  DC    AL4(WARH)                                                00308000
+@CB00312 DC    X'08000002'                                              00309000
+WA       DS    CL14                                                     00310000
+         ORG   WA                                                       00311000
+WAPIUO   DS    FL1                                                      00312000
+WATH     DS    CL10                                                     00313000
+WARH     DS    CL3                                                      00314000
+         ORG   WA+14                                                    00315000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00316000
+@01      EQU   01                                                       00317000
+@02      EQU   02                                                       00318000
+@03      EQU   03                                                       00319000
+@04      EQU   04                                                       00320000
+@05      EQU   05                                                       00321000
+@06      EQU   06                                                       00322000
+@07      EQU   07                                                       00323000
+@08      EQU   08                                                       00324000
+@09      EQU   09                                                       00325000
+@10      EQU   10                                                       00326000
+@11      EQU   11                                                       00327000
+@12      EQU   12                                                       00328000
+@13      EQU   13                                                       00329000
+@14      EQU   14                                                       00330000
+@15      EQU   15                                                       00331000
+UNITPTR  EQU   @04                                                      00332000
+UNITCTR  EQU   @07                                                      00333000
+BDUPTR   EQU   @04                                                      00334000
+PIUSTART EQU   @05                                                      00335000
+IEDQPPTR EQU   @06                                                      00336000
+RPARM    EQU   @01                                                      00337000
+PIUBFRP  EQU   @06                                                      00338000
+R14      EQU   @14                                                      00339000
+IEDBDU   EQU   0                                                        00340000
+BDUCMND  EQU   IEDBDU                                                   00341000
+BDUFNFLG EQU   IEDBDU+2                                                 00342000
+BDUHEADR EQU   BDUFNFLG                                                 00343000
+BDUBDUFG EQU   IEDBDU+3                                                 00344000
+BDURSP   EQU   IEDBDU+4                                                 00345000
+BDUSYRSP EQU   BDURSP                                                   00346000
+BDUERROR EQU   BDUSYRSP                                                 00347000
+BDUPHASE EQU   BDUSYRSP                                                 00348000
+BDUEXRSP EQU   BDURSP+1                                                 00349000
+BDUEND   EQU   IEDBDU+6                                                 00350000
+IEDPIU   EQU   0                                                        00351000
+PIUTH    EQU   IEDPIU                                                   00352000
+PIURH    EQU   IEDPIU+10                                                00353000
+IEDQPRF  EQU   0                                                        00354000
+PRFRCB   EQU   IEDQPRF                                                  00355000
+PRFKEY   EQU   PRFRCB                                                   00356000
+PRFQCBA  EQU   PRFRCB+1                                                 00357000
+PRFPRI   EQU   PRFRCB+4                                                 00358000
+PRFLINK  EQU   PRFRCB+5                                                 00359000
+PRFTIC   EQU   IEDQPRF+8                                                00360000
+PRFTICC  EQU   PRFTIC                                                   00361000
+PRFNBUNT EQU   IEDQPRF+12                                               00362000
+PRFSUNIT EQU   PRFNBUNT                                                 00363000
+PRFPLQCB EQU   PRFSUNIT                                                 00364000
+PRFPIUO  EQU   PRFPLQCB                                                 00365000
+@NM00007 EQU   IEDQPRF+16                                               00366000
+PRFSVFFO EQU   @NM00007                                                 00367000
+PRFSRCE  EQU   PRFSVFFO                                                 00368000
+PRFSIZE  EQU   PRFSVFFO+2                                               00369000
+PRFSTAT1 EQU   IEDQPRF+20                                               00370000
+PRFEOFN  EQU   PRFSTAT1                                                 00371000
+PRFNLSTN EQU   PRFSTAT1                                                 00372000
+PRFNHDRN EQU   PRFSTAT1                                                 00373000
+PRFCORE  EQU   IEDQPRF+21                                               00374000
+PRFXTRA  EQU   PRFCORE                                                  00375000
+PRFSCAN  EQU   IEDQPRF+24                                               00376000
+PRFISIZE EQU   PRFSCAN+1                                                00377000
+PRFTQBCK EQU   IEDQPRF+26                                               00378000
+PRFNTXT  EQU   PRFTQBCK                                                 00379000
+PRFEOBOF EQU   PRFNTXT                                                  00380000
+PRFCHDR  EQU   IEDQPRF+32                                               00381000
+PRFHQBCK EQU   IEDQPRF+35                                               00382000
+PRFDEST  EQU   IEDQPRF+40                                               00383000
+IEDPF1   EQU   0                                                        00384000
+PRF1RH   EQU   IEDPF1                                                   00385000
+PRF1FLG1 EQU   IEDPF1+3                                                 00386000
+PRF1FIDI EQU   PRF1FLG1                                                 00387000
+PRF1EXPI EQU   PRF1FLG1                                                 00388000
+PRF1FORM EQU   PRF1FLG1                                                 00389000
+PRF1WD2  EQU   IEDPF1+4                                                 00390000
+PRF1SEQP EQU   PRF1WD2                                                  00391000
+PRF1SQID EQU   PRF1SEQP                                                 00392000
+PRF1TAG1 EQU   PRF1SQID                                                 00393000
+IEDPF2   EQU   0                                                        00394000
+PRF2FLG2 EQU   IEDPF2                                                   00395000
+PRF2WD2  EQU   IEDPF2+4                                                 00396000
+IEDRH    EQU   0                                                        00397000
+TRHBYTE0 EQU   IEDRH                                                    00398000
+TRHBC    EQU   TRHBYTE0                                                 00399000
+TRHEC    EQU   TRHBYTE0                                                 00400000
+TRHBYTE1 EQU   IEDRH+1                                                  00401000
+TRHBYTE2 EQU   IEDRH+2                                                  00402000
+IEDTH    EQU   0                                                        00403000
+TTHBYTE0 EQU   IEDTH                                                    00404000
+TTHFTYPE EQU   TTHBYTE0                                                 00405000
+TTHEFI   EQU   TTHBYTE0                                                 00406000
+TTHDAF   EQU   IEDTH+2                                                  00407000
+TTHOAF   EQU   IEDTH+4                                                  00408000
+TTHSNF   EQU   IEDTH+6                                                  00409000
+TTHTAG   EQU   TTHSNF                                                   00410000
+TTHTAG1  EQU   TTHTAG                                                   00411000
+TTHDCF   EQU   IEDTH+8                                                  00412000
+BDUTEXT  EQU   BDUEND                                                   00413000
+PRFSHDR  EQU   IEDQPRF+42                                               00414000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00415000
+TTHTAG2  EQU   TTHTAG+1                                                 00416000
+@NM00023 EQU   TTHTAG1                                                  00417000
+TTHTAGS  EQU   TTHTAG1                                                  00418000
+TTHBYTE1 EQU   IEDTH+1                                                  00419000
+@NM00022 EQU   TTHBYTE0                                                 00420000
+TTHEBIU  EQU   TTHBYTE0                                                 00421000
+TTHBBIU  EQU   TTHBYTE0                                                 00422000
+@NM00021 EQU   TRHBYTE2                                                 00423000
+@NM00020 EQU   TRHBYTE2                                                 00424000
+@NM00019 EQU   TRHBYTE2                                                 00425000
+TRHCSI   EQU   TRHBYTE2                                                 00426000
+@NM00018 EQU   TRHBYTE2                                                 00427000
+TRHCDI   EQU   TRHBYTE2                                                 00428000
+TRHEB    EQU   TRHBYTE2                                                 00429000
+TRHBB    EQU   TRHBYTE2                                                 00430000
+TRHPI    EQU   TRHBYTE1                                                 00431000
+@NM00017 EQU   TRHBYTE1                                                 00432000
+@NM00016 EQU   TRHBYTE1                                                 00433000
+@NM00015 EQU   TRHBYTE1                                                 00434000
+TRHER    EQU   TRHBYTE1                                                 00435000
+TRHDR2   EQU   TRHBYTE1                                                 00436000
+@NM00014 EQU   TRHBYTE1                                                 00437000
+TRHDR1   EQU   TRHBYTE1                                                 00438000
+TRHSDI   EQU   TRHBYTE0                                                 00439000
+TRHFI    EQU   TRHBYTE0                                                 00440000
+@NM00013 EQU   TRHBYTE0                                                 00441000
+TRHRUCAT EQU   TRHBYTE0                                                 00442000
+TRHTYPE  EQU   TRHBYTE0                                                 00443000
+PRF2SEQP EQU   PRF2WD2                                                  00444000
+@NM00012 EQU   IEDPF2+1                                                 00445000
+@NM00011 EQU   PRF2FLG2                                                 00446000
+PRF2TERM EQU   PRF2FLG2                                                 00447000
+PRF2SMI  EQU   PRF2FLG2                                                 00448000
+PRF2FORM EQU   PRF2FLG2                                                 00449000
+PRF2TNTI EQU   PRF2FLG2                                                 00450000
+PRF1RULN EQU   PRF1SEQP+2                                               00451000
+PRF1TAG2 EQU   PRF1SQID+1                                               00452000
+@NM00010 EQU   PRF1TAG1                                                 00453000
+PRF1TAGS EQU   PRF1TAG1                                                 00454000
+@NM00009 EQU   PRF1FLG1                                                 00455000
+PRF1LOGD EQU   PRF1FLG1                                                 00456000
+PRF1USS  EQU   PRF1FLG1                                                 00457000
+PRFISEQ  EQU   IEDQPRF+38                                               00458000
+PRFSTXT  EQU   PRFHQBCK                                                 00459000
+PRFNHDR  EQU   PRFCHDR                                                  00460000
+PRFCRCD  EQU   IEDQPRF+29                                               00461000
+PRFSVSEQ EQU   PRFNTXT+1                                                00462000
+PRFSVPRI EQU   PRFEOBOF                                                 00463000
+@NM00008 EQU   PRFSCAN                                                  00464000
+PRFEOB   EQU   PRFXTRA+1                                                00465000
+PRFSTSO  EQU   PRFXTRA                                                  00466000
+PRFLOCK  EQU   PRFEOFN                                                  00467000
+PRFDUPLN EQU   PRFSTAT1                                                 00468000
+PRFTSMSG EQU   PRFSTAT1                                                 00469000
+PRFITCPN EQU   PRFSTAT1                                                 00470000
+PRFERMGN EQU   PRFSTAT1                                                 00471000
+PRFCNCLN EQU   PRFSTAT1                                                 00472000
+PRFSVFLG EQU   @NM00007+3                                               00473000
+PRFLCB   EQU   IEDQPRF+13                                               00474000
+PRFTI0   EQU   PRFTIC+1                                                 00475000
+@NM00006 EQU   PRFTICC                                                  00476000
+@NM00005 EQU   PRFTICC                                                  00477000
+@NM00004 EQU   PRFTICC                                                  00478000
+PRFTICON EQU   PRFTICC                                                  00479000
+@NM00003 EQU   PRFTICC                                                  00480000
+@NM00002 EQU   PRFTICC                                                  00481000
+PRFBFMM  EQU   PRFTICC                                                  00482000
+PRFEOMSG EQU   PRFTICC                                                  00483000
+PRFCOUNT EQU   PRFLINK+1                                                00484000
+@NM00001 EQU   PRFLINK                                                  00485000
+PRFFLAGS EQU   PRFPRI                                                   00486000
+PRFIOADR EQU   PRFQCBA                                                  00487000
+PRFOPCDE EQU   PRFKEY                                                   00488000
+PIURU    EQU   IEDPIU+13                                                00489000
+BDUXGRPH EQU   BDUEXRSP                                                 00490000
+BDUXFINL EQU   BDUEXRSP                                                 00491000
+BDUXINIT EQU   BDUEXRSP                                                 00492000
+BDURESP  EQU   BDUSYRSP                                                 00493000
+BDUXERLK EQU   BDUBDUFG                                                 00494000
+BDUALTAK EQU   BDUFNFLG                                                 00495000
+BDUNEGAK EQU   BDUFNFLG                                                 00496000
+BDUPOSAK EQU   BDUFNFLG                                                 00497000
+BDUTPTX  EQU   BDUFNFLG                                                 00498000
+BDUFRSTB EQU   BDUFNFLG                                                 00499000
+BDULEADG EQU   BDUFNFLG                                                 00500000
+BDUSTHDR EQU   BDUFNFLG                                                 00501000
+BDUMODIF EQU   IEDBDU+1                                                 00502000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00503000
+@RC00152 EQU   @EL00001                                                 00504000
+@RC00175 EQU   @EL00003                                                 00505000
+@RC00195 EQU   @EL00004                                                 00506000
+@ENDDATA EQU   *                                                        00507000
+         END   IEDXFMI,(C'PLS1005',0701,78179)                          00508000

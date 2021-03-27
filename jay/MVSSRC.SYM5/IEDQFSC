@@ -1,0 +1,403 @@
+IEDQFSC  CSECT                                                          00050082
+         TITLE 'FULLSCREEN MACRO FUNCTION ROUTINE'                      00100082
+*********************************************************************** 00150082
+*C039000,086000,089500,099000,102500                           @OZ35823 00150182
+*A038500,053500,042500,091500,104500,109500,115500             @OZ35823 00150282
+*********************************************************************** 00200082
+*                                                                     * 00250082
+* MODULE NAME = IEDFSC                                                * 00300082
+*                                                                     * 00350082
+* DESCRIPTIVE NAME = TSO FULLSCREEN MACRO FUNCTION ROUTINE            * 00400082
+*                                                                     * 00450082
+* COPYRIGHT = NONE                                                    * 00500082
+*                                                                     * 00550082
+* STATUS = VS2 RELEASE 3.7                                            * 00600082
+*                                                                     * 00650082
+* FUNCTION = DETERMINES WHETHER FULLSCREEN MODE IS TO BE ENTERED      * 00700082
+*            AND RESETS LINE COUNT AND CARRIAGE COUNT VALUES WHEN     * 00750082
+*            SPECIFIED.                                               * 00800082
+*                                                                     * 00850082
+* NOTES = SEE BELOW                                                   * 00900082
+*                                                                     * 00950082
+*   DEPENDENCIES = NONE                                               * 01000082
+*                                                                     * 01050082
+*   RESTRICTIONS = NONE                                               * 01100082
+*                                                                     * 01150082
+*   REGISTER CONVENTIONS = TCAM STANDARD                              * 01200082
+*                                                                     * 01250082
+*   PATCH LABEL = FIXAWAY                                             * 01300082
+*                                                                     * 01350082
+* MODULE TYPE = MACRO FUNCTION ROUTINE                                * 01400082
+*                                                                     * 01450082
+*   PROCESSOR = ASSEMBLER F                                           * 01500082
+*                                                                     * 01550082
+*   MODULE SIZE = N/A                                                 * 01600082
+*                                                                     * 01650082
+*   ATTRIBUTES = SERIALLY REUSEABLE                                   * 01700082
+*                                                                     * 01750082
+* ENTRY POINT = IEDFSC                                                * 01800082
+*                                                                     * 01850082
+* INPUT = BUFFER FROM MESSAGE HANDLER                                 * 01900082
+*                                                                     * 01950082
+* OUTPUT = TO MESSAGE HANDLER                                         * 02000082
+*                                                                     * 02050082
+* EXIT-NORMAL = TO MESSAGE HANDLER VIA IEDQUI                         * 02100082
+*                                                                     * 02150082
+* EXIT-ERROR = TO MESSAGE HANDLER VIA IEDQUI                          * 02200082
+*               RETURN CODES            MEANING                       * 02250082
+*                 4            FULLSCREEN MODE NOT SWITCHED           * 02300082
+*                 8            OPTION FIELD NOT FOUND                 * 02350082
+*                 C            NOT A TSO MESSAGE                      * 02400082
+*                10            INVALID TRIGGER OPTION CONTENTS        * 02450082
+*                                                                     * 02500082
+* EXTERNAL REFERENCES = IEDQAE - TO LOCATE OPTION FIELDS              * 02550082
+*                                                                     * 02600082
+*   DATA AREAS = TCAM BUFFER                                          * 02650082
+*                                                                     * 02700082
+*   CONTROL BLOCKS = AVT, DCT, LCB, QCB, TRM, PRF                     * 02750082
+*                                                                     * 02800082
+* TABLES = NONE                                                       * 02850082
+*                                                                     * 02900082
+* MACROS = IEDDCT - TO LOCATE DEVICE CHARACTERISTICS TABLE ENTRY      * 02950082
+*                                                                     * 03000082
+*********************************************************************** 03050082
+R0       EQU   0                                                        03100082
+R1       EQU   1                                                        03150082
+RPARM    EQU   2                                                        03200082
+R3       EQU   3                                                        03250082
+RLCB     EQU   4                                                        03300082
+R5       EQU   5                                                        03350082
+RPREFIX  EQU   6                                                        03400082
+RQCB     EQU   7                                                        03450082
+RTRM     EQU   8                                                        03500082
+RAVT     EQU   9                                                        03550082
+RDCT     EQU   10                                                       03600082
+R11      EQU   11                                                       03650082
+RBASE    EQU   12                                                       03700082
+R13      EQU   13                                                       03750082
+R14      EQU   14                                                       03800082
+R15      EQU   15                                                       03850082
+CONWCC   EQU   X'C0'                    WCC CONTROL BITS       @OZ35823 03870082
+PA3KEY   EQU   X'6B'                    PA3KEY                 @OZ35823 03900082
+PA1KEY   EQU   X'6C'                    PA1KEY                 @OZ35823 03904082
+ESC      EQU   X'27'                    ESCAPE CHARACTER       @OZ35823 03908082
+SYN      EQU   X'32'                    SYN CHARACTER          @OZ35823 03912082
+SAWCC    EQU   X'C4'                    SOUND ALARM WCC        @OZ35823 03916082
+LLWCC    EQU   X'40'                    LEAVE LOCKED WCC       @OZ35823 03920082
+KIWCC    EQU   X'02'                    KEYBOARD INHIBIT       @OZ35823 03924082
+SBA      EQU   X'11'                    SBA AID                @OZ35823 03928082
+CCWSTX   EQU   X'02'                    STX CHARACTER          @OZ35823 03932082
+         EJECT                                                          03936082
+         USING IEDQAVTD,RAVT                                            03950082
+         USING IEDDCT,RDCT                                              04000082
+         USING IEDQLCB,RLCB                                             04050082
+         USING IEDQQCB,RQCB                                             04100082
+         USING IEDQPRF,RPREFIX                                          04150082
+         USING IEDQTRM,RTRM                                             04200082
+         USING PARMLIST,RPARM                                           04250082
+         USING IEDQFSO,R3                                      @OZ35823 04270082
+         USING *,RBASE                                                  04300082
+IEDQFSC  IEDHJN CODE                                                    04350082
+         EJECT                                                          04400082
+         LR    RPARM,R1                 SAVE PARAMETER LIST             04450082
+         TM    PRFSTAT1,PRFTSMSG        TSO MESSAGE                     04500082
+         BNO   ERRORC                   BRANCH NO                       04550082
+         LH    R1,LCBTTCIN              GET CONNECTED INDEX             04600082
+         N     R1,AVTCLRHI              CLEAR HIGH ORDER BYTES          04650082
+         LTR   R1,R1                    IS TTCIN ZERO                   04700082
+         BZ    ERRORC                   BRANCH ERROR                    04750082
+         L     R15,AVTRNMPT             GET TERMINAL                    04800082
+         BALR  R14,R15                  ENTRY ADDRESS                   04850082
+         LR    RTRM,R1                  SAVE TERMINAL ADDRESS           04900082
+         L     RQCB,TRMDESTQ-1          LOAD QCB ADDRESS                04950082
+         IEDDCT REG=RDCT,LEN=6                                          05000082
+         TM    DCTBYTE1,DCT3270         3270 TERMINAL                   05050082
+         BNO   ERRORC                   BRANCH NO                       05100082
+         LA    R1,AEOPT                 SET PARM LIST ADDRESS           05150082
+         L     R15,AVTUI                LOCATE IEDQFSCR OPTION          05200082
+         BALR  R14,R15                  FIELD                           05250082
+         LTR   R15,R15                  TEST RETURN CODE                05300082
+         BNZ   ERROR8                   BRANCH NO                       05350082
+         EJECT                                                          05350382
+         TM    FSFLAG,EXPFLS            EXPANDED FULLSCREEN    @OZ35823 05350682
+         BNO   REGFUN                   BRANCH NO              @OZ35823 05350982
+         TM    LCBSTAT1,LCBSENDN        SENDING                @OZ35823 05351282
+         BO    OUTPUT                   BRANCH YES             @OZ35823 05351582
+         TM    PRFSTAT1,PRFNHDRN        HEADER BUFFER          @OZ35823 05351882
+         BO    ERROR0                   BRANCH NO              @OZ35823 05352182
+         LH    R5,PRFSIZE               GET DATA SIZE          @OZ35823 05352482
+         LA    R11,AVTHDRSZ             GET HEADER SIZE        @OZ35823 05352782
+         SR    R5,R11                   ANY DATA PRESENT       @OZ35823 05353082
+         BNP   ERROR0                   BRANCH NO              @OZ35823 05353382
+         SR    R11,R11                  CLEAR WORK REGISTER    @OZ35823 05353682
+         IC    R11,LCBISZE              GET IDLES COUNT        @OZ35823 05353982
+         LA    R11,PRFSHDR(R11)         POINT TO DATA          @OZ35823 05354282
+         CLI   0(R11),CCWSTX            STX CHARACTER          @OZ35823 05354582
+         BE    ISKIP3                   BRANCH YES             @OZ35823 05354882
+         CH    R5,AVTHA4                MINIMUM INPUT          @OZ35823 05355182
+         BNH   ISKIP0                   YES, IS AID,CSR,CSR,NL @OZ35823 05355482
+         CLI   3(R11),SBA               SBA CHARACTER          @OZ35823 05355782
+         BE    ISKIP0                   BRANCH YES             @OZ35823 05356082
+         B     ISKIP2                   SKIP CU DVC CHARACTERS @OZ35823 05356382
+ISKIP3   EQU   *                                               @OZ35823 05356682
+         LA    R11,1(,R11)              SKIP STX,ESC,CMD       @OZ35823 05356982
+ISKIP2   EQU   *                                               @OZ35823 05357282
+         LA    R11,1(,R11)              SKIP ESC CMD           @OZ35823 05357582
+ISKIP1   EQU   *                                               @OZ35823 05357882
+         LA    R11,1(,R11)              SKIP 1 BYTE            @OZ35823 05358182
+ISKIP0   EQU   *                                               @OZ35823 05358482
+         CLI   0(R11),PA1KEY            PA1 KEY                @OZ35823 05358782
+         BNE   INNEWC                   BRANCH NO              @OZ35823 05359082
+         NI    FSOFIELD,AVTEFF-(FSOFS+FSOBC+FSORD) RESET STATUS@OZ35823 05359382
+         B     ERROR0                                          @OZ35823 05359682
+INNEWC   EQU   *                                               @OZ35823 05359982
+         TM    FSOFIELD,FSOBC           BROADCAST              @OZ35823 05360282
+         BZ    INNEWE                   BRANCH NO              @OZ35823 05360582
+         NI    FSOFIELD,AVTEFF-FSOBC    RESET BROADCAST        @OZ35823 05360882
+         NI    QCBTSOF1,AVTEFF-QCBSATRD RESET SATRD            @OZ35823 05361182
+         XI    FSOFIELD,FSORD           FLIP INTERCEPT FLAG    @OZ35823 05361482
+         MVI   0(R11),PA3KEY            SET AID TO PA3         @OZ35823 05361782
+         B     NORMEXP                                         @OZ35823 05362082
+INNEWE   EQU   *                                               @OZ35823 05362382
+         TM    FSOFIELD,FSOFS           PREVIOUS OUTPUT FS     @OZ35823 05362682
+         BZ    ERROR0                   BRANCH NO              @OZ35823 05362982
+         B     NORMEXP                  SET LINE AND CARRIAGE  @OZ35823 05363282
+         EJECT                                                          05363582
+OUTPUT   EQU   *                                               @OZ35823 05363882
+         TM    PRFSTAT1,PRFNHDRN        HEADER BUFFER          @OZ35823 05364182
+         BO    OUTNEWX                  BRANCH NO              @OZ35823 05364482
+         NI    FSOFIELD,AVTEFF-FSOLK    RESET KEYBOARD LOCK    @OZ35823 05364782
+         LH    R5,PRFSIZE               GET DATA SIZE          @OZ35823 05365082
+         LA    R11,AVTHDRSZ             GET PREFIX SIZE        @OZ35823 05365382
+         SR    R5,R11                   ANY DATA               @OZ35823 05365682
+         BNP   ERROR0                   BRANCH NO              @OZ35823 05365982
+         SR    R11,R11                  CLEAR FOR INSERT       @OZ35823 05366282
+         IC    R11,LCBISZE              GET IDLES COUNT        @OZ35823 05366582
+         LA    R11,PRFSHDR(R11)         POINT TO DATA          @OZ35823 05366882
+         CLI   0(R11),CCWSTX            STX CHARACTER          @OZ35823 05367182
+         BE    OSKIP3                   BRANCH YES             @OZ35823 05367482
+         CLI   0(R11),ESC               ESCAPE CHARACTER       @OZ35823 05367782
+         BE    OSKIP2                   BRANCH YES             @OZ35823 05368082
+         B     OSKIP0                   SKIP NO CHARACTERS     @OZ35823 05368382
+OSKIP3   EQU   *                                               @OZ35823 05368682
+         LA    R11,1(,R11)              SKIP STX ESC CMD       @OZ35823 05368982
+OSKIP2   EQU   *                                               @OZ35823 05369282
+         LA    R11,1(,R11)              SKIP ESC CMD           @OZ35823 05369582
+OSKIP1   EQU   *                                               @OZ35823 05369882
+         LA    R11,1(,R11)              SKIP 1 BYTE            @OZ35823 05370182
+OSKIP0   EQU   *                                               @OZ35823 05370482
+         CLC   1(4,R11),EXPFSID         EXPANDED FULLSCREEN MSG@OZ35823 05370782
+         BNE   OUTNEWH                  BRANCH NO              @OZ35823 05371082
+         OI    FSOFIELD,FSOFS           SET FULLSCREEN         @OZ35823 05371382
+         MVC   QCBCARCT(1),CARRIER      SET CARRIAGE COUNT     @OZ35823 05371682
+         MVC   QCBSATCT(1),LCOUNT       AND LINE COUNT         @OZ35823 05371982
+         TM    FSOFIELD,FSORD+FSOBC     REDISPLAY OR BROADCAST @OZ35823 05372282
+         BZ    ERROR0                   BRANCH NO              @OZ35823 05372582
+         XI    FSOFIELD,FSORD           FLIP REDISPLAY FLAG    @OZ35823 05372882
+         OI    FSOFIELD,FSOLK           SET KEYBOARD LOCK      @OZ35823 05373182
+         TM    0(R11),KIWCC             KEYBOARD LOCKED        @OZ35823 05373482
+         BZ    ERROR0                   BRANCH NO              @OZ35823 05373782
+         NI    QCBTSOF2,AVTEFF-QCBDSSMI RESET KEYBOARD UNLOCK  @OZ35823 05374082
+         NI    0(R11),AVTEFF-KIWCC      INHIBIT KEYBOARD       @OZ35823 05374382
+         CLI   0(R11),CONWCC            WCC CONTROL OFF        @OZ35823 05374682
+         BNE   ERROR0                   BRANCH NO              @OZ35823 05374982
+         MVI   0(R11),AVTEFF-CONWCC+1   CLEAR BITS             @OZ35823 05375282
+         B     ERROR0                   EXIT                   @OZ35823 05375582
+OUTNEWH  EQU   *                                               @OZ35823 05375882
+         CLC   1(4,R11),EXPLFSID        LAST FULLSCREEN MESSAGE@OZ35823 05376182
+         BNE   OUTNEWJ                  BRANCH NO              @OZ35823 05376482
+         NI    FSOFIELD,AVTEFF-(FSOFS+FSOBC+FSORD) RESET EXP FS@OZ35823 05376782
+         MVI   QCBCARCT,AVTEZERO        CLEAR CARRIAGE COUNT   @OZ35823 05377082
+         LH    R1,5(,R11)               COMPUTE VALUE          @OZ35823 05377382
+         SLDL  R0,24                    TO WHICH LINE COUNT    @OZ35823 05377682
+         SLL   R1,2                     IS TO BE RESET         @OZ35823 05377982
+         SRDL  R0,6                     AS REQUESTED IN        @OZ35823 05378282
+         SRL   R1,20                    SECOND SBA             @OZ35823 05378582
+         SLR   R0,R0                    ADDRESS OF             @OZ35823 05378882
+         LA    R15,80                   FULLSCREEN             @OZ35823 05379182
+         DR    R0,R15                   MESSAGE                @OZ35823 05379482
+         STC   R1,QCBSATCT              RESET COUNT            @OZ35823 05379782
+         B     ERROR0                   EXIT                   @OZ35823 05380082
+OUTNEWJ  EQU   *                                               @OZ35823 05380382
+         TM    FSOFIELD,FSOFS           PREVIOUS MESSAGE FS    @OZ35823 05380682
+         BNO   ERROR0                   BRANCH NO              @OZ35823 05380982
+         NI    FSOFIELD,AVTEFF-FSOFS    RESET FULLSCREEN       @OZ35823 05381282
+         OI    FSOFIELD,FSOBC           BROADCAST              @OZ35823 05381582
+         MVI   QCBSATCT,AVTEFF          SET NEXT TO LAST LINE  @OZ35823 05381882
+         MVI   QCBCARCT,AVTEZERO        START                  @OZ35823 05382182
+         OI    QCBTSOF1,QCBSATRD        SET SIMATTN READ REQ   @OZ35823 05382482
+         OI    0(R11),SAWCC             SET SOUND ALARM WCC    @OZ35823 05382782
+         B     ERROR0                   EXIT                   @OZ35823 05383082
+OUTNEWX  EQU   *                                               @OZ35823 05383382
+         TM    FSOFIELD,FSOLK           KEYBOARD TO BE LOCKED  @OZ35823 05383682
+         BZ    ERROR0                   BRANCH NO              @OZ35823 05383982
+         TM    PRFSTAT1,PRFNLSTN        LAST BUFFER            @OZ35823 05384282
+         BO    ERROR0                   BRANCH NO              @OZ35823 05384582
+         CLI   LCBFLAG1,LCBPLCB         3705 TERMINAL          @OZ35823 05384882
+         BE    NOXTERM                  BRANCH NO              @OZ35823 05385182
+         LA    RPREFIX,1(,RPREFIX)      INCREMENT LOOK ADDRESS @OZ35823 05385482
+NOXTERM  EQU   *                                               @OZ35823 05385782
+         CLC   PRFSTXT(3),ULSEQ         UNLOCK SEQUENCE        @OZ35823 05386082
+         BNE   ERROR0                   BRANCH NO              @OZ35823 05386382
+         NI    QCBTSOF2,AVTEFF-QCBDSSMI RESET KEYBOARD UNLOCK  @OZ35823 05386682
+         MVI   PRFSTXT+2,AVTEFF-CONWCC+1 LEAVE KEYBOARD LOCKED @OZ35823 05386982
+         B     ERROR0                   EXIT                   @OZ35823 05387282
+         EJECT                                                          05387582
+REGFUN   EQU   *                                               @OZ35823 05387882
+         LA    R11,AEPARMS              LOAD ADDRESS PARMLIST           05400082
+MACLC    EQU   *                                                        05450082
+         TM    FSFLAG,LCOPT             LCOUNT IN OPTION FIELD          05500082
+         BNO   MACCA                    BRANCH NO                       05550082
+         LR    R1,R11                   SET PARMLIST REGISTER           05600082
+         LA    R11,4(,R11)              LOCATE                          05650082
+         L     R15,AVTUI                LCOUNT                          05700082
+         BALR  R14,R15                  OPTION FIELD                    05750082
+         LTR   R15,R15                  CARRIER OPTION PRESENT          05800082
+         BNZ   ERROR8                   BRANCH NO                       05850082
+         MVC   LCOUNT(1),0(R5)          SET CARRIER                     05900082
+MACCA    EQU   *                                                        05950082
+         TM    FSFLAG,CAOPT             CARRIER IN OPTION FIELD         06000082
+         BNO   MACTRIG                  BRANCH NO                       06050082
+         LR    R1,R11                   SET PARMLIST REGISTER           06100082
+         LA    R11,4(,R11)              LOCATE                          06150082
+         L     R15,AVTUI                CARRIER                         06200082
+         BALR  R14,R15                  OPTION FIELD                    06250082
+         LTR   R15,R15                  TRIGGER OPTION PRESENT          06300082
+         BNZ   ERROR8                   BRANCH NO                       06350082
+         MVC   CARRIER(1),0(R5)         SET CARRIER IN PARMLIST         06400082
+         EJECT                                                          06450082
+MACTRIG  EQU   *                                                        06500082
+         TM    LCBSTAT1,LCBSENDN        SEND OPERATION                  06550082
+         BO    LOCTRIG                  BRANCH YES                      06600082
+         TM    PRFSTAT1,PRFNHDRN        HEADER BUFFER                   06650082
+         BO    ERROR4                   BRANCH NO                       06700082
+LOCTRIG  EQU   *                                                        06750082
+         TM    FSFLAG,CHARPRES          CONCHARS SPECIFIED              06800082
+         BO    SETFULL                  BRANCH YES                      06850082
+         TM    FSFLAG,TROPT             TRIGGER IN OPTION FIELD         06900082
+         BNO   MACALL                   BRANCH NO                       06950082
+         LR    R1,R11                   SET PARMLIST REGISTER           07000082
+         L     R15,AVTUI                LOCATE TRIGGER                  07050082
+         BALR  R14,R15                  OPTION FIELD                    07100082
+         LTR   R15,R15                  TRIGGER OPTION PRESENT          07150082
+         BNZ   ERROR8                   BRANCH NO                       07200082
+         MVC   TRIGGER(1),0(R5)         SET TRIGGER                     07250082
+MACALL   EQU   *                                                        07300082
+         CLI   TRIGGER,AVTEZERO         TERMINATE FULLSCREEN            07350082
+         BE    OFF                      BRANCH YES                      07400082
+         CLI   TRIGGER,AVTEFF           ENTER FULLSCREEN                07450082
+         BE    ON                       BRANCH YES                      07500082
+         TM    LCBSTAT1,LCBSENDN        SEND OPERATION                  07550082
+         BO    ERROR10                  BRANCH YES                      07600082
+         SR    R5,R5                    CLEAR INDEX REGISTER            07650082
+         IC    R5,LCBISZE               GET IDLES COUNT                 07700082
+         LA    R5,AVTHDRSZ+12(R5,RPREFIX) SET DATA START                07750082
+         TM    DCTBYTE2,DCTLOCAL        3270 LOCAL                      07800082
+         BZ    REMOTE                   BRANCH REMOTE                   07850082
+         CLC   0(1,R5),TRIGGER          LOCAL FULLSCREEN MODE           07900082
+         BE    SETFULL                  BRANCH YES                      07950082
+         B     ERROR4                   BRANCH NOT FOUND                08000082
+REMOTE   EQU   *                                                        08050082
+         TM    TRMDEVFL+1,TRMRNTRM      3705 TERMINAL                   08100082
+         BO    NCPTERM                  BRANCH YES                      08150082
+         CLC   3(1,R5),TRIGGER          TRIGGER FOUND                   08200082
+         BE    SETFULL                  BRANCH YES                      08250082
+         B     ERROR4                   BRANCH NOT FOUND                08300082
+NCPTERM  EQU   *                                                        08350082
+         CLC   2(1,R5),TRIGGER          TRIGGER FOUND                   08400082
+         BNE   ERROR4                   BRANCH NOT FOUND                08450082
+         EJECT                                                          08500082
+SETFULL  EQU   *                                                        08550082
+         XI    FSOFIELD,FSOFULL         FLIP FULLSCREEN MODE   @OZ35823 08600082
+         SR    R15,R15                  SET GOOD RETURN CODE            08650082
+         B     NORMAL                   PERFORM FULLSCREEN              08700082
+ERROR4   EQU   *                                                        08750082
+         LA    R15,4                    SET MODE NOT SWITCHED           08800082
+NORMAL   EQU   *                                                        08850082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             08900082
+         TM    FSOFIELD,FSOFULL         ENTRY FOR FULLSCREEN   @OZ35823 08950082
+         BZ    4(,RBASE)                BRANCH NO                       09000082
+         MVC   QCBCARCT(1),CARRIER      RESET CARRIAGE                  09050082
+         MVC   QCBSATCT(1),LCOUNT       COUNT AND LINE COUNT            09100082
+         B     4(,RBASE)                ERROR EXIT                      09150082
+NORMEXP  EQU   *                                               @OZ35823 09156082
+         MVC   QCBCARCT(1),CARRIER      SET CARRIAGE COUNT     @OZ35823 09162082
+         MVC   QCBSATCT(1),LCOUNT       AND LINE COUNT         @OZ35823 09168082
+ERROR0   EQU   *                                               @OZ35823 09174082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS    @OZ35823 09180082
+         SR    R15,R15                  SET NORMAL RETURN      @OZ35823 09186082
+         B     4(,RBASE)                RETURN                 @OZ35823 09192082
+ERROR8   EQU   *                                                        09200082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             09250082
+         LA    R15,8                    SET OPTION FIELD NOT FOUND      09300082
+         B     4(,RBASE)                RETURN                          09350082
+ERRORC   EQU   *                                                        09400082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             09450082
+         LA    R15,12                   SET NOT TSO MESSAGE             09500082
+         B     4(,RBASE)                RETURN                          09550082
+ERROR10  EQU   *                                                        09600082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             09650082
+         LA    R15,16                   SET BAD CONTENTS IEDQFSCR       09700082
+         B     4(,RBASE)                RETURN                          09750082
+ON       EQU   *                                                        09800082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             09850082
+         OI    FSOFIELD,FSOFULL         SET FULLSCREEN MODE    @OZ35823 09900082
+         MVC   QCBCARCT(1),CARRIER      RESET CARRIAGE COUNT            09950082
+         MVC   QCBSATCT(1),LCOUNT       AND LINE COUNT                  10000082
+         SR    R15,R15                  ZERO RETURN CODE                10050082
+         B     4(,RBASE)                RETURN                          10100082
+OFF      EQU   *                                                        10150082
+         L     RBASE,AVTUI              LOAD RETURN ADDRESS             10200082
+         NI    FSOFIELD,AVTEFF-FSOFULL  RESET FULLSCREEN MODE  @OZ35823 10250082
+         SR    R15,R15                  ZERO RETURN CODE                10300082
+         B     4(,RBASE)                RETURN                          10350082
+         EJECT                                                          10400082
+FIXAWAY  DC    20F'0'                   PATCH AREA                      10450082
+EXPFSID  DC    X'115D7F11'              FULLSCREEN MSG ID      @OZ35823 10460082
+EXPLFSID DC    X'115D7E11'              LAST FULLSCREEN MSG ID @OZ35823 10470082
+ULSEQ    DC    X'27F1C2'                UNLOCK SEQUENCE        @OZ35823 10480082
+         EJECT                                                          10500082
+PARMLIST DSECT                                                          10550082
+         DS    XL1                      INDEX TO IEDQNWMH               10600082
+         DS    XL1                      PARAMETER LIST LENGTH           10650082
+         DS    XL1                      INDEX TO IEDQFSC                10700082
+FSFLAG   DS    XL1                      FLAGS                           10750082
+LCOPT    EQU   X'80'                    LCOUNT PRESENT                  10800082
+CAOPT    EQU   X'40'                    CARRIER PRESENT                 10850082
+TROPT    EQU   X'20'                    TRIGGER PRESENT                 10900082
+CHARPRES EQU   X'10'                    CONCHARS PRESENT                10950082
+EXPFLS   EQU   X'08'                    EXPANDED FULLSCREEN    @OZ35823 10970082
+LCOUNT   DS    XL1                      LINE COUNT                      11000082
+CARRIER  DS    XL1                      CARRIAGE COUNT                  11050082
+TRIGGER  DS    XL1                      TRIGGER CHARACTER               11100082
+AEOPT    DS    XL1                      INDEX TO IEDQAE                 11150082
+         DS    XL1                      FOR FULLSCREEN OPTION           11200082
+         DS    XL1                      OPTION OFFSET                   11250082
+         DS    XL1                      OUTPUT REGISTER                 11300082
+AEPARMS  DS    XL1                      INDEX TO IEDQAE                 11350082
+         DS    XL1                                                      11400082
+         DS    XL1                      OPTION OFFSET                   11450082
+         DS    XL1                      OUTPUT REGISTER                 11500082
+         DC    XL1'00'                  ALIGNMENT BYTE                  11550082
+         EJECT                                                          11555082
+IEDQFSO  DSECT                                                 @OZ35823 11560082
+FSOFIELD DS    XL1                      FULLSCREEN OPTION BYTE @OZ35823 11565082
+FSOLK    EQU   X'20'                    KEEP KEYBOARD LOCKED   @OZ35823 11570082
+FSORD    EQU   X'08'                    REDISPLAY FLAG         @OZ35823 11575082
+FSOBC    EQU   X'04'                    BROADCAST FLAG         @OZ35823 11580082
+FSOFS    EQU   X'02'                    EXPANDED FULLSCREEN    @OZ35823 11585082
+FSOFULL  EQU   X'01'                    FULLSCREEN MODE SWITCH @OZ35823 11590082
+         EJECT                                                          11595082
+         EJECT                                                          11600082
+         TAVTD                                                          11650082
+         EJECT                                                          11700082
+         TDCTD                                                          11750082
+         EJECT                                                          11800082
+         TLCBD                                                          11850082
+         EJECT                                                          11900082
+         TQCBD                                                          11950082
+         EJECT                                                          12000082
+         TPRFD                                                          12050082
+         EJECT                                                          12100082
+         TTRMD                                                          12150082
+         END                                                            12200082

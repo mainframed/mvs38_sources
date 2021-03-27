@@ -1,0 +1,1350 @@
+         TITLE 'ISTAPC41 SCHEDULE IRB PROCEDURE'                        00001000
+ISTAPC41 CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'ISTAPC41  78.336'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  DS    0H                                                  0002 00009000
+         PRINT OFF                                                      00010000
+         PRINT ON                                                       00011000
+ISTAPC41 CSECT                                                          00012000
+*   STM(REG1,PSTPTR,PSTSAVE);       /* SAVE REGS 1 & 2               */ 00013000
+         STM   REG1,PSTPTR,PSTSAVE(REG1)                           0079 00014000
+*   STM(BASEREG,REG14,PSTSAVE8);    /* SAVE REGS 9 THRU 14           */ 00015000
+         STM   BASEREG,REG14,PSTSAVE8(REG1)                        0080 00016000
+*   GEN;                                                           0081 00017000
+         BALR  BASEREG,REG0                                             00018000
+         USING *,BASEREG                                                00019000
+*   RFY                                                            0082 00020000
+*     ISTPST BASED(PSTPTR);         /* RE-BASE PST ON PSTPTR         */ 00021000
+*   PSTPTR=REG1;                    /* ASSIGN PST POINTER            */ 00022000
+         LR    PSTPTR,REG1                                         0083 00023000
+*   RFY                                                            0084 00024000
+*    (REG10,                                                       0084 00025000
+*     REG11) RSTD;                  /* RESTRICT REGS FOR CS  @ZM31951*/ 00026000
+*   REG10=PSTFLGA;                  /* COMP REG FOR CS       @ZM31951*/ 00027000
+         L     REG10,PSTFLGA(,PSTPTR)                              0085 00028000
+*/*   PST IRB IN USE FLAG MUST BE TURNED ON BY CS IN VS2             */ 00029000
+*                                                                  0086 00030000
+*   IF PSTIRBU1=ON                  /* CHECK FOR FIRST IRB IN USE    */ 00031000
+*     THEN                                                         0086 00032000
+         TM    PSTIRBU1(PSTPTR),B'00100000'                        0086 00033000
+         BNO   @RF00086                                            0086 00034000
+*     DO;                                                          0087 00035000
+*SWPON2:                            /* IRB 1 IN USE. WILL SWAP ON  0088 00036000
+*                                      IRB2 IN USE           @ZM31951*/ 00037000
+*       REG11=REG10|PSTIRB21;       /* SWAP REG WITH IRBU2 ON      0088 00038000
+*                                                            @ZM31951*/ 00039000
+SWPON2   LR    REG11,REG10                                         0088 00040000
+         O     REG11,@CF01056                                      0088 00041000
+*       CS(REG10,REG11,PSTFLGA);    /* USE CS LOGIC          @ZM31951*/ 00042000
+         CS    REG10,@11,PSTFLGA(PSTPTR)                           0089 00043000
+*       BC(7,SWPON2);               /* GET IT ON             @ZM31951*/ 00044000
+         BC    7,SWPON2                                            0090 00045000
+*       REG1=PSTIQE22;              /* OBTAIN ACTIVE IQE ADDRESS     */ 00046000
+         L     REG1,PSTIQE22(,PSTPTR)                              0091 00047000
+*       PSTIQE22=PSTIQE21;          /* INTERCHANGE ADDRESSES         */ 00048000
+         L     @12,PSTIQE21(,PSTPTR)                               0092 00049000
+         ST    @12,PSTIQE22(,PSTPTR)                               0092 00050000
+*       PSTIQE21=REG1;              /* STORE SAVED ADDRESS           */ 00051000
+         ST    REG1,PSTIQE21(,PSTPTR)                              0093 00052000
+*     END;                                                         0094 00053000
+*   ELSE                                                           0095 00054000
+*     DO;                                                          0095 00055000
+         B     @RC00086                                            0095 00056000
+@RF00086 DS    0H                                                  0096 00057000
+*SWPON1:                            /* IRB 1 NOT IN USE. WILL SWAP IT   00058000
+*                                      ON                    @ZM31951*/ 00059000
+*       REG11=REG10|PSTIRB11;       /* SWAP REG WITH IRBU1 IN USE  0096 00060000
+*                                                            @ZM31951*/ 00061000
+SWPON1   LR    REG11,REG10                                         0096 00062000
+         O     REG11,@CF01048                                      0096 00063000
+*       CS(REG10,REG11,PSTFLGA);    /* USE CS LOGIC          @ZM31951*/ 00064000
+         CS    REG10,@11,PSTFLGA(PSTPTR)                           0097 00065000
+*       BC(7,SWPON1);               /* IF FAIL TRY AGAIN     @ZM31951*/ 00066000
+         BC    7,SWPON1                                            0098 00067000
+*       REG1=PSTIQE12;              /* OBTAIN ACTIVE IQE ADDRESS     */ 00068000
+         L     REG1,PSTIQE12(,PSTPTR)                              0099 00069000
+*       PSTIQE12=PSTIQE11;          /* INTERCHANGE ADDRESSES         */ 00070000
+         L     @12,PSTIQE11(,PSTPTR)                               0100 00071000
+         ST    @12,PSTIQE12(,PSTPTR)                               0100 00072000
+*       PSTIQE11=REG1;              /* STORE SAVED ADDRESS           */ 00073000
+         ST    REG1,PSTIQE11(,PSTPTR)                              0101 00074000
+*     END;                                                         0102 00075000
+*   RFY                                                            0103 00076000
+*    (REG10,                                                       0103 00077000
+*     REG11) UNRSTD;                /* UN RESTRICT REG 10, 11      0103 00078000
+*                                                            @ZM31951*/ 00079000
+@RC00086 DS    0H                                                  0104 00080000
+*   GEN(LNR   REG1,REG1           COMPLEMENT OF IQE ADDRESS);      0104 00081000
+         LNR   REG1,REG1           COMPLEMENT OF IQE ADDRESS            00082000
+*OBTLOCK:                                                          0105 00083000
+*   ;                                                              0105 00084000
+OBTLOCK  DS    0H                                                  0106 00085000
+*   GEN CODE REFS(REG11,REG12,REG13,REG14,PSALITA,FLC);            0106 00086000
+          SETLOCK OBTAIN,TYPE=LOCAL,MODE=UNCOND,                       *00087000
+               RELATED=(IEAVGM00,ISTAPC41(RELLOCK))                     00088000
+*   RFY                                                            0107 00089000
+*     REG13 RSTD;                   /* RESTRICT RETURN CODE REGISTER */ 00090000
+*   IF REG13=LOCKHELD               /* CHECK FOR LOCK ALREADY HELD   */ 00091000
+*     THEN                                                         0108 00092000
+         C     REG13,@CF00052                                      0108 00093000
+         BNE   @RF00108                                            0108 00094000
+*     PSTPTR=PSTPTR|SWITON;         /* INDICATE LOCK ALREADY HELD    */ 00095000
+         O     PSTPTR,@CF01038                                     0109 00096000
+*   ELSE                                                           0110 00097000
+*     PSTPTR=PSTPTR&SWITOFF;        /* INDICATE LOCK NOW HELD        */ 00098000
+         B     @RC00108                                            0110 00099000
+@RF00108 N     PSTPTR,@CF01036                                     0110 00100000
+*   CALL CVTPTR->CVT0EF00;          /* CALL STAGE 2 EXIT EFFECTOR    */ 00101000
+@RC00108 L     @12,CVTPTR                                          0111 00102000
+         L     @15,CVT0EF00(,@12)                                  0111 00103000
+         BALR  @14,@15                                             0111 00104000
+*   IF PSTPTR>ZERO                  /* CHECK FOR LOCK HELD           */ 00105000
+*     THEN                          /* IF HELD THEN MUST RELEASE IT     00106000
+*                                                            @ZM31951*/ 00107000
+         LTR   PSTPTR,PSTPTR                                       0112 00108000
+         BNP   @RF00112                                            0112 00109000
+*     DO;                           /* LOCK HELD. RESTORE REGS AND 0113 00110000
+*                                      RELEASE LOCK          @ZM31951*/ 00111000
+*                                                                  0113 00112000
+*       /*************************************************************/ 00113000
+*       /*                                                           */ 00114000
+*       /* *** CAUTION *** RESTORE OF REGS FROM PSTSAVE DESTROYS BASE*/ 00115000
+*       /* REG(9).. ANY ADDITIONAL CODE MUST BE INDEPENDENT OF BASE  */ 00116000
+*       /* REG(9)                                                    */ 00117000
+*       /*                                                           */ 00118000
+*       /*************************************************************/ 00119000
+*                                                                  0114 00120000
+*       LM(REG1,PSTPTR,PSTSAVE);    /* RESTORE REG 1,2       @ZM31951*/ 00121000
+         LM    REG1,PSTPTR,PSTSAVE(PSTPTR)                         0114 00122000
+*       RFY                                                        0115 00123000
+*         ISTPST BASED(REG1);       /* REBASE THE PST ON REG 1     0115 00124000
+*                                                            @ZM31951*/ 00125000
+*       LM(BASEREG,REG14,PSTSAVE8); /* RESTORE 9-14          @ZM31951*/ 00126000
+         LM    BASEREG,REG14,PSTSAVE8(REG1)                        0116 00127000
+*       REG1=REG11;                 /* SAVE R11 ACROSS RELEASE LOCK     00128000
+*                                                            @ZM31951*/ 00129000
+         LR    REG1,REG11                                          0117 00130000
+*       REG3=REG12;                 /* SAVE R12 ACROSS RELEASE LOCK     00131000
+*                                                            @ZM31951*/ 00132000
+         LR    REG3,REG12                                          0118 00133000
+*       REG5=REG13;                 /* SAVE R13 ACROSS RELEASE LOCK     00134000
+*                                                            @ZM31951*/ 00135000
+         LR    REG5,REG13                                          0119 00136000
+*       REG15=REG14;                /* SAVE R14 ACROSS RELE LOCK   0120 00137000
+*                                                            @ZM31951*/ 00138000
+         LR    REG15,REG14                                         0120 00139000
+*RELLOCK:                                                          0121 00140000
+*       ;                                                          0121 00141000
+RELLOCK  DS    0H                                                  0122 00142000
+*       GEN CODE REFS(REG11,REG12,REG13,REG14,PSALITA,FLC);        0122 00143000
+          SETLOCK RELEASE,TYPE=LOCAL,                                  *00144000
+               RELATED=(IEAVGM00,ISTAPC41(OBTLOCK))                     00145000
+*       REG11=REG1;                 /* RESTORE R11           @ZM31951*/ 00146000
+         LR    REG11,REG1                                          0123 00147000
+*       REG12=REG3;                 /* RESTORE REG12         @ZM31951*/ 00148000
+         LR    REG12,REG3                                          0124 00149000
+*       REG13=REG5;                 /* RESTORE R13           @ZM31951*/ 00150000
+         LR    REG13,REG5                                          0125 00151000
+*       REG14=REG15;                /* RESTORE REG 14        @ZM31951*/ 00152000
+         LR    REG14,REG15                                         0126 00153000
+*       GOTO REG14;                 /* RETURN TO CALLER      @ZM31951*/ 00154000
+         BR    REG14                                               0127 00155000
+*     END;                                                         0128 00156000
+*   RFY                                                            0129 00157000
+*     ISTPST BASED(PSTPTR);         /* IF HERE PST STILL BASED ON  0129 00158000
+*                                      PSTPTR                        */ 00159000
+@RF00112 DS    0H                                                  0130 00160000
+*   LM(REG1,PSTPTR,PSTSAVE);        /* RESTORE REGS 1 & 2            */ 00161000
+         LM    REG1,PSTPTR,PSTSAVE(PSTPTR)                         0130 00162000
+*   RFY                                                            0131 00163000
+*     ISTPST BASED(REG1);           /* RE-BASE PST FOR LM FROM SVAREA*/ 00164000
+*   LM(BASEREG,REG14,PSTSAVE8);     /* RESTORE REGS 9 THRU 14        */ 00165000
+         LM    BASEREG,REG14,PSTSAVE8(REG1)                        0132 00166000
+*   GOTO REG14;                     /* RETURN TO CALLER      @ZM31951*/ 00167000
+         BR    REG14                                               0133 00168000
+*   DO;                             /* TPEPILOG                      */ 00169000
+*     GEN(PRINT OFF);                                              0135 00170000
+         PRINT OFF                                                      00171000
+*     GEN(PRINT ON);                                               0136 00172000
+         PRINT ON                                                       00173000
+*   END;                            /* TPEPILOG                      */ 00174000
+*   END ISTAPC41                                                   0138 00175000
+*                                                                  0138 00176000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.     */ 00177000
+*/*%INCLUDE SYSLIB  (CVT     )                                       */ 00178000
+*/*%INCLUDE SYSLIB  (IHAPSA  )                                       */ 00179000
+*                                                                  0138 00180000
+*       ;                                                          0138 00181000
+@EL00001 DS    0H                                                  0138 00182000
+@EF00001 DS    0H                                                  0138 00183000
+@ER00001 BR    @14                                                 0138 00184000
+@DATA    DS    0H                                                       00185000
+@DATD    DSECT                                                          00186000
+         DS    0F                                                       00187000
+ISTAPC41 CSECT                                                          00188000
+         DS    0F                                                       00189000
+@CF00052 DC    F'4'                                                     00190000
+@CF01036 DC    XL4'7FFFFFFF'                                            00191000
+@CF01038 DC    XL4'80000000'                                            00192000
+@CF01048 DC    XL4'20000000'                                            00193000
+@CF01056 DC    XL4'10000000'                                            00194000
+@DATD    DSECT                                                          00195000
+         DS    0D                                                       00196000
+         ORG   *+1-(*-@DATD)/(*-@DATD) INSURE DSECT DATA                00197000
+@ENDDATD EQU   *                                                        00198000
+ISTAPC41 CSECT                                                          00199000
+         DS    0F                                                       00200000
+@SIZDATD DC    AL1(0)                                                   00201000
+         DC    AL3(@ENDDATD-@DATD)                                      00202000
+         DS    0D                                                       00203000
+ISTAPP41 DC    F'0'                                                     00204000
+         DS    11XL4                                                    00205000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00206000
+@01      EQU   01                                                       00207000
+@02      EQU   02                                                       00208000
+@03      EQU   03                                                       00209000
+@04      EQU   04                                                       00210000
+@05      EQU   05                                                       00211000
+@06      EQU   06                                                       00212000
+@07      EQU   07                                                       00213000
+@08      EQU   08                                                       00214000
+@09      EQU   09                                                       00215000
+@10      EQU   10                                                       00216000
+@11      EQU   11                                                       00217000
+@12      EQU   12                                                       00218000
+@13      EQU   13                                                       00219000
+@14      EQU   14                                                       00220000
+@15      EQU   15                                                       00221000
+RPHPTR   EQU   @01                                                      00222000
+REG0     EQU   @00                                                      00223000
+REG1     EQU   @01                                                      00224000
+REG3     EQU   @03                                                      00225000
+REG4     EQU   @04                                                      00226000
+REG5     EQU   @05                                                      00227000
+REG6     EQU   @06                                                      00228000
+REG7     EQU   @07                                                      00229000
+REG8     EQU   @08                                                      00230000
+REG10    EQU   @10                                                      00231000
+REG11    EQU   @11                                                      00232000
+REG12    EQU   @12                                                      00233000
+REG13    EQU   @13                                                      00234000
+REG14    EQU   @14                                                      00235000
+REG15    EQU   @15                                                      00236000
+PSTPTR   EQU   @02                                                      00237000
+BASEREG  EQU   @09                                                      00238000
+CVTPTR   EQU   16                                                       00239000
+PSA      EQU   0                                                        00240000
+FLCRNPSW EQU   PSA                                                      00241000
+FLCROPSW EQU   PSA+8                                                    00242000
+FLCICCW2 EQU   PSA+16                                                   00243000
+PSAEEPSW EQU   PSA+132                                                  00244000
+PSAESPSW EQU   PSA+136                                                  00245000
+FLCSVILC EQU   PSAESPSW+1                                               00246000
+PSAEPPSW EQU   PSA+140                                                  00247000
+FLCPIILC EQU   PSAEPPSW+1                                               00248000
+FLCPICOD EQU   PSAEPPSW+2                                               00249000
+PSAPICOD EQU   FLCPICOD+1                                               00250000
+FLCTEA   EQU   PSAEPPSW+4                                               00251000
+FLCPER   EQU   PSA+152                                                  00252000
+FLCMCLA  EQU   PSA+168                                                  00253000
+FLCIOEL  EQU   FLCMCLA+4                                                00254000
+FLCIOA   EQU   FLCMCLA+16                                               00255000
+FLCFSA   EQU   FLCMCLA+80                                               00256000
+PSASUPER EQU   PSA+552                                                  00257000
+PSASUP1  EQU   PSASUPER                                                 00258000
+PSASUP2  EQU   PSASUPER+1                                               00259000
+PSASUP3  EQU   PSASUPER+2                                               00260000
+PSASUP4  EQU   PSASUPER+3                                               00261000
+PSACLHT  EQU   PSA+640                                                  00262000
+PSALKSA  EQU   PSA+696                                                  00263000
+PSAHLHI  EQU   PSA+760                                                  00264000
+PSALITA  EQU   PSA+764                                                  00265000
+PSADSSFL EQU   PSA+836                                                  00266000
+PSADSSF1 EQU   PSADSSFL                                                 00267000
+PSADSSF3 EQU   PSADSSFL+2                                               00268000
+PSADSSF4 EQU   PSADSSFL+3                                               00269000
+PSARSVT  EQU   PSA+896                                                  00270000
+CVTMAP   EQU   0                                                        00271000
+CVT0EF00 EQU   CVTMAP+4                                                 00272000
+CVTDAR   EQU   CVTMAP+72                                                00273000
+CVTFLGS1 EQU   CVTDAR                                                   00274000
+CVTDCB   EQU   CVTMAP+116                                               00275000
+CVTIERLC EQU   CVTMAP+144                                               00276000
+CVTOPTA  EQU   CVTMAP+182                                               00277000
+CVTOPTB  EQU   CVTMAP+183                                               00278000
+CVTGTF   EQU   CVTMAP+236                                               00279000
+CVTGTFST EQU   CVTGTF                                                   00280000
+CVTGTFS  EQU   CVTGTFST                                                 00281000
+CVTSTATE EQU   CVTGTFST                                                 00282000
+CVTTMODE EQU   CVTGTFST                                                 00283000
+CVTFORM  EQU   CVTGTFST                                                 00284000
+CVTAQAVT EQU   CVTMAP+240                                               00285000
+CVTTCMFG EQU   CVTAQAVT                                                 00286000
+CVTVOLM2 EQU   CVTMAP+244                                               00287000
+CVTTATA  EQU   CVTVOLM2                                                 00288000
+CVTTSKS  EQU   CVTTATA                                                  00289000
+CVTVOLF2 EQU   CVTTSKS                                                  00290000
+CVTTAT   EQU   CVTTATA+1                                                00291000
+CVTATER  EQU   CVTMAP+248                                               00292000
+CVTEXT1  EQU   CVTMAP+252                                               00293000
+CVTPURG  EQU   CVTMAP+260                                               00294000
+CVTQMSG  EQU   CVTMAP+268                                               00295000
+CVTDMSR  EQU   CVTMAP+272                                               00296000
+CVTRSV37 EQU   CVTDMSR                                                  00297000
+CVTDMSRF EQU   CVTRSV37                                                 00298000
+CVTERPV  EQU   CVTMAP+316                                               00299000
+CVTINTLA EQU   CVTMAP+320                                               00300000
+CVTAPF   EQU   CVTMAP+324                                               00301000
+CVTEXT2  EQU   CVTMAP+328                                               00302000
+CVTHJES  EQU   CVTMAP+332                                               00303000
+CVTPGSIA EQU   CVTMAP+348                                               00304000
+CVTA1F1  EQU   CVTMAP+356                                               00305000
+CVTSYSK  EQU   CVTMAP+357                                               00306000
+CVTVOLM1 EQU   CVTMAP+380                                               00307000
+CVTVOLF1 EQU   CVTVOLM1                                                 00308000
+CVTXTNT1 EQU   0                                                        00309000
+CVTXTNT2 EQU   0                                                        00310000
+CVTDSSV  EQU   CVTXTNT2                                                 00311000
+CVTFLGBT EQU   CVTXTNT2+5                                               00312000
+CVTQID   EQU   CVTXTNT2+24                                              00313000
+CVTRV400 EQU   CVTXTNT2+52                                              00314000
+CVTRV409 EQU   CVTXTNT2+53                                              00315000
+CVTATCVT EQU   CVTXTNT2+64                                              00316000
+CVTRV429 EQU   CVTXTNT2+84                                              00317000
+CVTRV438 EQU   CVTXTNT2+85                                              00318000
+CVTRV457 EQU   CVTXTNT2+112                                             00319000
+CVTRV466 EQU   CVTXTNT2+113                                             00320000
+CVTFIX   EQU   0                                                        00321000
+CVTRELNO EQU   CVTFIX+252                                               00322000
+ISTLOK   EQU   0                                                        00323000
+LOKCHN   EQU   ISTLOK+1                                                 00324000
+LOKCHNG  EQU   LOKCHN                                                   00325000
+@NM00028 EQU   LOKCHNG+2                                                00326000
+ISTPAB   EQU   0                                                        00327000
+PABWQCHN EQU   ISTPAB                                                   00328000
+PABWEQA  EQU   PABWQCHN                                                 00329000
+PABCHAIN EQU   PABWQCHN+4                                               00330000
+PABRUNNG EQU   PABCHAIN                                                 00331000
+PABRPHFG EQU   ISTPAB+12                                                00332000
+PABFLAGS EQU   PABRPHFG                                                 00333000
+PABERLCK EQU   PABFLAGS                                                 00334000
+PABERRLK EQU   PABERLCK                                                 00335000
+PABEND   EQU   ISTPAB+16                                                00336000
+ISTDYPAB EQU   0                                                        00337000
+DYPCHAIN EQU   ISTDYPAB+4                                               00338000
+DYPPACMD EQU   ISTDYPAB+12                                              00339000
+ISTRPH   EQU   0                                                        00340000
+RPHCNTL  EQU   ISTRPH                                                   00341000
+RPHFLAGS EQU   RPHCNTL+2                                                00342000
+RPHFSTLC EQU   RPHFLAGS                                                 00343000
+RPHFLGB  EQU   RPHCNTL+3                                                00344000
+RPHRPHA  EQU   ISTRPH+4                                                 00345000
+RPHTSKID EQU   ISTRPH+8                                                 00346000
+RPHRESMA EQU   ISTRPH+16                                                00347000
+RPHWPFLG EQU   RPHRESMA                                                 00348000
+RPHWEA   EQU   ISTRPH+24                                                00349000
+RPHCSPA  EQU   RPHWEA                                                   00350000
+RPHSRPRM EQU   ISTRPH+28                                                00351000
+RPHPABQA EQU   ISTRPH+36                                                00352000
+RPHWORK  EQU   ISTRPH+40                                                00353000
+RPHSAVE1 EQU   RPHWORK                                                  00354000
+RPHSBITS EQU   RPHSAVE1+1                                               00355000
+ISTPST   EQU   0                                                        00356000
+PSTRQFGA EQU   ISTPST+8                                                 00357000
+PSTRQUE  EQU   PSTRQFGA                                                 00358000
+PSTFLGA  EQU   PSTRQFGA+4                                               00359000
+PSTIRBU1 EQU   PSTFLGA                                                  00360000
+PSTABINP EQU   PSTFLGA                                                  00361000
+PSTIQE11 EQU   ISTPST+40                                                00362000
+PSTIQE12 EQU   ISTPST+44                                                00363000
+PSTIQE21 EQU   ISTPST+48                                                00364000
+PSTIQE22 EQU   ISTPST+52                                                00365000
+PSTSAVE  EQU   ISTPST+96                                                00366000
+PSTDMPS  EQU   ISTPST+132                                               00367000
+ISTXDYP  EQU   0                                                        00368000
+ISTXPAB  EQU   0                                                        00369000
+CVTS01   EQU   CVTPGSIA                                                 00370000
+CVTLPDIA EQU   CVTS01+12                                                00371000
+CVTDIRST EQU   CVTLPDIA                                                 00372000
+CVTSLIDA EQU   CVTS01+24                                                00373000
+CVTCTLFG EQU   CVTS01+50                                                00374000
+CVTRV210 EQU   CVTS01+424                                               00375000
+CVTRV219 EQU   CVTS01+425                                               00376000
+CVTRV228 EQU   CVTS01+426                                               00377000
+CVTRV237 EQU   CVTS01+427                                               00378000
+CVTMFRTR EQU   CVTS01+452                                               00379000
+CVTRV262 EQU   CVTS01+468                                               00380000
+CVTRV271 EQU   CVTS01+469                                               00381000
+CVTRV280 EQU   CVTS01+470                                               00382000
+CVTRV289 EQU   CVTS01+471                                               00383000
+CVTGSDA  EQU   CVTS01+600                                               00384000
+FLC      EQU   PSA                                                      00385000
+PSARSVTE EQU   PSARSVT                                                  00386000
+PABXTNSN EQU   PABEND                                                   00387000
+PSTSAVE8 EQU   PSTSAVE+8                                                00388000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00389000
+@NM00030 EQU   PABXTNSN+12                                              00390000
+PABNPSSQ EQU   PABXTNSN+8                                               00391000
+PABLOCK  EQU   PABXTNSN+4                                               00392000
+PABLAST  EQU   PABXTNSN                                                 00393000
+PSARSAV  EQU   PSARSVTE+60                                              00394000
+PSARSTK  EQU   PSARSVTE+56                                              00395000
+PSAESAV3 EQU   PSARSVTE+52                                              00396000
+PSAESTK3 EQU   PSARSVTE+48                                              00397000
+PSAESAV2 EQU   PSARSVTE+44                                              00398000
+PSAESTK2 EQU   PSARSVTE+40                                              00399000
+PSAESAV1 EQU   PSARSVTE+36                                              00400000
+PSAESTK1 EQU   PSARSVTE+32                                              00401000
+PSAPSAV  EQU   PSARSVTE+28                                              00402000
+PSAPSTK  EQU   PSARSVTE+24                                              00403000
+PSAMSAV  EQU   PSARSVTE+20                                              00404000
+PSAMSTK  EQU   PSARSVTE+16                                              00405000
+PSASSAV  EQU   PSARSVTE+12                                              00406000
+PSASSTK  EQU   PSARSVTE+8                                               00407000
+PSANSTK  EQU   PSARSVTE+4                                               00408000
+PSACSTK  EQU   PSARSVTE                                                 00409000
+CVTRV628 EQU   CVTS01+728                                               00410000
+CVTRV627 EQU   CVTS01+724                                               00411000
+CVTRV626 EQU   CVTS01+720                                               00412000
+CVTRV625 EQU   CVTS01+716                                               00413000
+CVTRV624 EQU   CVTS01+712                                               00414000
+CVTRV623 EQU   CVTS01+708                                               00415000
+CVTRV622 EQU   CVTS01+704                                               00416000
+CVTRV621 EQU   CVTS01+700                                               00417000
+CVTIHASU EQU   CVTS01+696                                               00418000
+CVTSUSP  EQU   CVTS01+692                                               00419000
+CVTT6SVC EQU   CVTS01+688                                               00420000
+CVTCDAL  EQU   CVTS01+684                                               00421000
+CVTTCTL  EQU   CVTS01+680                                               00422000
+CVTRSUME EQU   CVTS01+676                                               00423000
+CVTJTERM EQU   CVTS01+672                                               00424000
+CVTASMRM EQU   CVTS01+668                                               00425000
+CVTTCASP EQU   CVTS01+664                                               00426000
+CVT0PT03 EQU   CVTS01+660                                               00427000
+CVT0PT0E EQU   CVTS01+656                                               00428000
+CVTRV609 EQU   CVTS01+652                                               00429000
+CVTCGK   EQU   CVTS01+648                                               00430000
+CVTRAC   EQU   CVTS01+644                                               00431000
+CVTRV606 EQU   CVTS01+640                                               00432000
+CVTRV605 EQU   CVTS01+636                                               00433000
+CVTRV604 EQU   CVTS01+632                                               00434000
+CVTEFF02 EQU   CVTS01+628                                               00435000
+CVTCBBR  EQU   CVTS01+624                                               00436000
+CVTSSCR  EQU   CVTS01+620                                               00437000
+CVTEVENT EQU   CVTS01+616                                               00438000
+CVTCRCA  EQU   CVTS01+612                                               00439000
+CVTTPIO  EQU   CVTS01+608                                               00440000
+CVTADV   EQU   CVTS01+604                                               00441000
+CVTGSDAB EQU   CVTGSDA                                                  00442000
+CVTQV3   EQU   CVTS01+596                                               00443000
+CVTQV2   EQU   CVTS01+592                                               00444000
+CVTQV1   EQU   CVTS01+588                                               00445000
+CVTRPT   EQU   CVTS01+584                                               00446000
+CVTSSRB  EQU   CVTS01+580                                               00447000
+CVTCSDRL EQU   CVTS01+576                                               00448000
+CVTEXP1  EQU   CVTS01+572                                               00449000
+CVTRMPMT EQU   CVTS01+568                                               00450000
+CVTRMPTT EQU   CVTS01+564                                               00451000
+CVTVPSA  EQU   CVTS01+560                                               00452000
+CVTVSTOP EQU   CVTS01+556                                               00453000
+CVTGTFR8 EQU   CVTS01+552                                               00454000
+CVTQUIT  EQU   CVTS01+548                                               00455000
+CVTVACR  EQU   CVTS01+544                                               00456000
+CVTWTCB  EQU   CVTS01+540                                               00457000
+CVTSTPRS EQU   CVTS01+536                                               00458000
+CVT0PT02 EQU   CVTS01+532                                               00459000
+CVTDARCM EQU   CVTS01+528                                               00460000
+CVTIRECM EQU   CVTS01+524                                               00461000
+CVTJRECM EQU   CVTS01+520                                               00462000
+CVTVEMS0 EQU   CVTS01+516                                               00463000
+CVTSPFRR EQU   CVTS01+512                                               00464000
+CVTRLSTG EQU   CVTS01+508                                               00465000
+CVT0TC0A EQU   CVTS01+504                                               00466000
+CVTGMBR  EQU   CVTS01+500                                               00467000
+CVTLFRM  EQU   CVTS01+496                                               00468000
+CVTRMBR  EQU   CVTS01+492                                               00469000
+CVTVIOP  EQU   CVTS01+488                                               00470000
+CVTRV307 EQU   CVTS01+486                                               00471000
+CVTRV306 EQU   CVTS01+484                                               00472000
+CVTRV305 EQU   CVTS01+482                                               00473000
+CVTRV304 EQU   CVTS01+480                                               00474000
+CVTRV303 EQU   CVTS01+478                                               00475000
+CVTRV302 EQU   CVTS01+476                                               00476000
+CVTTRCA  EQU   CVTS01+472                                               00477000
+CVTRV297 EQU   CVTRV289                                                 00478000
+CVTRV296 EQU   CVTRV289                                                 00479000
+CVTRV295 EQU   CVTRV289                                                 00480000
+CVTRV294 EQU   CVTRV289                                                 00481000
+CVTRV293 EQU   CVTRV289                                                 00482000
+CVTRV292 EQU   CVTRV289                                                 00483000
+CVTRV291 EQU   CVTRV289                                                 00484000
+CVTRV290 EQU   CVTRV289                                                 00485000
+CVTRV288 EQU   CVTRV280                                                 00486000
+CVTRV287 EQU   CVTRV280                                                 00487000
+CVTRV286 EQU   CVTRV280                                                 00488000
+CVTRV285 EQU   CVTRV280                                                 00489000
+CVTRV284 EQU   CVTRV280                                                 00490000
+CVTRV283 EQU   CVTRV280                                                 00491000
+CVTRV282 EQU   CVTRV280                                                 00492000
+CVTRV281 EQU   CVTRV280                                                 00493000
+CVTRV279 EQU   CVTRV271                                                 00494000
+CVTRV278 EQU   CVTRV271                                                 00495000
+CVTRV277 EQU   CVTRV271                                                 00496000
+CVTRV276 EQU   CVTRV271                                                 00497000
+CVTRV275 EQU   CVTRV271                                                 00498000
+CVTRV274 EQU   CVTRV271                                                 00499000
+CVTRV273 EQU   CVTRV271                                                 00500000
+CVTRV272 EQU   CVTRV271                                                 00501000
+CVTRV270 EQU   CVTRV262                                                 00502000
+CVTRV269 EQU   CVTRV262                                                 00503000
+CVTRV268 EQU   CVTRV262                                                 00504000
+CVTRV267 EQU   CVTRV262                                                 00505000
+CVTRV266 EQU   CVTRV262                                                 00506000
+CVTRV265 EQU   CVTRV262                                                 00507000
+CVTRV264 EQU   CVTRV262                                                 00508000
+CVTRV263 EQU   CVTRV262                                                 00509000
+CVTVFP   EQU   CVTS01+464                                               00510000
+CVTVSI   EQU   CVTS01+460                                               00511000
+CVTVPSIB EQU   CVTS01+456                                               00512000
+CVTMFACT EQU   CVTMFRTR                                                 00513000
+CVTMFCTL EQU   CVTS01+448                                               00514000
+CVTPVBP  EQU   CVTS01+444                                               00515000
+CVTPWI   EQU   CVTS01+440                                               00516000
+CVTRV254 EQU   CVTS01+438                                               00517000
+CVTRV253 EQU   CVTS01+436                                               00518000
+CVTRV252 EQU   CVTS01+434                                               00519000
+CVTRV251 EQU   CVTS01+433                                               00520000
+CVTRV250 EQU   CVTS01+432                                               00521000
+CVTRV249 EQU   CVTS01+431                                               00522000
+CVTRV248 EQU   CVTS01+430                                               00523000
+CVTRV247 EQU   CVTS01+429                                               00524000
+CVTRV246 EQU   CVTS01+428                                               00525000
+CVTRV245 EQU   CVTRV237                                                 00526000
+CVTRV244 EQU   CVTRV237                                                 00527000
+CVTRV243 EQU   CVTRV237                                                 00528000
+CVTRV242 EQU   CVTRV237                                                 00529000
+CVTRV241 EQU   CVTRV237                                                 00530000
+CVTRV240 EQU   CVTRV237                                                 00531000
+CVTRV239 EQU   CVTRV237                                                 00532000
+CVTRV238 EQU   CVTRV237                                                 00533000
+CVTRV236 EQU   CVTRV228                                                 00534000
+CVTRV235 EQU   CVTRV228                                                 00535000
+CVTRV234 EQU   CVTRV228                                                 00536000
+CVTRV233 EQU   CVTRV228                                                 00537000
+CVTRV232 EQU   CVTRV228                                                 00538000
+CVTRV231 EQU   CVTRV228                                                 00539000
+CVTRV230 EQU   CVTRV228                                                 00540000
+CVTRV229 EQU   CVTRV228                                                 00541000
+CVTRV227 EQU   CVTRV219                                                 00542000
+CVTRV226 EQU   CVTRV219                                                 00543000
+CVTRV225 EQU   CVTRV219                                                 00544000
+CVTRV224 EQU   CVTRV219                                                 00545000
+CVTRV223 EQU   CVTRV219                                                 00546000
+CVTRV222 EQU   CVTRV219                                                 00547000
+CVTRV221 EQU   CVTRV219                                                 00548000
+CVTRV220 EQU   CVTRV219                                                 00549000
+CVTRV218 EQU   CVTRV210                                                 00550000
+CVTRV217 EQU   CVTRV210                                                 00551000
+CVTRV216 EQU   CVTRV210                                                 00552000
+CVTRV215 EQU   CVTRV210                                                 00553000
+CVTRV214 EQU   CVTRV210                                                 00554000
+CVTRV213 EQU   CVTRV210                                                 00555000
+CVTRV212 EQU   CVTRV210                                                 00556000
+CVTRV211 EQU   CVTRV210                                                 00557000
+CVTLCCAT EQU   CVTS01+420                                               00558000
+CVTPCCAT EQU   CVTS01+416                                               00559000
+CVTIPCRP EQU   CVTS01+412                                               00560000
+CVTIPCRI EQU   CVTS01+408                                               00561000
+CVTIPCDS EQU   CVTS01+404                                               00562000
+CVTAIDVT EQU   CVTS01+400                                               00563000
+CVTSSAP  EQU   CVTS01+396                                               00564000
+CVTEHCIR EQU   CVTS01+392                                               00565000
+CVTEHDEF EQU   CVTS01+388                                               00566000
+CVTDAIR  EQU   CVTS01+384                                               00567000
+CVTPERFM EQU   CVTS01+380                                               00568000
+CVT044R2 EQU   CVTS01+376                                               00569000
+CVTFETCH EQU   CVTS01+372                                               00570000
+CVTRSTWD EQU   CVTS01+368                                               00571000
+CVTSPOST EQU   CVTS01+364                                               00572000
+CVTIOBP  EQU   CVTS01+360                                               00573000
+CVTASMVT EQU   CVTS01+356                                               00574000
+CVTRECRQ EQU   CVTS01+352                                               00575000
+CVTWSAC  EQU   CVTS01+348                                               00576000
+CVTRV149 EQU   CVTS01+344                                               00577000
+CVTWSAL  EQU   CVTS01+340                                               00578000
+CVTSPSA  EQU   CVTS01+336                                               00579000
+CVTGLMN  EQU   CVTS01+332                                               00580000
+CVTVEAC0 EQU   CVTS01+328                                               00581000
+CVT062R1 EQU   CVTS01+324                                               00582000
+CVTRPOST EQU   CVTS01+320                                               00583000
+CVTDQIQE EQU   CVTS01+316                                               00584000
+CVTCSD   EQU   CVTS01+312                                               00585000
+CVTLKRMA EQU   CVTS01+308                                               00586000
+CVTRSPIE EQU   CVTS01+304                                               00587000
+CVTRENQ  EQU   CVTS01+300                                               00588000
+CVTLQCB  EQU   CVTS01+296                                               00589000
+CVTFQCB  EQU   CVTS01+292                                               00590000
+CVTQCS01 EQU   CVTS01+288                                               00591000
+CVTAPFT  EQU   CVTS01+284                                               00592000
+CVTPARRL EQU   CVTS01+280                                               00593000
+CVTVWAIT EQU   CVTS01+276                                               00594000
+CVTGSPL  EQU   CVTS01+272                                               00595000
+CVTLSMQ  EQU   CVTS01+268                                               00596000
+CVTGSMQ  EQU   CVTS01+264                                               00597000
+CVTEXPRO EQU   CVTS01+260                                               00598000
+CVTOPCTP EQU   CVTS01+256                                               00599000
+CVTSIC   EQU   CVTS01+252                                               00600000
+CVTTPIOS EQU   CVTS01+248                                               00601000
+CVTRTMS  EQU   CVTS01+244                                               00602000
+CVTSDBF  EQU   CVTS01+240                                               00603000
+CVTSCBP  EQU   CVTS01+236                                               00604000
+CVTSDMP  EQU   CVTS01+232                                               00605000
+CVTSV60  EQU   CVTS01+228                                               00606000
+CVTRTMCT EQU   CVTS01+224                                               00607000
+CVTASCBL EQU   CVTS01+220                                               00608000
+CVTASCBH EQU   CVTS01+216                                               00609000
+CVTGDA   EQU   CVTS01+212                                               00610000
+CVTASVT  EQU   CVTS01+208                                               00611000
+CVTVVMDI EQU   CVTS01+204                                               00612000
+CVTAQTOP EQU   CVTS01+200                                               00613000
+CVTIOSCS EQU   CVTS01+196                                               00614000
+CVTSDRM  EQU   CVTS01+192                                               00615000
+CVTOPTE  EQU   CVTS01+188                                               00616000
+CVTSTXU  EQU   CVTS01+184                                               00617000
+CVTQUIS  EQU   CVTS01+180                                               00618000
+CVTPARS  EQU   CVTS01+176                                               00619000
+CVTS1EE  EQU   CVTS01+172                                               00620000
+CVTFRAS  EQU   CVTS01+168                                               00621000
+CVTQSAS  EQU   CVTS01+164                                               00622000
+CVTCRAS  EQU   CVTS01+160                                               00623000
+CVTCRMN  EQU   CVTS01+156                                               00624000
+CVTDELCP EQU   CVTS01+152                                               00625000
+CVTFRECL EQU   CVTS01+148                                               00626000
+CVTGETCL EQU   CVTS01+144                                               00627000
+CVTBLDCP EQU   CVTS01+140                                               00628000
+CVTAUTHL EQU   CVTS01+136                                               00629000
+CVTSCAN  EQU   CVTS01+132                                               00630000
+CVTRV144 EQU   CVTS01+130                                               00631000
+CVTMAXMP EQU   CVTS01+128                                               00632000
+CVTSTCK  EQU   CVTS01+124                                               00633000
+CVTRV139 EQU   CVTS01+123                                               00634000
+CVTDSSAC EQU   CVTS01+122                                               00635000
+CVTRV513 EQU   CVTS01+121                                               00636000
+CVTIOSPL EQU   CVTS01+120                                               00637000
+CVTPTGT  EQU   CVTS01+116                                               00638000
+CVTCSPIE EQU   CVTS01+112                                               00639000
+CVTSMFEX EQU   CVTS01+108                                               00640000
+CVTOLT0A EQU   CVTS01+104                                               00641000
+CVTSRBRT EQU   CVTS01+100                                               00642000
+CVTPUTL  EQU   CVTS01+96                                                00643000
+CVTASCRL EQU   CVTS01+92                                                00644000
+CVTASCRF EQU   CVTS01+88                                                00645000
+CVTRV326 EQU   CVTS01+84                                                00646000
+CVTRV325 EQU   CVTS01+80                                                00647000
+CVTRV324 EQU   CVTS01+76                                                00648000
+CVT0VL01 EQU   CVTS01+72                                                00649000
+CVTSHRVM EQU   CVTS01+68                                                00650000
+CVTRV332 EQU   CVTS01+64                                                00651000
+CVTTAS   EQU   CVTS01+60                                                00652000
+CVTRSCN  EQU   CVTS01+56                                                00653000
+CVTTRAC2 EQU   CVTS01+54                                                00654000
+CVTTRACE EQU   CVTS01+52                                                00655000
+CVTAPG   EQU   CVTS01+51                                                00656000
+CVTSDTRC EQU   CVTCTLFG                                                 00657000
+CVTGTRCE EQU   CVTCTLFG                                                 00658000
+CVTNOMP  EQU   CVTCTLFG                                                 00659000
+CVTRSV79 EQU   CVTCTLFG                                                 00660000
+CVTDSTAT EQU   CVTCTLFG                                                 00661000
+CVTRSV78 EQU   CVTCTLFG                                                 00662000
+CVTRV333 EQU   CVTCTLFG                                                 00663000
+CVTRV323 EQU   CVTCTLFG                                                 00664000
+CVTSPVLK EQU   CVTS01+49                                                00665000
+CVTRSV77 EQU   CVTS01+48                                                00666000
+CVTRV331 EQU   CVTS01+44                                                00667000
+CVTRV330 EQU   CVTS01+40                                                00668000
+CVTRV329 EQU   CVTS01+36                                                00669000
+CVTRV328 EQU   CVTS01+32                                                00670000
+CVTRV322 EQU   CVTS01+28                                                00671000
+CVTSLID  EQU   CVTSLIDA+1                                               00672000
+CVTSYLK  EQU   CVTSLIDA                                                 00673000
+CVTRV321 EQU   CVTS01+20                                                00674000
+CVTRV320 EQU   CVTS01+16                                                00675000
+CVTLPDIR EQU   CVTLPDIA+1                                               00676000
+CVTRSV69 EQU   CVTDIRST                                                 00677000
+CVTRSV68 EQU   CVTDIRST                                                 00678000
+CVTRSV67 EQU   CVTDIRST                                                 00679000
+CVTRSV66 EQU   CVTDIRST                                                 00680000
+CVTRSV65 EQU   CVTDIRST                                                 00681000
+CVTRSV64 EQU   CVTDIRST                                                 00682000
+CVTRSV63 EQU   CVTDIRST                                                 00683000
+CVTDICOM EQU   CVTDIRST                                                 00684000
+CVTPVTP  EQU   CVTS01+8                                                 00685000
+CVTLPDSR EQU   CVTS01+4                                                 00686000
+CVTGETL  EQU   CVTS01                                                   00687000
+PSTDRDYQ EQU   PSTDMPS+1                                                00688000
+@NM00036 EQU   PSTDMPS                                                  00689000
+PSTDGATE EQU   PSTDMPS                                                  00690000
+PSTDEBP  EQU   ISTPST+128                                               00691000
+PSTSMDYP EQU   ISTPST+64                                                00692000
+PSTCRRS  EQU   ISTPST+60                                                00693000
+PSTCRR1  EQU   ISTPST+56                                                00694000
+PSTUEQ   EQU   ISTPST+36                                                00695000
+PSTNSSQ  EQU   ISTPST+32                                                00696000
+PSTPSSQ  EQU   ISTPST+28                                                00697000
+PSTACBCT EQU   ISTPST+24                                                00698000
+PSTMPSTP EQU   ISTPST+20                                                00699000
+PSTTCBA  EQU   ISTPST+16                                                00700000
+PSTRSV08 EQU   PSTFLGA+1                                                00701000
+PSTPEND  EQU   PSTFLGA+1                                                00702000
+PSTDMPC  EQU   PSTFLGA+1                                                00703000
+PSTABEND EQU   PSTABINP                                                 00704000
+PSTAUTH  EQU   PSTFLGA                                                  00705000
+PSTSMCU  EQU   PSTFLGA                                                  00706000
+PSTSMQR  EQU   PSTFLGA                                                  00707000
+PSTIRBU2 EQU   PSTFLGA                                                  00708000
+PSTUERN  EQU   PSTFLGA                                                  00709000
+PSTSSRN  EQU   PSTFLGA                                                  00710000
+PSTRQUEA EQU   PSTRQUE+1                                                00711000
+PSTRSV07 EQU   PSTRQUE                                                  00712000
+PSTRSV06 EQU   PSTRQUE                                                  00713000
+PSTRSV05 EQU   PSTRQUE                                                  00714000
+PSTRSV04 EQU   PSTRQUE                                                  00715000
+PSTRSV03 EQU   PSTRQUE                                                  00716000
+PSTRSV02 EQU   PSTRQUE                                                  00717000
+PSTRSV01 EQU   PSTRQUE                                                  00718000
+PSTRQFLG EQU   PSTRQUE                                                  00719000
+PSTCHAIN EQU   ISTPST+4                                                 00720000
+@NM00035 EQU   ISTPST+2                                                 00721000
+PSTLNGTH EQU   ISTPST+1                                                 00722000
+PSTTYPE  EQU   ISTPST                                                   00723000
+RPHUPSTA EQU   ISTRPH+104                                               00724000
+RPHSAV16 EQU   RPHWORK+60                                               00725000
+RPHSAV15 EQU   RPHWORK+56                                               00726000
+RPHSAV14 EQU   RPHWORK+52                                               00727000
+RPHSAV13 EQU   RPHWORK+48                                               00728000
+RPHSAV12 EQU   RPHWORK+44                                               00729000
+RPHSAV11 EQU   RPHWORK+40                                               00730000
+RPHSAV10 EQU   RPHWORK+36                                               00731000
+RPHSAVE9 EQU   RPHWORK+32                                               00732000
+RPHSAVE8 EQU   RPHWORK+28                                               00733000
+RPHSAVE7 EQU   RPHWORK+24                                               00734000
+RPHSAVE6 EQU   RPHWORK+20                                               00735000
+RPHSAVE5 EQU   RPHWORK+16                                               00736000
+RPHSAVE4 EQU   RPHWORK+12                                               00737000
+RPHSAVE3 EQU   RPHWORK+8                                                00738000
+RPHSAVE2 EQU   RPHWORK+4                                                00739000
+RPHSHALF EQU   RPHSAVE1+2                                               00740000
+RPHSBIT8 EQU   RPHSBITS                                                 00741000
+RPHSBIT7 EQU   RPHSBITS                                                 00742000
+RPHSBIT6 EQU   RPHSBITS                                                 00743000
+RPHSBIT5 EQU   RPHSBITS                                                 00744000
+RPHSBIT4 EQU   RPHSBITS                                                 00745000
+RPHSBIT3 EQU   RPHSBITS                                                 00746000
+RPHSBIT2 EQU   RPHSBITS                                                 00747000
+RPHSBIT1 EQU   RPHSBITS                                                 00748000
+RPHSBYTE EQU   RPHSAVE1                                                 00749000
+RPHPABQP EQU   RPHPABQA+1                                               00750000
+RPHPABFG EQU   RPHPABQA                                                 00751000
+RPHCRR   EQU   ISTRPH+32                                                00752000
+RPHSRP34 EQU   RPHSRPRM+2                                               00753000
+RPHSRP12 EQU   RPHSRPRM                                                 00754000
+RPHWEGT  EQU   RPHCSPA                                                  00755000
+RPHMAJCB EQU   ISTRPH+21                                                00756000
+RPHPABOF EQU   ISTRPH+20                                                00757000
+RPHRESUM EQU   RPHRESMA+1                                               00758000
+@NM00034 EQU   RPHWPFLG                                                 00759000
+RPHPURGE EQU   RPHWPFLG                                                 00760000
+RPHPT    EQU   RPHWPFLG                                                 00761000
+RPHWT    EQU   RPHWPFLG                                                 00762000
+RPHRSKEY EQU   RPHWPFLG                                                 00763000
+RPHDVTA  EQU   ISTRPH+12                                                00764000
+RPHTIK   EQU   RPHTSKID+3                                               00765000
+@NM00033 EQU   RPHTSKID                                                 00766000
+RPHRPHAP EQU   RPHRPHA+1                                                00767000
+@NM00032 EQU   RPHRPHA                                                  00768000
+RPHGATE  EQU   RPHRPHA                                                  00769000
+RPHABEND EQU   RPHFLGB                                                  00770000
+RPHUWAIT EQU   RPHFLGB                                                  00771000
+RPHRLCRA EQU   RPHFLGB                                                  00772000
+@NM00031 EQU   RPHFLGB                                                  00773000
+RPHPGCMP EQU   RPHFLGB                                                  00774000
+RPHFBAPS EQU   RPHFLGB                                                  00775000
+RPHBSSP  EQU   RPHFLGB                                                  00776000
+RPHLOCK  EQU   RPHFLGB                                                  00777000
+RPHFNFLG EQU   RPHFSTLC                                                 00778000
+RPHMLTCP EQU   RPHFLAGS                                                 00779000
+RPHSMCLR EQU   RPHFLAGS                                                 00780000
+RPHSMTYP EQU   RPHFLAGS                                                 00781000
+RPHSMQ   EQU   RPHFLAGS                                                 00782000
+RPHAPTYP EQU   RPHFLAGS                                                 00783000
+RPHSPGIN EQU   RPHFLAGS                                                 00784000
+RPHOGIND EQU   RPHFLAGS                                                 00785000
+RPHLNGTH EQU   RPHCNTL+1                                                00786000
+RPHTYPE  EQU   RPHCNTL                                                  00787000
+DYPPAB   EQU   ISTDYPAB+16                                              00788000
+DYPOCRPH EQU   DYPPACMD                                                 00789000
+DYPTSKID EQU   ISTDYPAB+8                                               00790000
+DYPPACTB EQU   DYPCHAIN                                                 00791000
+DYPFLGS  EQU   ISTDYPAB+2                                               00792000
+DYPLNGTH EQU   ISTDYPAB+1                                               00793000
+DYPTYPE  EQU   ISTDYPAB                                                 00794000
+PABRPHA  EQU   PABRPHFG+1                                               00795000
+PABNODQ  EQU   PABFLAGS                                                 00796000
+PABINHBT EQU   PABFLAGS                                                 00797000
+PABERLOK EQU   PABERRLK                                                 00798000
+PABSSN   EQU   PABFLAGS                                                 00799000
+PABDYNAM EQU   PABFLAGS                                                 00800000
+PABXTND  EQU   PABFLAGS                                                 00801000
+PABPRIOR EQU   PABFLAGS                                                 00802000
+PABAPYP  EQU   PABFLAGS                                                 00803000
+PABDVTA  EQU   ISTPAB+9                                                 00804000
+PABOFFST EQU   ISTPAB+8                                                 00805000
+PABCHNGP EQU   PABCHAIN+1                                               00806000
+PABRSV02 EQU   PABCHAIN                                                 00807000
+PABDELAY EQU   PABCHAIN                                                 00808000
+PABQUED  EQU   PABRUNNG                                                 00809000
+PABRESET EQU   PABCHAIN                                                 00810000
+PABUNCON EQU   PABCHAIN                                                 00811000
+PABCDP   EQU   PABCHAIN                                                 00812000
+PABRESCH EQU   PABCHAIN                                                 00813000
+PABCHNG  EQU   PABCHAIN                                                 00814000
+PABWEQP  EQU   PABWEQA+1                                                00815000
+PABRSV01 EQU   PABWEQA                                                  00816000
+PABWEQG  EQU   PABWEQA                                                  00817000
+LOKXCL   EQU   @NM00028                                                 00818000
+LOKPRY   EQU   @NM00028                                                 00819000
+@NM00029 EQU   @NM00028                                                 00820000
+@NM00027 EQU   LOKCHNG                                                  00821000
+LOKCT    EQU   ISTLOK                                                   00822000
+CVTLEVL  EQU   CVTRELNO+2                                               00823000
+CVTNUMB  EQU   CVTRELNO                                                 00824000
+CVTMDL   EQU   CVTFIX+250                                               00825000
+@NM00002 EQU   CVTFIX+248                                               00826000
+@NM00001 EQU   CVTFIX                                                   00827000
+CVTRV482 EQU   CVTXTNT2+128                                             00828000
+CVTRV481 EQU   CVTXTNT2+124                                             00829000
+CVTRV480 EQU   CVTXTNT2+120                                             00830000
+CVTRV479 EQU   CVTXTNT2+118                                             00831000
+CVTRV478 EQU   CVTXTNT2+117                                             00832000
+CVTRV477 EQU   CVTXTNT2+116                                             00833000
+CVTRV476 EQU   CVTXTNT2+115                                             00834000
+CVTRV475 EQU   CVTXTNT2+114                                             00835000
+CVTRV474 EQU   CVTRV466                                                 00836000
+CVTRV473 EQU   CVTRV466                                                 00837000
+CVTRV472 EQU   CVTRV466                                                 00838000
+CVTRV471 EQU   CVTRV466                                                 00839000
+CVTRV470 EQU   CVTRV466                                                 00840000
+CVTRV469 EQU   CVTRV466                                                 00841000
+CVTRV468 EQU   CVTRV466                                                 00842000
+CVTRV467 EQU   CVTRV466                                                 00843000
+CVTRV465 EQU   CVTRV457                                                 00844000
+CVTRV464 EQU   CVTRV457                                                 00845000
+CVTRV463 EQU   CVTRV457                                                 00846000
+CVTRV462 EQU   CVTRV457                                                 00847000
+CVTRV461 EQU   CVTRV457                                                 00848000
+CVTRV460 EQU   CVTRV457                                                 00849000
+CVTRV459 EQU   CVTRV457                                                 00850000
+CVTRV458 EQU   CVTRV457                                                 00851000
+CVTRV456 EQU   CVTXTNT2+108                                             00852000
+CVTRV455 EQU   CVTXTNT2+104                                             00853000
+CVTRV454 EQU   CVTXTNT2+100                                             00854000
+CVTRV453 EQU   CVTXTNT2+96                                              00855000
+CVTRV452 EQU   CVTXTNT2+94                                              00856000
+CVTRV451 EQU   CVTXTNT2+92                                              00857000
+CVTRV450 EQU   CVTXTNT2+90                                              00858000
+CVTRV449 EQU   CVTXTNT2+88                                              00859000
+CVTRV448 EQU   CVTXTNT2+87                                              00860000
+CVTRV447 EQU   CVTXTNT2+86                                              00861000
+CVTRV446 EQU   CVTRV438                                                 00862000
+CVTRV445 EQU   CVTRV438                                                 00863000
+CVTRV444 EQU   CVTRV438                                                 00864000
+CVTRV443 EQU   CVTRV438                                                 00865000
+CVTRV442 EQU   CVTRV438                                                 00866000
+CVTRV441 EQU   CVTRV438                                                 00867000
+CVTRV440 EQU   CVTRV438                                                 00868000
+CVTRV439 EQU   CVTRV438                                                 00869000
+CVTRV437 EQU   CVTRV429                                                 00870000
+CVTRV436 EQU   CVTRV429                                                 00871000
+CVTRV435 EQU   CVTRV429                                                 00872000
+CVTRV434 EQU   CVTRV429                                                 00873000
+CVTRV433 EQU   CVTRV429                                                 00874000
+CVTRV432 EQU   CVTRV429                                                 00875000
+CVTRV431 EQU   CVTRV429                                                 00876000
+CVTRV430 EQU   CVTRV429                                                 00877000
+CVTRV428 EQU   CVTXTNT2+80                                              00878000
+CVTRV427 EQU   CVTXTNT2+76                                              00879000
+CVTRV426 EQU   CVTXTNT2+72                                              00880000
+CVTRV425 EQU   CVTXTNT2+68                                              00881000
+CVTATACT EQU   CVTATCVT                                                 00882000
+CVTRV423 EQU   CVTXTNT2+62                                              00883000
+CVTRV422 EQU   CVTXTNT2+60                                              00884000
+CVTRV421 EQU   CVTXTNT2+58                                              00885000
+CVTRV420 EQU   CVTXTNT2+56                                              00886000
+CVTRV419 EQU   CVTXTNT2+55                                              00887000
+CVTRV418 EQU   CVTXTNT2+54                                              00888000
+CVTRV417 EQU   CVTRV409                                                 00889000
+CVTRV416 EQU   CVTRV409                                                 00890000
+CVTRV415 EQU   CVTRV409                                                 00891000
+CVTRV414 EQU   CVTRV409                                                 00892000
+CVTRV413 EQU   CVTRV409                                                 00893000
+CVTRV412 EQU   CVTRV409                                                 00894000
+CVTRV411 EQU   CVTRV409                                                 00895000
+CVTRV410 EQU   CVTRV409                                                 00896000
+CVTRV408 EQU   CVTRV400                                                 00897000
+CVTRV407 EQU   CVTRV400                                                 00898000
+CVTRV406 EQU   CVTRV400                                                 00899000
+CVTRV405 EQU   CVTRV400                                                 00900000
+CVTRV404 EQU   CVTRV400                                                 00901000
+CVTRV403 EQU   CVTRV400                                                 00902000
+CVTRV402 EQU   CVTRV400                                                 00903000
+CVTRV401 EQU   CVTRV400                                                 00904000
+CVTICB   EQU   CVTXTNT2+48                                              00905000
+CVTSKTA  EQU   CVTXTNT2+44                                              00906000
+CVTCCVT  EQU   CVTXTNT2+40                                              00907000
+CVTRSV98 EQU   CVTXTNT2+36                                              00908000
+CVTRSV97 EQU   CVTXTNT2+34                                              00909000
+CVTRSV96 EQU   CVTXTNT2+32                                              00910000
+CVTOLTEP EQU   CVTXTNT2+28                                              00911000
+CVTQIDA  EQU   CVTQID+1                                                 00912000
+CVTRSV95 EQU   CVTQID                                                   00913000
+CVTRSV94 EQU   CVTXTNT2+20                                              00914000
+CVTRSV93 EQU   CVTXTNT2+16                                              00915000
+CVTRSV92 EQU   CVTXTNT2+12                                              00916000
+CVTDEBVR EQU   CVTXTNT2+8                                               00917000
+CVTRSV91 EQU   CVTXTNT2+6                                               00918000
+CVTRSV9H EQU   CVTFLGBT                                                 00919000
+CVTRSV9G EQU   CVTFLGBT                                                 00920000
+CVTRSV9F EQU   CVTFLGBT                                                 00921000
+CVTRSV9E EQU   CVTFLGBT                                                 00922000
+CVTRSV9D EQU   CVTFLGBT                                                 00923000
+CVTBAH   EQU   CVTFLGBT                                                 00924000
+CVTVME   EQU   CVTFLGBT                                                 00925000
+CVTNPE   EQU   CVTFLGBT                                                 00926000
+CVTNUCLS EQU   CVTXTNT2+4                                               00927000
+CVTDSSVA EQU   CVTDSSV+1                                                00928000
+CVTRSV89 EQU   CVTDSSV                                                  00929000
+CVTRSV88 EQU   CVTXTNT1+8                                               00930000
+CVTRSV87 EQU   CVTXTNT1+4                                               00931000
+CVTFACHN EQU   CVTXTNT1                                                 00932000
+CVTRV488 EQU   CVTMAP+412                                               00933000
+CVTRV487 EQU   CVTMAP+408                                               00934000
+CVTRV486 EQU   CVTMAP+404                                               00935000
+CVTRV485 EQU   CVTMAP+400                                               00936000
+CVTACTAP EQU   CVTMAP+396                                               00937000
+CVTAUTH  EQU   CVTMAP+392                                               00938000
+CVTRV490 EQU   CVTMAP+388                                               00939000
+CVTSU    EQU   CVTMAP+384                                               00940000
+CVTVOLT1 EQU   CVTVOLM1+1                                               00941000
+CVTVOLI1 EQU   CVTVOLF1                                                 00942000
+CVTSTOA  EQU   CVTMAP+376                                               00943000
+CVTRSV58 EQU   CVTMAP+374                                               00944000
+CVTRSV57 EQU   CVTMAP+372                                               00945000
+CVTDDCE  EQU   CVTMAP+368                                               00946000
+CVTPNWFR EQU   CVTMAP+364                                               00947000
+CVTSMF   EQU   CVTMAP+360                                               00948000
+CVTSULK  EQU   CVTMAP+358                                               00949000
+CVTSLKO  EQU   CVTSYSK                                                  00950000
+CVTSLKP  EQU   CVTSYSK                                                  00951000
+CVTSLKQ  EQU   CVTSYSK                                                  00952000
+CVTSLKR  EQU   CVTSYSK                                                  00953000
+CVTRSV56 EQU   CVTSYSK                                                  00954000
+CVTRSV55 EQU   CVTSYSK                                                  00955000
+CVTRSV54 EQU   CVTSYSK                                                  00956000
+CVTRSV53 EQU   CVTSYSK                                                  00957000
+CVTRSV52 EQU   CVTA1F1                                                  00958000
+CVTRSV51 EQU   CVTA1F1                                                  00959000
+CVTRSV50 EQU   CVTA1F1                                                  00960000
+CVTRSV49 EQU   CVTA1F1                                                  00961000
+CVTRSV48 EQU   CVTA1F1                                                  00962000
+CVTRSV47 EQU   CVTA1F1                                                  00963000
+CVTSRSW  EQU   CVTA1F1                                                  00964000
+CVTPFSW  EQU   CVTA1F1                                                  00965000
+CVTPCVT  EQU   CVTMAP+352                                               00966000
+CVTRSV46 EQU   CVTMAP+344                                               00967000
+CVTRSV45 EQU   CVTMAP+340                                               00968000
+CVTRSV44 EQU   CVTMAP+338                                               00969000
+CVTRSV43 EQU   CVTMAP+336                                               00970000
+CVTHJESA EQU   CVTHJES+1                                                00971000
+CVTRSV42 EQU   CVTHJES                                                  00972000
+CVTEXT2A EQU   CVTEXT2+1                                                00973000
+CVTRSV41 EQU   CVTEXT2                                                  00974000
+CVTAPFA  EQU   CVTAPF+1                                                 00975000
+CVTRSV40 EQU   CVTAPF                                                   00976000
+CVTRV518 EQU   CVTINTLA                                                 00977000
+CVTRV517 EQU   CVTERPV                                                  00978000
+CVTEORM  EQU   CVTMAP+312                                               00979000
+CVTMCHPR EQU   CVTMAP+308                                               00980000
+CVTTZ    EQU   CVTMAP+304                                               00981000
+CVTJEPS  EQU   CVTMAP+300                                               00982000
+CVTJESCT EQU   CVTMAP+296                                               00983000
+CVTMODE  EQU   CVTMAP+292                                               00984000
+CVTPTRV  EQU   CVTMAP+288                                               00985000
+CVTREAL  EQU   CVTMAP+284                                               00986000
+CVTRSV39 EQU   CVTMAP+280                                               00987000
+CVTRSV38 EQU   CVTMAP+276                                               00988000
+CVTDMSRA EQU   CVTDMSR+1                                                00989000
+CVTRV634 EQU   CVTDMSRF                                                 00990000
+CVTRV633 EQU   CVTDMSRF                                                 00991000
+CVTRV632 EQU   CVTDMSRF                                                 00992000
+CVTRV631 EQU   CVTDMSRF                                                 00993000
+CVTRV630 EQU   CVTDMSRF                                                 00994000
+CVTRV629 EQU   CVTDMSRF                                                 00995000
+CVTUDUMP EQU   CVTDMSRF                                                 00996000
+CVTSDUMP EQU   CVTDMSRF                                                 00997000
+CVTQMSGA EQU   CVTQMSG+1                                                00998000
+CVTRSV36 EQU   CVTQMSG                                                  00999000
+CVTAMFF  EQU   CVTMAP+264                                               01000000
+CVTPURGA EQU   CVTPURG+1                                                01001000
+CVTRSV35 EQU   CVTPURG                                                  01002000
+CVTCBSP  EQU   CVTMAP+256                                               01003000
+CVTATERA EQU   CVTATER+1                                                01004000
+CVTSYST  EQU   CVTATER                                                  01005000
+CVTVOLT2 EQU   CVTTAT                                                   01006000
+CVTVOLI2 EQU   CVTVOLF2                                                 01007000
+CVTAQAVB EQU   CVTAQAVT+1                                               01008000
+CVTRSV34 EQU   CVTTCMFG                                                 01009000
+CVTRSV33 EQU   CVTTCMFG                                                 01010000
+CVTRSV32 EQU   CVTTCMFG                                                 01011000
+CVTRSV31 EQU   CVTTCMFG                                                 01012000
+CVTRSV30 EQU   CVTTCMFG                                                 01013000
+CVTRSV29 EQU   CVTTCMFG                                                 01014000
+CVTLDEV  EQU   CVTTCMFG                                                 01015000
+CVTTCRDY EQU   CVTTCMFG                                                 01016000
+CVTGTFA  EQU   CVTGTF+1                                                 01017000
+CVTRSV27 EQU   CVTGTFST                                                 01018000
+CVTRNIO  EQU   CVTGTFST                                                 01019000
+CVTUSR   EQU   CVTGTFST                                                 01020000
+CVTRV318 EQU   CVTFORM                                                  01021000
+CVTRV317 EQU   CVTTMODE                                                 01022000
+CVTRV316 EQU   CVTSTATE                                                 01023000
+CVTRV315 EQU   CVTGTFS                                                  01024000
+CVTGTFAV EQU   CVTGTFS                                                  01025000
+CVT0SCR1 EQU   CVTMAP+232                                               01026000
+CVTRV515 EQU   CVTMAP+228                                               01027000
+CVTRMS   EQU   CVTMAP+224                                               01028000
+CVTPATCH EQU   CVTMAP+220                                               01029000
+CVTTSCE  EQU   CVTMAP+216                                               01030000
+CVTLNKSC EQU   CVTMAP+214                                               01031000
+CVTQABST EQU   CVTMAP+212                                               01032000
+CVTMDLDS EQU   CVTMAP+208                                               01033000
+CVTUSER  EQU   CVTMAP+204                                               01034000
+CVTABEND EQU   CVTMAP+200                                               01035000
+CVTSMCA  EQU   CVTMAP+196                                               01036000
+CVTRSV18 EQU   CVTMAP+192                                               01037000
+CVTQLPAQ EQU   CVTMAP+188                                               01038000
+CVTQCDSR EQU   CVTMAP+184                                               01039000
+CVTVS1B  EQU   CVTOPTB                                                  01040000
+CVTVS1A  EQU   CVTOPTB                                                  01041000
+CVTFP    EQU   CVTOPTB                                                  01042000
+CVTAPTHR EQU   CVTOPTB                                                  01043000
+CVTNLOG  EQU   CVTOPTB                                                  01044000
+CVTTOD   EQU   CVTOPTB                                                  01045000
+CVTCTIMS EQU   CVTOPTB                                                  01046000
+CVTPROT  EQU   CVTOPTB                                                  01047000
+CVTXPFP  EQU   CVTOPTA                                                  01048000
+CVTASCII EQU   CVTOPTA                                                  01049000
+CVTRSV13 EQU   CVTOPTA                                                  01050000
+CVTRSV12 EQU   CVTOPTA                                                  01051000
+CVTNIP   EQU   CVTOPTA                                                  01052000
+CVTDDR   EQU   CVTOPTA                                                  01053000
+CVTAPR   EQU   CVTOPTA                                                  01054000
+CVTCCH   EQU   CVTOPTA                                                  01055000
+CVTSNCTR EQU   CVTMAP+180                                               01056000
+CVTQMWR  EQU   CVTMAP+176                                               01057000
+CVTQOCR  EQU   CVTMAP+172                                               01058000
+CVT1EF00 EQU   CVTMAP+168                                               01059000
+CVTMZ00  EQU   CVTMAP+164                                               01060000
+CVTHEAD  EQU   CVTMAP+160                                               01061000
+CVTRSV11 EQU   CVTMAP+156                                               01062000
+CVT0PT01 EQU   CVTMAP+152                                               01063000
+CVTMSER  EQU   CVTMAP+148                                               01064000
+CVTRV516 EQU   CVTIERLC                                                 01065000
+CVTILCH  EQU   CVTMAP+140                                               01066000
+CVT0DS   EQU   CVTMAP+136                                               01067000
+CVTFBOSV EQU   CVTMAP+132                                               01068000
+CVTNUCB  EQU   CVTMAP+128                                               01069000
+CVTIXAVL EQU   CVTMAP+124                                               01070000
+CVTIOQET EQU   CVTMAP+120                                               01071000
+CVTDCBA  EQU   CVTMAP+117                                               01072000
+CVTMVS2  EQU   CVTDCB                                                   01073000
+CVT6DAT  EQU   CVTDCB                                                   01074000
+CVT4MPS  EQU   CVTDCB                                                   01075000
+CVTRSV09 EQU   CVTDCB                                                   01076000
+CVT4MS1  EQU   CVTDCB                                                   01077000
+CVT2SPS  EQU   CVTDCB                                                   01078000
+CVT1SSS  EQU   CVTDCB                                                   01079000
+CVTRSV08 EQU   CVTDCB                                                   01080000
+CVTSTB   EQU   CVTMAP+112                                               01081000
+CVTQTD00 EQU   CVTMAP+108                                               01082000
+CVTQTE00 EQU   CVTMAP+104                                               01083000
+CVTCUCB  EQU   CVTMAP+100                                               01084000
+CVTSJQ   EQU   CVTMAP+96                                                01085000
+CVTPBLDL EQU   CVTMAP+92                                                01086000
+CVTTPC   EQU   CVTMAP+88                                                01087000
+CVTSVDCB EQU   CVTMAP+84                                                01088000
+CVTBRET  EQU   CVTMAP+82                                                01089000
+CVTEXIT  EQU   CVTMAP+80                                                01090000
+CVT0FN00 EQU   CVTMAP+76                                                01091000
+CVTDARA  EQU   CVTDAR+1                                                 01092000
+CVTRSV07 EQU   CVTFLGS1                                                 01093000
+CVTRSV06 EQU   CVTFLGS1                                                 01094000
+CVTRSV05 EQU   CVTFLGS1                                                 01095000
+CVTRSV04 EQU   CVTFLGS1                                                 01096000
+CVTRSV03 EQU   CVTFLGS1                                                 01097000
+CVTRSV02 EQU   CVTFLGS1                                                 01098000
+CVTRSV01 EQU   CVTFLGS1                                                 01099000
+CVTDMPLK EQU   CVTFLGS1                                                 01100000
+CVTXITP  EQU   CVTMAP+68                                                01101000
+CVTZDTAB EQU   CVTMAP+64                                                01102000
+CVTMSLT  EQU   CVTMAP+60                                                01103000
+CVTDATE  EQU   CVTMAP+56                                                01104000
+CVTBTERM EQU   CVTMAP+52                                                01105000
+CVTSYSAD EQU   CVTMAP+48                                                01106000
+CVTXTLER EQU   CVTMAP+44                                                01107000
+CVTILK2  EQU   CVTMAP+40                                                01108000
+CVTILK1  EQU   CVTMAP+36                                                01109000
+CVTPRLTV EQU   CVTMAP+32                                                01110000
+CVTPCNVT EQU   CVTMAP+28                                                01111000
+CVT0VL00 EQU   CVTMAP+24                                                01112000
+CVTXAPG  EQU   CVTMAP+20                                                01113000
+CVTBUF   EQU   CVTMAP+16                                                01114000
+CVTJOB   EQU   CVTMAP+12                                                01115000
+CVTLINK  EQU   CVTMAP+8                                                 01116000
+CVTTCBP  EQU   CVTMAP                                                   01117000
+CVT      EQU   CVTMAP                                                   01118000
+@NM00026 EQU   PSA+3668                                                 01119000
+PSASTAK  EQU   PSA+3072                                                 01120000
+@NM00025 EQU   PSA+1048                                                 01121000
+PSAUSEND EQU   PSA+1048                                                 01122000
+PSARV062 EQU   PSA+1044                                                 01123000
+PSACDAL  EQU   PSA+1040                                                 01124000
+PSAWTCOD EQU   PSA+1036                                                 01125000
+PSAATCVT EQU   PSA+1032                                                 01126000
+PSAPCPSW EQU   PSA+1024                                                 01127000
+PSAPIR2  EQU   PSA+1020                                                 01128000
+PSARV059 EQU   PSA+1018                                                 01129000
+PSASVC13 EQU   PSA+1016                                                 01130000
+PSALSFCC EQU   PSA+1012                                                 01131000
+PSASFACC EQU   PSA+1008                                                 01132000
+PSASTOP  EQU   PSA+992                                                  01133000
+PSASTART EQU   PSA+976                                                  01134000
+PSARSPSW EQU   PSA+968                                                  01135000
+PSASRPSW EQU   PSA+960                                                  01136000
+PSARV045 EQU   PSA+892                                                  01137000
+PSARV044 EQU   PSA+888                                                  01138000
+PSARV043 EQU   PSA+884                                                  01139000
+PSARV042 EQU   PSA+880                                                  01140000
+PSARV041 EQU   PSA+876                                                  01141000
+PSARV040 EQU   PSA+872                                                  01142000
+PSARV025 EQU   PSA+868                                                  01143000
+PSADSSED EQU   PSA+868                                                  01144000
+PSADSSPR EQU   PSA+864                                                  01145000
+PSADSSFW EQU   PSA+860                                                  01146000
+PSADSS14 EQU   PSA+856                                                  01147000
+PSADSSPP EQU   PSA+848                                                  01148000
+PSADSSRP EQU   PSA+840                                                  01149000
+PSADSS05 EQU   PSADSSF4                                                 01150000
+PSADSS10 EQU   PSADSSF4                                                 01151000
+PSADSSVE EQU   PSADSSF4                                                 01152000
+PSADSSDE EQU   PSADSSF4                                                 01153000
+PSADSSC0 EQU   PSADSSF4                                                 01154000
+PSADSSIE EQU   PSADSSF4                                                 01155000
+PSADSS12 EQU   PSADSSF4                                                 01156000
+PSADSSRC EQU   PSADSSF4                                                 01157000
+PSARV057 EQU   PSADSSF3                                                 01158000
+PSARV056 EQU   PSADSSF3                                                 01159000
+PSARV055 EQU   PSADSSF3                                                 01160000
+PSADSSMC EQU   PSADSSF3                                                 01161000
+PSADSSRW EQU   PSADSSF3                                                 01162000
+PSADSSNM EQU   PSADSSF3                                                 01163000
+PSADSSES EQU   PSADSSF3                                                 01164000
+PSADSSGP EQU   PSADSSF3                                                 01165000
+PSADSSF2 EQU   PSADSSFL+1                                               01166000
+PSADSSPI EQU   PSADSSF1                                                 01167000
+PSADSSOI EQU   PSADSSF1                                                 01168000
+PSADSSSP EQU   PSADSSF1                                                 01169000
+PSADSSTP EQU   PSADSSF1                                                 01170000
+PSADSSDW EQU   PSADSSF1                                                 01171000
+PSADSSDD EQU   PSADSSF1                                                 01172000
+PSADSSDM EQU   PSADSSF1                                                 01173000
+PSADSSMV EQU   PSADSSF1                                                 01174000
+PSADSSTS EQU   PSA+816                                                  01175000
+PSADSSWK EQU   PSA+812                                                  01176000
+PSADSSR3 EQU   PSA+808                                                  01177000
+PSADSSR2 EQU   PSA+804                                                  01178000
+PSADSSRS EQU   PSA+800                                                  01179000
+PSASTOR  EQU   PSA+796                                                  01180000
+PSACPUSA EQU   PSA+794                                                  01181000
+PSAVSTAP EQU   PSA+792                                                  01182000
+PSAWKVAP EQU   PSA+788                                                  01183000
+PSAWKRAP EQU   PSA+784                                                  01184000
+PSAMCHIC EQU   PSA+783                                                  01185000
+PSARV061 EQU   PSA+782                                                  01186000
+PSASYMSK EQU   PSA+781                                                  01187000
+PSAMCHFL EQU   PSA+780                                                  01188000
+PSACR0   EQU   PSA+776                                                  01189000
+PSAPSWSV EQU   PSA+768                                                  01190000
+PSACLHS  EQU   PSAHLHI                                                  01191000
+PSALKR15 EQU   PSALKSA+60                                               01192000
+PSALKR14 EQU   PSALKSA+56                                               01193000
+PSALKR13 EQU   PSALKSA+52                                               01194000
+PSALKR12 EQU   PSALKSA+48                                               01195000
+PSALKR11 EQU   PSALKSA+44                                               01196000
+PSALKR10 EQU   PSALKSA+40                                               01197000
+PSALKR9  EQU   PSALKSA+36                                               01198000
+PSALKR8  EQU   PSALKSA+32                                               01199000
+PSALKR7  EQU   PSALKSA+28                                               01200000
+PSALKR6  EQU   PSALKSA+24                                               01201000
+PSALKR5  EQU   PSALKSA+20                                               01202000
+PSALKR4  EQU   PSALKSA+16                                               01203000
+PSALKR3  EQU   PSALKSA+12                                               01204000
+PSALKR2  EQU   PSALKSA+8                                                01205000
+PSALKR1  EQU   PSALKSA+4                                                01206000
+PSALKR0  EQU   PSALKSA                                                  01207000
+PSARV023 EQU   PSACLHT+52                                               01208000
+PSALOCAL EQU   PSACLHT+48                                               01209000
+PSACMSL  EQU   PSACLHT+44                                               01210000
+PSAOPTL  EQU   PSACLHT+40                                               01211000
+PSATPACL EQU   PSACLHT+36                                               01212000
+PSATPDNL EQU   PSACLHT+32                                               01213000
+PSATPNCL EQU   PSACLHT+28                                               01214000
+PSAIOSLL EQU   PSACLHT+24                                               01215000
+PSAIOSUL EQU   PSACLHT+20                                               01216000
+PSAIOSCL EQU   PSACLHT+16                                               01217000
+PSAIOSSL EQU   PSACLHT+12                                               01218000
+PSASALCL EQU   PSACLHT+8                                                01219000
+PSAASML  EQU   PSACLHT+4                                                01220000
+PSADISPL EQU   PSACLHT                                                  01221000
+PSASRSA  EQU   PSA+636                                                  01222000
+PSARV050 EQU   PSA+634                                                  01223000
+PSADSSGO EQU   PSA+633                                                  01224000
+PSARECUR EQU   PSA+632                                                  01225000
+PSAHLHIS EQU   PSA+628                                                  01226000
+PSAIPCSA EQU   PSA+624                                                  01227000
+@NM00024 EQU   PSA+621                                                  01228000
+PSAIPCDM EQU   PSA+620                                                  01229000
+PSAIPCD  EQU   PSA+616                                                  01230000
+@NM00023 EQU   PSA+613                                                  01231000
+PSAIPCRM EQU   PSA+612                                                  01232000
+PSAIPCR  EQU   PSA+608                                                  01233000
+PSAMCHEX EQU   PSA+600                                                  01234000
+PSAMPSW  EQU   PSA+592                                                  01235000
+PSAEXPS2 EQU   PSA+584                                                  01236000
+PSAEXPS1 EQU   PSA+576                                                  01237000
+PSAPIREG EQU   PSA+572                                                  01238000
+PSARSREG EQU   PSA+568                                                  01239000
+PSAGPREG EQU   PSA+556                                                  01240000
+PSARV022 EQU   PSASUP4                                                  01241000
+PSARV021 EQU   PSASUP4                                                  01242000
+PSARV020 EQU   PSASUP4                                                  01243000
+PSARV019 EQU   PSASUP4                                                  01244000
+PSARV018 EQU   PSASUP4                                                  01245000
+PSARV017 EQU   PSASUP4                                                  01246000
+PSARV016 EQU   PSASUP4                                                  01247000
+PSARV015 EQU   PSASUP4                                                  01248000
+PSARV014 EQU   PSASUP3                                                  01249000
+PSARV013 EQU   PSASUP3                                                  01250000
+PSARV012 EQU   PSASUP3                                                  01251000
+PSARV011 EQU   PSASUP3                                                  01252000
+PSASPR   EQU   PSASUP3                                                  01253000
+PSAPSREG EQU   PSASUP3                                                  01254000
+PSAPI2   EQU   PSASUP3                                                  01255000
+PSAIOSUP EQU   PSASUP3                                                  01256000
+PSALCR   EQU   PSASUP2                                                  01257000
+PSARTM   EQU   PSASUP2                                                  01258000
+PSAACR   EQU   PSASUP2                                                  01259000
+PSAIPCE2 EQU   PSASUP2                                                  01260000
+PSAIPCES EQU   PSASUP2                                                  01261000
+PSAIPCEC EQU   PSASUP2                                                  01262000
+PSAGTF   EQU   PSASUP2                                                  01263000
+PSAIPCRI EQU   PSASUP2                                                  01264000
+PSARV063 EQU   PSASUP1                                                  01265000
+PSATCTL  EQU   PSASUP1                                                  01266000
+PSADISP  EQU   PSASUP1                                                  01267000
+PSALOCK  EQU   PSASUP1                                                  01268000
+PSAPI    EQU   PSASUP1                                                  01269000
+PSAEXT   EQU   PSASUP1                                                  01270000
+PSASVC   EQU   PSASUP1                                                  01271000
+PSAIO    EQU   PSASUP1                                                  01272000
+PSAAOLD  EQU   PSA+548                                                  01273000
+PSAANEW  EQU   PSA+544                                                  01274000
+PSATOLD  EQU   PSA+540                                                  01275000
+PSATNEW  EQU   PSA+536                                                  01276000
+PSALCCAR EQU   PSA+532                                                  01277000
+PSALCCAV EQU   PSA+528                                                  01278000
+PSAPCCAR EQU   PSA+524                                                  01279000
+PSAPCCAV EQU   PSA+520                                                  01280000
+PSACPULA EQU   PSA+518                                                  01281000
+PSACPUPA EQU   PSA+516                                                  01282000
+PSAPSA   EQU   PSA+512                                                  01283000
+FLCHDEND EQU   PSA+512                                                  01284000
+FLCCRSAV EQU   FLCMCLA+280                                              01285000
+FLCGRSAV EQU   FLCMCLA+216                                              01286000
+FLCFPSAV EQU   FLCMCLA+184                                              01287000
+FLCFLA   EQU   FLCMCLA+88                                               01288000
+FLCRGNCD EQU   FLCMCLA+84                                               01289000
+FLCFSAA  EQU   FLCFSA+1                                                 01290000
+@NM00022 EQU   FLCFSA                                                   01291000
+@NM00021 EQU   FLCMCLA+72                                               01292000
+FLCMCIC  EQU   FLCMCLA+64                                               01293000
+@NM00020 EQU   FLCMCLA+20                                               01294000
+FLCIOAA  EQU   FLCIOA+1                                                 01295000
+@NM00019 EQU   FLCIOA                                                   01296000
+@NM00018 EQU   FLCMCLA+15                                               01297000
+@NM00017 EQU   FLCMCLA+14                                               01298000
+@NM00016 EQU   FLCMCLA+12                                               01299000
+FLCLCL   EQU   FLCMCLA+8                                                01300000
+FLCIOELA EQU   FLCIOEL+1                                                01301000
+@NM00015 EQU   FLCIOEL                                                  01302000
+FLCCHNID EQU   FLCMCLA                                                  01303000
+@NM00014 EQU   PSA+160                                                  01304000
+FLCMTRCD EQU   PSA+157                                                  01305000
+@NM00013 EQU   PSA+156                                                  01306000
+FLCPERA  EQU   FLCPER+1                                                 01307000
+@NM00012 EQU   FLCPER                                                   01308000
+@NM00011 EQU   PSA+151                                                  01309000
+FLCPERCD EQU   PSA+150                                                  01310000
+FLCMCNUM EQU   PSA+149                                                  01311000
+@NM00010 EQU   PSA+148                                                  01312000
+FLCTEAA  EQU   FLCTEA+1                                                 01313000
+@NM00009 EQU   FLCTEA                                                   01314000
+PSAPIPC  EQU   PSAPICOD                                                 01315000
+PSAPIMC  EQU   PSAPICOD                                                 01316000
+PSAPIPER EQU   PSAPICOD                                                 01317000
+PSARV049 EQU   FLCPICOD                                                 01318000
+FLCPILCB EQU   FLCPIILC                                                 01319000
+@NM00008 EQU   FLCPIILC                                                 01320000
+@NM00007 EQU   PSAEPPSW                                                 01321000
+FLCSVCN  EQU   PSAESPSW+2                                               01322000
+FLCSILCB EQU   FLCSVILC                                                 01323000
+@NM00006 EQU   FLCSVILC                                                 01324000
+@NM00005 EQU   PSAESPSW                                                 01325000
+FLCEICOD EQU   PSAEEPSW+2                                               01326000
+PSASPAD  EQU   PSAEEPSW                                                 01327000
+@NM00004 EQU   PSA+128                                                  01328000
+FLCINPSW EQU   PSA+120                                                  01329000
+FLCMNPSW EQU   PSA+112                                                  01330000
+FLCPNPSW EQU   PSA+104                                                  01331000
+FLCSNPSW EQU   PSA+96                                                   01332000
+FLCENPSW EQU   PSA+88                                                   01333000
+FLCTRACE EQU   PSA+84                                                   01334000
+FLCTIMER EQU   PSA+80                                                   01335000
+FLCCVT2  EQU   PSA+76                                                   01336000
+FLCCAW   EQU   PSA+72                                                   01337000
+FLCCSW   EQU   PSA+64                                                   01338000
+FLCIOPSW EQU   PSA+56                                                   01339000
+FLCMOPSW EQU   PSA+48                                                   01340000
+FLCPOPSW EQU   PSA+40                                                   01341000
+FLCSOPSW EQU   PSA+32                                                   01342000
+FLCEOPSW EQU   PSA+24                                                   01343000
+@NM00003 EQU   FLCICCW2+4                                               01344000
+FLCCVT   EQU   FLCICCW2                                                 01345000
+FLCICCW1 EQU   FLCROPSW                                                 01346000
+FLCIPPSW EQU   FLCRNPSW                                                 01347000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      01348000
+@ENDDATA EQU   *                                                        01349000
+         END   ISTAPC41,(C'PLS1136',0702,78336)                         01350000

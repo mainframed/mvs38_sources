@@ -1,0 +1,1025 @@
+         TITLE 'ISTCFMMI - MESSAGE ISSUING ROUTINE'                     00001000
+ISTCFMMI CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'ISTCFMMI  79.215'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  BALR  @12,0                                               0001 00009000
+@PSTART  DS    0H                                                  0001 00010000
+         USING @PSTART,@12                                         0001 00011000
+         PRINT OFF                                                      00012000
+         PRINT ON                                                       00013000
+*                                                                  0048 00014000
+*/********************************************************************/ 00015000
+*/*                                                                  */ 00016000
+*/*  ISTCFMMI - MAIN LINE CODE                                       */ 00017000
+*/*                                                                  */ 00018000
+*/********************************************************************/ 00019000
+*                                                                  0048 00020000
+*   SAVERPH=R1;                     /* SAVE RPH ADDRESS              */ 00021000
+         LR    SAVERPH,R1                                          0048 00022000
+*   BUFPTR=RPHWEA;                  /* GET ADDRESS OF MESSAGE        */ 00023000
+         L     BUFPTR,RPHWEA(,RPHPTR)                              0049 00024000
+*   DO;                             /* LISATCVT                    0050 00025000
+*                                      CVTBASE(PAGEABLE,(ATCVTPTR))  */ 00026000
+*     ATCVTPTR=ATCLCPTR;            /* SET UP ATCVT POINTER          */ 00027000
+         L     ATCVTPTR,ATCLCPTR                                   0051 00028000
+*   END;                            /* LISATCVT                      */ 00029000
+*   RFY                                                            0053 00030000
+*     ISTATCVT BASED(ATCVTPTR);                                    0053 00031000
+*   DO WHILE BUFPTR^=0;             /* LOOP UNTIL NO MORE MESSAGES TO   00032000
+*                                      PROCESS                       */ 00033000
+         B     @DE00054                                            0054 00034000
+@DL00054 DS    0H                                                  0055 00035000
+*     R0=MSGCONID;                  /* GET CONSOLE ID                */ 00036000
+         L     R0,MSGCONID(,BUFPTR)                                0055 00037000
+*     R1=ADDR(MSGWPL);              /* GET MESSAGE ADDRESS           */ 00038000
+         LA    R1,16                                               0056 00039000
+         ALR   R1,BUFPTR                                           0056 00040000
+*/***** IWTO ****                                                    */ 00041000
+*                                                                  0057 00042000
+*     DO;                                                          0057 00043000
+*       GEN;                                                       0058 00044000
+         WTO   MF=(E,(1))                                               00045000
+*     END;                          /* IWTO ISSUE MESSAGE TO CONSOLE */ 00046000
+*     R1=SAVERPH;                   /* SET UP FOR FREESTOR AND TPDEQ */ 00047000
+         LR    R1,SAVERPH                                          0060 00048000
+*     DO;                           /* FREESTOR SIZE(LENGTH(MSGBUF))A   00049000
+*                                      REA(BUFPTR)FETCHP(NO)         */ 00050000
+*                                                                  0062 00051000
+*/* ATBUILD (ISTPAB,ISTDYPAB,ISTATCVT,ISTRPH)                        */ 00052000
+*/* END OF ATBUILD                                                   */ 00053000
+*                                                                  0062 00054000
+*       DO;                                                        0062 00055000
+*       END;                                                       0063 00056000
+*       DO;                                                        0064 00057000
+*         RFY                                                      0065 00058000
+*          (GPR00P,                                                0065 00059000
+*           GPR01P,                                                0065 00060000
+*           GPR02P,                                                0065 00061000
+*           GPR03P) RSTD;                                          0065 00062000
+*       END;                                                       0066 00063000
+*       GEN REFS(GPR02P,GPR03P,GPR04P,GPR05P,GPR06P,GPR07P,GPR08P, 0067 00064000
+*           GPR09P,GPR10P,GPR11P,GPR12P,GPR13P) SETS(RPHWORK);     0067 00065000
+         STM   GPR02P,GPR13P,RPHWORK(GPR01P)        SAVE REGISTERS      00066000
+*       GPR00F=LENGTH(MSGBUF);      /* SIZE IN REG0                  */ 00067000
+         LA    GPR00F,283                                          0068 00068000
+*       DCL                                                        0069 00069000
+*         1 CMZA0008 FIXED(31) STATIC LOCAL,                       0069 00070000
+*          2 * FIXED(8) INIT(64),   /* OPTION FLAGS                  */ 00071000
+*          2 * FIXED(8) INIT(96),   /* STORAGE KEY                   */ 00072000
+*          2 * FIXED(8) INIT(241),  /* SUBPOOL NUMBER                */ 00073000
+*          2 * FIXED(8) INIT('01'X);/* REQUEST TYPE                  */ 00074000
+*       GPR03F=CMZA0008;                                           0070 00075000
+         L     GPR03F,CMZA0008                                     0070 00076000
+*       DO;                                                        0071 00077000
+*         RFY                                                      0072 00078000
+*          (GPR04P) RSTD;                                          0072 00079000
+*       END;                                                       0073 00080000
+*       GPR04P=BUFPTR;              /* PUT FREEMAIN ADDR IN REG4     */ 00081000
+         LR    GPR04P,BUFPTR                                       0074 00082000
+*       DO;                         /* LISATCVT                    0075 00083000
+*                                      CVTBASE(PAGEABLE,(GPR02P))    */ 00084000
+*         GPR02P=ATCLCPTR;          /* SET UP ATCVT POINTER          */ 00085000
+         L     GPR02P,ATCLCPTR                                     0076 00086000
+*       END;                        /* LISATCVT                      */ 00087000
+*       CALL GPR02P->ATCGTSTR;      /* CALL ISTORFSR                 */ 00088000
+         L     @15,ATCGTSTR(,GPR02P)                               0078 00089000
+         BALR  @14,@15                                             0078 00090000
+*       DO;                                                        0079 00091000
+*         RFY                                                      0080 00092000
+*          (GPR00P,                                                0080 00093000
+*           GPR01P,                                                0080 00094000
+*           GPR02P,                                                0080 00095000
+*           GPR03P,                                                0080 00096000
+*           GPR04P) UNRSTD;                                        0080 00097000
+*       END;                                                       0081 00098000
+*     END;                          /* FREESTOR                      */ 00099000
+*     DO;                           /* TPDEQ                       0083 00100000
+*                                      (,ADDR(ATCTPMPB)->DYPPAB)   0083 00101000
+*                                      RETPTR(BUFPTR)                */ 00102000
+*       DCL                                                        0084 00103000
+*         FMZCA035 BIT(32) CONSTANT('80000000'X);                  0084 00104000
+*       DCL                                                        0085 00105000
+*         FMZCB035 BIT(32) CONSTANT('7FFFFFFF'X);                  0085 00106000
+*       DO;                                                        0086 00107000
+*         RFY                                                      0087 00108000
+*          (GPR00P,                                                0087 00109000
+*           GPR01P,                                                0087 00110000
+*           GPR14P,                                                0087 00111000
+*           GPR15P) RSTD;                                          0087 00112000
+*       END;                                                       0088 00113000
+*       GEN(PRINT OFF);                                            0089 00114000
+         PRINT OFF                                                      00115000
+*/* TEMPLATE FOR CHAIN FIELD OF WORK ELEMENT */                    0090 00116000
+*DCL  1  ISTWKE BDY(WORD) BASED(WKEPTR),                           0090 00117000
+*        2  * CHAR(4),                 /* SPACE                       * 00118000
+*        2  WKECHAIN PTR(31),          /* CHAIN POINTER               * 00119000
+*           3 WKEFLAGS BIT(8),         /* FLAGS                       * 00120000
+*             4 WKEGATE  BIT(1),       /* GATE BIT                    * 00121000
+*             4 *        BIT(7),       /* RESERVED                    * 00122000
+*           3 WKECHNGP PTR(24);        /* PTR ADDRESS                 * 00123000
+*       GEN(PRINT ON);                                             0091 00124000
+         PRINT ON                                                       00125000
+*       GPR15P=ADDR(ADDR(ATCTPMPB)->DYPPAB);                       0092 00126000
+         LA    GPR15P,DYPPAB+1776(,ATCVTPTR)                       0092 00127000
+*       GPR14P=GPR15P->PABWEQA|FMZCA035;                           0093 00128000
+         L     @11,@CF00104                                        0093 00129000
+         L     GPR14P,PABWEQA(,GPR15P)                             0093 00130000
+         OR    GPR14P,@11                                          0093 00131000
+*       IF GPR14P=FMZCA035 THEN                                    0094 00132000
+         CLR   GPR14P,@11                                          0094 00133000
+         BE    @RT00094                                            0094 00134000
+*         ;                                                        0095 00135000
+*       ELSE                                                       0096 00136000
+*         DO;                                                      0096 00137000
+*FMZL1035:                                                         0097 00138000
+*           ;                                                      0097 00139000
+FMZL1035 DS    0H                                                  0098 00140000
+*           DO WHILE(GPR14P->WKECHAIN^=FMZCA035);                  0098 00141000
+         B     @DE00098                                            0098 00142000
+@DL00098 DS    0H                                                  0099 00143000
+*             GPR15P=ADDR(GPR14P->WKECHAIN);                       0099 00144000
+         LA    GPR15P,WKECHAIN(,GPR14P)                            0099 00145000
+*             GPR14P=GPR15P->PABWEQA;                              0100 00146000
+         L     GPR14P,PABWEQA(,GPR15P)                             0100 00147000
+*           END;                                                   0101 00148000
+@DE00098 L     @11,@CF00104                                        0101 00149000
+         CL    @11,WKECHAIN(,GPR14P)                               0101 00150000
+         BNE   @DL00098                                            0101 00151000
+*           GPR00P=FMZCA035;                                       0102 00152000
+         LR    GPR00P,@11                                          0102 00153000
+*           CS(GPR14P,GPR00P,GPR15P->PABWEQA);                     0103 00154000
+         CS    GPR14P,@00,PABWEQA(GPR15P)                          0103 00155000
+*           BC(7,FMZL1035);                                        0104 00156000
+         BC    7,FMZL1035                                          0104 00157000
+*           GPR14P->WKECHAIN=0;                                    0105 00158000
+         SLR   @11,@11                                             0105 00159000
+         ST    @11,WKECHAIN(,GPR14P)                               0105 00160000
+*         END;                                                     0106 00161000
+*ISTA0035:                                                         0107 00162000
+*       ;                                                          0107 00163000
+@RT00094 DS    0H                                                  0107 00164000
+ISTA0035 DS    0H                                                  0108 00165000
+*       GPR14P=GPR14P&FMZCB035;                                    0108 00166000
+         N     GPR14P,@CF00102                                     0108 00167000
+*       BUFPTR=GPR14P;                                             0109 00168000
+         LR    BUFPTR,GPR14P                                       0109 00169000
+*       DO;                                                        0110 00170000
+*         RFY                                                      0111 00171000
+*          (GPR00P,                                                0111 00172000
+*           GPR01P,                                                0111 00173000
+*           GPR14P,                                                0111 00174000
+*           GPR15P) UNRSTD;                                        0111 00175000
+*       END;                                                       0112 00176000
+*     END;                          /* TPDEQ GET NEXT BUFFER         */ 00177000
+*   END;                            /* END OF DO WHILE BUFPTR ^= 0   */ 00178000
+@DE00054 LTR   BUFPTR,BUFPTR                                       0114 00179000
+         BNZ   @DL00054                                            0114 00180000
+*   IF NOCORE=ON THEN               /* IF SOMEONE TRIED TO ISSUE A 0115 00181000
+*                                      MESSAGE AND NO CORE WAS     0115 00182000
+*                                      AVAILABLE,                    */ 00183000
+         TM    NOCORE(ATCVTPTR),B'01000000'                        0115 00184000
+         BNO   @RF00115                                            0115 00185000
+*     DO;                           /* ISSUE THE 'NO CORE AVAILABLE     00186000
+*                                      FOR MESSAGE' MESSAGE          */ 00187000
+*       R0=0;                       /* ISSUE TO MASTER CONSOLE       */ 00188000
+         SLR   R0,R0                                               0117 00189000
+*       R1=ADDR(NOSTRMSG);          /* POINT TO ERROR MESSAGE        */ 00190000
+         L     @15,ATCMSGM(,ATCVTPTR)                              0118 00191000
+         L     R1,NOSTRPTR(,@15)                                   0118 00192000
+         LA    R1,NOSTRMSG(,R1)                                    0118 00193000
+*/***** IWTO ****                                                    */ 00194000
+*                                                                  0119 00195000
+*       DO;                                                        0119 00196000
+*         GEN;                                                     0120 00197000
+         WTO   MF=(E,(1))                                               00198000
+*       END;                        /* IWTO ISSUE ERROR MESSAGE      */ 00199000
+*       NOCORE=OFF;                 /* TURN OFF NOCORE FLAG WITH CS     00200000
+*                                      LOGIC                         */ 00201000
+         L     @15,NOCORE(,ATCVTPTR)                               0122 00202000
+@GL00001 LR    @14,@15                                             0122 00203000
+         N     @14,@CF00831                                        0122 00204000
+         CS    @15,@14,NOCORE(ATCVTPTR)                            0122 00205000
+         BNE   @GL00001                                            0122 00206000
+*     END;                          /* END OF NO CORE MESSAGE      0123 00207000
+*                                      PROCESSING                    */ 00208000
+*   R1=SAVERPH;                     /* GET RPH ADDRESS FOR EXIT      */ 00209000
+@RF00115 LR    R1,SAVERPH                                          0124 00210000
+*   DO;                             /* TPEXIT NORM                   */ 00211000
+*     DO;                                                          0126 00212000
+*     END;                                                         0127 00213000
+*     DO;                                                          0128 00214000
+*       RFY                                                        0129 00215000
+*        (GPR15P) RSTD;                                            0129 00216000
+*     END;                                                         0130 00217000
+*                                                                  0131 00218000
+*/* ATBUILD (ISTPAB,ISTDYPAB,ISTATCVT)                               */ 00219000
+*/* END OF ATBUILD                                                   */ 00220000
+*                                                                  0131 00221000
+*     DO;                           /* LISATCVT                    0131 00222000
+*                                      CVTBASE(PAGEABLE,(GPR15P))    */ 00223000
+*       GPR15P=ATCLCPTR;            /* SET UP ATCVT POINTER          */ 00224000
+         L     GPR15P,ATCLCPTR                                     0132 00225000
+*     END;                          /* LISATCVT                      */ 00226000
+*     DO;                                                          0134 00227000
+*       RFY                                                        0135 00228000
+*        (GPR00P) RSTD;                                            0135 00229000
+*     END;                                                         0136 00230000
+*     GPR00F=4;                     /* SET PARAMETER REGISTER TO 4   */ 00231000
+         LA    GPR00F,4                                            0137 00232000
+*     GPR15P=GPR15P->ATCAP31;                                      0138 00233000
+         L     GPR15P,ATCAP31(,GPR15P)                             0138 00234000
+*     DCL                                                          0139 00235000
+*       FMZL0046 BASED(GPR15P) LABEL VALUERANGE(*);                0139 00236000
+*     CALL FMZL0046;                                               0140 00237000
+         BALR  @14,@15                                             0140 00238000
+*     DO;                                                          0141 00239000
+*       RFY                                                        0142 00240000
+*        (GPR00P,                                                  0142 00241000
+*         GPR15P) UNRSTD;                                          0142 00242000
+*     END;                                                         0143 00243000
+*   END;                            /* TPEXIT                        */ 00244000
+*   DO;                             /* TPEPILOG                      */ 00245000
+*     GEN(PRINT OFF);                                              0146 00246000
+         PRINT OFF                                                      00247000
+*     DO;                                                          0147 00248000
+*       DCL                                                        0148 00249000
+*         GPR00F FIXED(31) REG(00),                                0148 00250000
+*         GPR00P PTR(31) REG(00),                                  0148 00251000
+*         GPR01F FIXED(31) REG(01),                                0148 00252000
+*         GPR01P PTR(31) REG(01),                                  0148 00253000
+*         GPR02F FIXED(31) REG(02),                                0148 00254000
+*         GPR02P PTR(31) REG(02),                                  0148 00255000
+*         GPR03F FIXED(31) REG(03),                                0148 00256000
+*         GPR03P PTR(31) REG(03),                                  0148 00257000
+*         GPR04F FIXED(31) REG(04),                                0148 00258000
+*         GPR04P PTR(31) REG(04),                                  0148 00259000
+*         GPR05F FIXED(31) REG(05),                                0148 00260000
+*         GPR05P PTR(31) REG(05),                                  0148 00261000
+*         GPR06F FIXED(31) REG(06),                                0148 00262000
+*         GPR06P PTR(31) REG(06),                                  0148 00263000
+*         GPR07F FIXED(31) REG(07),                                0148 00264000
+*         GPR07P PTR(31) REG(07),                                  0148 00265000
+*         GPR08F FIXED(31) REG(08),                                0148 00266000
+*         GPR08P PTR(31) REG(08),                                  0148 00267000
+*         GPR09F FIXED(31) REG(09),                                0148 00268000
+*         GPR09P PTR(31) REG(09),                                  0148 00269000
+*         GPR10F FIXED(31) REG(10),                                0148 00270000
+*         GPR10P PTR(31) REG(10),                                  0148 00271000
+*         GPR11F FIXED(31) REG(11),                                0148 00272000
+*         GPR11P PTR(31) REG(11),                                  0148 00273000
+*         GPR12F FIXED(31) REG(12),                                0148 00274000
+*         GPR12P PTR(31) REG(12),                                  0148 00275000
+*         GPR13F FIXED(31) REG(13),                                0148 00276000
+*         GPR13P PTR(31) REG(13),                                  0148 00277000
+*         GPR14F FIXED(31) REG(14),                                0148 00278000
+*         GPR14P PTR(31) REG(14),                                  0148 00279000
+*         GPR15F FIXED(31) REG(15),                                0148 00280000
+*         GPR15P PTR(31) REG(15);                                  0148 00281000
+*     END;                                                         0149 00282000
+*     GEN(PRINT ON);                                               0150 00283000
+         PRINT ON                                                       00284000
+*   END;                            /* TPEPILOG                      */ 00285000
+*   END ISTCFMMI;                                                  0152 00286000
+@EL00001 DS    0H                                                  0152 00287000
+@EF00001 DS    0H                                                  0152 00288000
+@ER00001 BR    @14                                                 0152 00289000
+@DATA    DS    0H                                                       00290000
+@DATD    DSECT                                                          00291000
+         DS    0F                                                       00292000
+ISTCFMMI CSECT                                                          00293000
+         DS    0F                                                       00294000
+@CF00102 DC    XL4'7FFFFFFF'                                            00295000
+@CF00104 DC    XL4'80000000'                                            00296000
+@CF00831 DC    BL4'10111111111111111111111111111111'                    00297000
+@DATD    DSECT                                                          00298000
+         DS    0D                                                       00299000
+@ENDDATD EQU   *                                                        00300000
+ISTCFMMI CSECT                                                          00301000
+         NOPR  ((@ENDDATD-@DATD)*16)                                    00302000
+         DS    0F                                                       00303000
+@SIZDATD DC    AL1(0)                                                   00304000
+         DC    AL3(@ENDDATD-@DATD)                                      00305000
+         DS    0D                                                       00306000
+CMZA0008 DS    FL4                                                      00307000
+         ORG   CMZA0008                                                 00308000
+@NM00066 DC    AL1(64)                                                  00309000
+@NM00067 DC    AL1(96)                                                  00310000
+@NM00068 DC    AL1(241)                                                 00311000
+@NM00069 DC    XL1'01'                                                  00312000
+         ORG   CMZA0008+4                                               00313000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00314000
+@01      EQU   01                                                       00315000
+@02      EQU   02                                                       00316000
+@03      EQU   03                                                       00317000
+@04      EQU   04                                                       00318000
+@05      EQU   05                                                       00319000
+@06      EQU   06                                                       00320000
+@07      EQU   07                                                       00321000
+@08      EQU   08                                                       00322000
+@09      EQU   09                                                       00323000
+@10      EQU   10                                                       00324000
+@11      EQU   11                                                       00325000
+@12      EQU   12                                                       00326000
+@13      EQU   13                                                       00327000
+@14      EQU   14                                                       00328000
+@15      EQU   15                                                       00329000
+BUFPTR   EQU   @07                                                      00330000
+SAVERPH  EQU   @09                                                      00331000
+ATCVTPTR EQU   @08                                                      00332000
+RPHPTR   EQU   @01                                                      00333000
+R0       EQU   @00                                                      00334000
+R1       EQU   @01                                                      00335000
+GPR00P   EQU   @00                                                      00336000
+GPR01P   EQU   @01                                                      00337000
+GPR02P   EQU   @02                                                      00338000
+GPR03P   EQU   @03                                                      00339000
+GPR04P   EQU   @04                                                      00340000
+GPR05P   EQU   @05                                                      00341000
+GPR06P   EQU   @06                                                      00342000
+GPR07P   EQU   @07                                                      00343000
+GPR08P   EQU   @08                                                      00344000
+GPR09P   EQU   @09                                                      00345000
+GPR10P   EQU   @10                                                      00346000
+GPR11P   EQU   @11                                                      00347000
+GPR12P   EQU   @12                                                      00348000
+GPR13P   EQU   @13                                                      00349000
+GPR00F   EQU   @00                                                      00350000
+GPR03F   EQU   @03                                                      00351000
+GPR14P   EQU   @14                                                      00352000
+GPR15P   EQU   @15                                                      00353000
+GPR01F   EQU   @01                                                      00354000
+GPR02F   EQU   @02                                                      00355000
+GPR04F   EQU   @04                                                      00356000
+GPR05F   EQU   @05                                                      00357000
+GPR06F   EQU   @06                                                      00358000
+GPR07F   EQU   @07                                                      00359000
+GPR08F   EQU   @08                                                      00360000
+GPR09F   EQU   @09                                                      00361000
+GPR10F   EQU   @10                                                      00362000
+GPR11F   EQU   @11                                                      00363000
+GPR12F   EQU   @12                                                      00364000
+GPR13F   EQU   @13                                                      00365000
+GPR14F   EQU   @14                                                      00366000
+GPR15F   EQU   @15                                                      00367000
+ATCLCPTR EQU   1032                                                     00368000
+ISTLOK   EQU   0                                                        00369000
+LOKCHN   EQU   ISTLOK+1                                                 00370000
+LOKCHNG  EQU   LOKCHN                                                   00371000
+@NM00002 EQU   LOKCHNG+2                                                00372000
+ISTPAB   EQU   0                                                        00373000
+PABWQCHN EQU   ISTPAB                                                   00374000
+PABWEQA  EQU   PABWQCHN                                                 00375000
+PABCHAIN EQU   PABWQCHN+4                                               00376000
+PABRUNNG EQU   PABCHAIN                                                 00377000
+PABRPHFG EQU   ISTPAB+12                                                00378000
+PABFLAGS EQU   PABRPHFG                                                 00379000
+PABERLCK EQU   PABFLAGS                                                 00380000
+PABERRLK EQU   PABERLCK                                                 00381000
+PABEND   EQU   ISTPAB+16                                                00382000
+ISTDYPAB EQU   0                                                        00383000
+DYPCHAIN EQU   ISTDYPAB+4                                               00384000
+DYPPACMD EQU   ISTDYPAB+12                                              00385000
+DYPPAB   EQU   ISTDYPAB+16                                              00386000
+ISTRPH   EQU   0                                                        00387000
+RPHCNTL  EQU   ISTRPH                                                   00388000
+RPHFLAGS EQU   RPHCNTL+2                                                00389000
+RPHFSTLC EQU   RPHFLAGS                                                 00390000
+RPHFLGB  EQU   RPHCNTL+3                                                00391000
+RPHRPHA  EQU   ISTRPH+4                                                 00392000
+RPHTSKID EQU   ISTRPH+8                                                 00393000
+RPHRESMA EQU   ISTRPH+16                                                00394000
+RPHWPFLG EQU   RPHRESMA                                                 00395000
+RPHWEA   EQU   ISTRPH+24                                                00396000
+RPHCSPA  EQU   RPHWEA                                                   00397000
+RPHSRPRM EQU   ISTRPH+28                                                00398000
+RPHPABQA EQU   ISTRPH+36                                                00399000
+RPHWORK  EQU   ISTRPH+40                                                00400000
+RPHSAVE1 EQU   RPHWORK                                                  00401000
+RPHSBITS EQU   RPHSAVE1+1                                               00402000
+ISTATCVT EQU   0                                                        00403000
+ATCRPTCH EQU   ISTATCVT                                                 00404000
+ATCITFLD EQU   ISTATCVT+8                                               00405000
+ATCITCDS EQU   ATCITFLD+8                                               00406000
+ATCITFLG EQU   ATCITCDS+4                                               00407000
+ATCITRA1 EQU   ATCITFLG+2                                               00408000
+ATCSMPAB EQU   ISTATCVT+88                                              00409000
+ATCVDPAB EQU   ISTATCVT+152                                             00410000
+ATCLDTIL EQU   ISTATCVT+408                                             00411000
+ATCMSGM  EQU   ISTATCVT+492                                             00412000
+ATCGTSTR EQU   ISTATCVT+608                                             00413000
+ATCLUDVT EQU   ISTATCVT+768                                             00414000
+ATCANYDT EQU   ISTATCVT+776                                             00415000
+@NM00012 EQU   ISTATCVT+780                                             00416000
+ATCPODVT EQU   ISTATCVT+804                                             00417000
+ATCSTAT  EQU   ISTATCVT+936                                             00418000
+ATCSTAT1 EQU   ATCSTAT                                                  00419000
+ATCPOFLG EQU   ATCSTAT+2                                                00420000
+ATCSTAT4 EQU   ATCSTAT+3                                                00421000
+ATCBITAN EQU   ISTATCVT+940                                             00422000
+ATCFLAG2 EQU   ATCBITAN+1                                               00423000
+ATCONID  EQU   ISTATCVT+944                                             00424000
+ATCSSCPA EQU   ISTATCVT+948                                             00425000
+ATCHPGM  EQU   ISTATCVT+1012                                            00426000
+ATCVLCNT EQU   ISTATCVT+1016                                            00427000
+ATCRNO   EQU   ISTATCVT+1020                                            00428000
+@NM00035 EQU   ISTATCVT+1028                                            00429000
+ATCSHRFG EQU   @NM00035+8                                               00430000
+ATCCPDVT EQU   ISTATCVT+1096                                            00431000
+ATCSMSDQ EQU   ISTATCVT+1140                                            00432000
+ATCRID   EQU   ISTATCVT+1152                                            00433000
+ATCLDAPP EQU   ISTATCVT+1288                                            00434000
+ATCSQAFR EQU   ISTATCVT+1312                                            00435000
+ATCORTCB EQU   ATCSQAFR+4                                               00436000
+ATCORSRB EQU   ATCORTCB                                                 00437000
+ATCICAPP EQU   ISTATCVT+1320                                            00438000
+ATCDAPVT EQU   ISTATCVT+1340                                            00439000
+ATCAP31  EQU   ISTATCVT+1372                                            00440000
+ATCGSRBQ EQU   ISTATCVT+1472                                            00441000
+ATCGSRBG EQU   ATCGSRBQ                                                 00442000
+ATCENFLG EQU   ISTATCVT+1512                                            00443000
+@NM00050 EQU   ISTATCVT+1575                                            00444000
+ATCVTFLG EQU   ISTATCVT+1576                                            00445000
+ATCZFLAG EQU   ISTATCVT+1696                                            00446000
+ATCTPMMI EQU   ISTATCVT+1708                                            00447000
+ATCCRA   EQU   ISTATCVT+1720                                            00448000
+ATCCRACN EQU   ATCCRA+4                                                 00449000
+ATCSRB   EQU   ISTATCVT+1728                                            00450000
+ATCSRBCN EQU   ATCSRB+4                                                 00451000
+ATCCRPL  EQU   ISTATCVT+1736                                            00452000
+ATCRPLCN EQU   ATCCRPL+4                                                00453000
+ATCTPMPB EQU   ISTATCVT+1776                                            00454000
+ISTWPL   EQU   0                                                        00455000
+WPLMCSF  EQU   ISTWPL+2                                                 00456000
+WPLMCSF1 EQU   WPLMCSF                                                  00457000
+WPLMCSF2 EQU   WPLMCSF+1                                                00458000
+ISTPOHD  EQU   0                                                        00459000
+POHSTAT  EQU   ISTPOHD+1                                                00460000
+ISTRWPL  EQU   0                                                        00461000
+RWPPRTR  EQU   ISTRWPL                                                  00462000
+RWPRECB  EQU   ISTRWPL+4                                                00463000
+ISTPOWE  EQU   0                                                        00464000
+POWRTR   EQU   ISTPOWE+8                                                00465000
+POWWPL   EQU   ISTPOWE+16                                               00466000
+VTAMMSGS EQU   0                                                        00467000
+NOSTRPTR EQU   VTAMMSGS+4                                               00468000
+@NM00060 EQU   0                                                        00469000
+NOSTRMSG EQU   @NM00060+7                                               00470000
+MSGBUF   EQU   0                                                        00471000
+MSGCONID EQU   MSGBUF                                                   00472000
+MSGRWPL  EQU   0                                                        00473000
+MSGWPL   EQU   MSGRWPL                                                  00474000
+ISTWKE   EQU   0                                                        00475000
+WKECHAIN EQU   ISTWKE+4                                                 00476000
+WKEFLAGS EQU   WKECHAIN                                                 00477000
+FMZL0046 EQU   0                                                        00478000
+ISTXDYP  EQU   0                                                        00479000
+ISTXPAB  EQU   0                                                        00480000
+PABXTNSN EQU   PABEND                                                   00481000
+MMISWS   EQU   ATCTPMMI                                                 00482000
+NOCORE   EQU   MMISWS                                                   00483000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00484000
+@NM00065 EQU   MMISWS                                                   00485000
+@NM00064 EQU   MMISWS                                                   00486000
+@NM00004 EQU   PABXTNSN+12                                              00487000
+PABNPSSQ EQU   PABXTNSN+8                                               00488000
+PABLOCK  EQU   PABXTNSN+4                                               00489000
+PABLAST  EQU   PABXTNSN                                                 00490000
+WKECHNGP EQU   WKECHAIN+1                                               00491000
+@NM00071 EQU   WKEFLAGS                                                 00492000
+WKEGATE  EQU   WKEFLAGS                                                 00493000
+@NM00070 EQU   ISTWKE                                                   00494000
+@NM00063 EQU   MSGBUF+8                                                 00495000
+MSGCHAIN EQU   MSGBUF+4                                                 00496000
+MSGCONSL EQU   MSGCONID+3                                               00497000
+@NM00062 EQU   MSGCONID                                                 00498000
+@NM00061 EQU   @NM00060                                                 00499000
+BADIDPTR EQU   VTAMMSGS                                                 00500000
+POWHDR   EQU   POWRTR+4                                                 00501000
+POWDEB   EQU   POWRTR                                                   00502000
+POWPSSQ  EQU   ISTPOWE+4                                                00503000
+POWRSVD  EQU   ISTPOWE+2                                                00504000
+POWLNGTH EQU   ISTPOWE+1                                                00505000
+POWCBID  EQU   ISTPOWE                                                  00506000
+RWPWPL   EQU   ISTRWPL+8                                                00507000
+RWPSSECB EQU   RWPRECB                                                  00508000
+RWPRPTRA EQU   RWPPRTR+1                                                00509000
+RWPLRLN  EQU   RWPPRTR                                                  00510000
+POHID    EQU   ISTPOHD+2                                                00511000
+POHGEN   EQU   POHSTAT                                                  00512000
+POHRREQ  EQU   POHSTAT                                                  00513000
+POHRSVD2 EQU   POHSTAT                                                  00514000
+POHCNTRL EQU   POHSTAT                                                  00515000
+POHLBL   EQU   POHSTAT                                                  00516000
+POHDATA  EQU   POHSTAT                                                  00517000
+POHEND   EQU   POHSTAT                                                  00518000
+POHRSVD1 EQU   ISTPOHD                                                  00519000
+WPLTXT   EQU   ISTWPL+4                                                 00520000
+WPLRSV02 EQU   WPLMCSF2                                                 00521000
+WPLMCSFN EQU   WPLMCSF2                                                 00522000
+WPLRSV01 EQU   WPLMCSF2                                                 00523000
+WPLSTGFL EQU   WPLMCSF2                                                 00524000
+WPLMCSFJ EQU   WPLMCSF2                                                 00525000
+WPLMCSFI EQU   WPLMCSF2                                                 00526000
+WPLMCSFH EQU   WPLMCSF1                                                 00527000
+WPLMCSFG EQU   WPLMCSF1                                                 00528000
+WPLMCSFF EQU   WPLMCSF1                                                 00529000
+WPLMCSFE EQU   WPLMCSF1                                                 00530000
+WPLMCSFD EQU   WPLMCSF1                                                 00531000
+WPLMCSFC EQU   WPLMCSF1                                                 00532000
+WPLMCSFB EQU   WPLMCSF1                                                 00533000
+WPLMCSFA EQU   WPLMCSF1                                                 00534000
+WPLLGH   EQU   ISTWPL                                                   00535000
+ATCAOS   EQU   ISTATCVT+1868                                            00536000
+@NM00059 EQU   ISTATCVT+1860                                            00537000
+@NM00058 EQU   ISTATCVT+1852                                            00538000
+@NM00057 EQU   ISTATCVT+1844                                            00539000
+@NM00056 EQU   ISTATCVT+1836                                            00540000
+@NM00055 EQU   ISTATCVT+1828                                            00541000
+@NM00054 EQU   ISTATCVT+1820                                            00542000
+ATCHWCSA EQU   ISTATCVT+1816                                            00543000
+ATCCACSA EQU   ISTATCVT+1812                                            00544000
+ATCMXCSA EQU   ISTATCVT+1808                                            00545000
+ATCTRMPB EQU   ISTATCVT+1744                                            00546000
+ATCRPLAC EQU   ATCRPLCN+2                                               00547000
+ATCRPLRC EQU   ATCRPLCN                                                 00548000
+ATCCRPLQ EQU   ATCCRPL                                                  00549000
+ATCSRBAC EQU   ATCSRBCN+2                                               00550000
+ATCSRBRC EQU   ATCSRBCN                                                 00551000
+ATCSRBQ  EQU   ATCSRB                                                   00552000
+ATCCRAAC EQU   ATCCRACN+2                                               00553000
+ATCCRARC EQU   ATCCRACN                                                 00554000
+ATCCRAQ  EQU   ATCCRA                                                   00555000
+ATCLUFFD EQU   ISTATCVT+1716                                            00556000
+ATCVIOPM EQU   ISTATCVT+1712                                            00557000
+ATCPXSRB EQU   ISTATCVT+1704                                            00558000
+ATCRPLCT EQU   ISTATCVT+1702                                            00559000
+ATCCRACT EQU   ISTATCVT+1700                                            00560000
+ATCSRBCT EQU   ISTATCVT+1698                                            00561000
+ATCSTNSM EQU   ISTATCVT+1697                                            00562000
+@NM00053 EQU   ATCZFLAG                                                 00563000
+ATCZF001 EQU   ATCZFLAG                                                 00564000
+ATCTPCP1 EQU   ISTATCVT+1692                                            00565000
+ATCTPCP0 EQU   ISTATCVT+1688                                            00566000
+ATCZR01  EQU   ISTATCVT+1684                                            00567000
+ATCMPLTA EQU   ISTATCVT+1680                                            00568000
+ATCASCB  EQU   ISTATCVT+1676                                            00569000
+ATCAP86  EQU   ISTATCVT+1672                                            00570000
+ATCAP85  EQU   ISTATCVT+1668                                            00571000
+ATCAP84  EQU   ISTATCVT+1664                                            00572000
+ATCAP83  EQU   ISTATCVT+1660                                            00573000
+ATCAP82  EQU   ISTATCVT+1656                                            00574000
+ATCAP69  EQU   ISTATCVT+1652                                            00575000
+ATCAP66  EQU   ISTATCVT+1648                                            00576000
+ATCAP62  EQU   ISTATCVT+1644                                            00577000
+ATCAPC59 EQU   ISTATCVT+1640                                            00578000
+ATCAP56  EQU   ISTATCVT+1636                                            00579000
+ATCAP55  EQU   ISTATCVT+1632                                            00580000
+ATCAP41  EQU   ISTATCVT+1628                                            00581000
+ATCAPC25 EQU   ISTATCVT+1624                                            00582000
+ATCAP23  EQU   ISTATCVT+1620                                            00583000
+ATCAPBE  EQU   ISTATCVT+1616                                            00584000
+ATCPSTA  EQU   ISTATCVT+1612                                            00585000
+ATCSMABF EQU   ISTATCVT+1608                                            00586000
+ATCSMAPR EQU   ISTATCVT+1604                                            00587000
+ATCTPWQA EQU   ISTATCVT+1600                                            00588000
+ATCSMAID EQU   ISTATCVT+1596                                            00589000
+ATCSMARA EQU   ISTATCVT+1592                                            00590000
+ATCCACXA EQU   ISTATCVT+1588                                            00591000
+ATCATA10 EQU   ISTATCVT+1584                                            00592000
+ATCHLTCB EQU   ISTATCVT+1580                                            00593000
+@NM00052 EQU   ATCVTFLG                                                 00594000
+ATCVTACT EQU   ATCVTFLG                                                 00595000
+@NM00051 EQU   @NM00050                                                 00596000
+ATCVTMAB EQU   @NM00050                                                 00597000
+ATCVTBAM EQU   ISTATCVT+1572                                            00598000
+@NM00049 EQU   ISTATCVT+1568                                            00599000
+@NM00048 EQU   ISTATCVT+1520                                            00600000
+ATCCCOOC EQU   ISTATCVT+1516                                            00601000
+@NM00047 EQU   ISTATCVT+1513                                            00602000
+ATCSNUF  EQU   ATCENFLG                                                 00603000
+ATCOPKL  EQU   ATCENFLG                                                 00604000
+ATCABEN  EQU   ATCENFLG                                                 00605000
+ATCSRDN  EQU   ATCENFLG                                                 00606000
+ATCDLDN  EQU   ATCENFLG                                                 00607000
+ATCTIMER EQU   ISTATCVT+1508                                            00608000
+ATCAIWT  EQU   ISTATCVT+1504                                            00609000
+ATCOROBT EQU   ISTATCVT+1500                                            00610000
+ATCDMAPP EQU   ISTATCVT+1496                                            00611000
+ATCZDVTX EQU   ISTATCVT+1492                                            00612000
+ATCPXCRA EQU   ISTATCVT+1488                                            00613000
+ATCICNCB EQU   ISTATCVT+1484                                            00614000
+ATCCMTCB EQU   ISTATCVT+1480                                            00615000
+ATCPRPH  EQU   ISTATCVT+1476                                            00616000
+ATCGSRBF EQU   ATCGSRBG                                                 00617000
+ATCSRBRT EQU   ISTATCVT+1468                                            00618000
+ATCTSCPC EQU   ISTATCVT+1464                                            00619000
+@NM00046 EQU   ISTATCVT+1460                                            00620000
+ATCCDTCB EQU   ISTATCVT+1456                                            00621000
+ATCORFRL EQU   ISTATCVT+1452                                            00622000
+ATCORFPX EQU   ISTATCVT+1448                                            00623000
+ATCORFMG EQU   ISTATCVT+1444                                            00624000
+ATCSMBQ  EQU   ISTATCVT+1440                                            00625000
+ATCINFDD EQU   ISTATCVT+1436                                            00626000
+ATCAP67  EQU   ISTATCVT+1432                                            00627000
+ATCAP65  EQU   ISTATCVT+1428                                            00628000
+ATCAP64  EQU   ISTATCVT+1424                                            00629000
+ATCAP63  EQU   ISTATCVT+1420                                            00630000
+ATCAP61  EQU   ISTATCVT+1416                                            00631000
+ATCAP58  EQU   ISTATCVT+1412                                            00632000
+ATCAP57  EQU   ISTATCVT+1408                                            00633000
+ATCAP54  EQU   ISTATCVT+1404                                            00634000
+ATCAP53  EQU   ISTATCVT+1400                                            00635000
+ATCAP52  EQU   ISTATCVT+1396                                            00636000
+ATCAP51  EQU   ISTATCVT+1392                                            00637000
+ATCAP38  EQU   ISTATCVT+1388                                            00638000
+ATCAP37  EQU   ISTATCVT+1384                                            00639000
+ATCAP34  EQU   ISTATCVT+1380                                            00640000
+ATCAP32  EQU   ISTATCVT+1376                                            00641000
+ATCAP12  EQU   ISTATCVT+1368                                            00642000
+ATCAP11  EQU   ISTATCVT+1364                                            00643000
+ATCDAPDG EQU   ATCDAPVT+20                                              00644000
+ATCDXCEA EQU   ATCDAPVT+16                                              00645000
+ATCDCEA  EQU   ATCDAPVT+12                                              00646000
+ATCDPCIA EQU   ATCDAPVT+8                                               00647000
+ATCDSIOA EQU   ATCDAPVT+4                                               00648000
+ATCDEOEA EQU   ATCDAPVT                                                 00649000
+ATCZAEA  EQU   ATCICAPP+16                                              00650000
+ATCZCEA  EQU   ATCICAPP+12                                              00651000
+ATCZCPCI EQU   ATCICAPP+8                                               00652000
+ATCZSIOA EQU   ATCICAPP+4                                               00653000
+ATCCDRPH EQU   ATCICAPP                                                 00654000
+ATCORQG  EQU   ATCORSRB                                                 00655000
+ATCORTBF EQU   ATCSQAFR                                                 00656000
+@NM00045 EQU   ISTATCVT+1308                                            00657000
+ATCZLAEA EQU   ATCLDAPP+16                                              00658000
+ATCZLCEA EQU   ATCLDAPP+12                                              00659000
+ATCZLPCI EQU   ATCLDAPP+8                                               00660000
+ATCSMFRR EQU   ATCLDAPP+4                                               00661000
+ATCCDTID EQU   ATCLDAPP                                                 00662000
+@NM00044 EQU   ISTATCVT+1256                                            00663000
+ATCZPAB2 EQU   ISTATCVT+1224                                            00664000
+@NM00043 EQU   ISTATCVT+1224                                            00665000
+@NM00042 EQU   ISTATCVT+1164                                            00666000
+ATCCPCFE EQU   ISTATCVT+1160                                            00667000
+@NM00041 EQU   ATCRID+2                                                 00668000
+ATCCDRMA EQU   ATCRID                                                   00669000
+@NM00040 EQU   ATCSMSDQ+8                                               00670000
+@NM00039 EQU   ATCSMSDQ+4                                               00671000
+@NM00038 EQU   ATCSMSDQ                                                 00672000
+ATCSEQNO EQU   ISTATCVT+1136                                            00673000
+ATCSMPMD EQU   ISTATCVT+1132                                            00674000
+ATCPAREA EQU   ISTATCVT+1128                                            00675000
+ATCCPCSM EQU   ISTATCVT+1124                                            00676000
+ATCQLOCK EQU   ISTATCVT+1120                                            00677000
+ATCITQLE EQU   ISTATCVT+1116                                            00678000
+ATCSQCDS EQU   ISTATCVT+1112                                            00679000
+ATCUSSVT EQU   ISTATCVT+1108                                            00680000
+ATCNOSQ  EQU   ISTATCVT+1104                                            00681000
+ATCINCIP EQU   ATCCPDVT+4                                               00682000
+ATCTSCNI EQU   ATCCPDVT                                                 00683000
+ATCMGCRT EQU   ISTATCVT+1092                                            00684000
+ATCMACRT EQU   ISTATCVT+1088                                            00685000
+ATCCSMT  EQU   ISTATCVT+1084                                            00686000
+ATCDRUSL EQU   ISTATCVT+1080                                            00687000
+ATCDRULL EQU   ISTATCVT+1076                                            00688000
+ATCCFCDR EQU   ISTATCVT+1072                                            00689000
+@NM00037 EQU   ISTATCVT+1069                                            00690000
+ATCMROUT EQU   ISTATCVT+1060                                            00691000
+ATCONFIG EQU   ISTATCVT+1052                                            00692000
+ATCNODEL EQU   ISTATCVT+1044                                            00693000
+@NM00036 EQU   @NM00035+9                                               00694000
+ATCLAST  EQU   ATCSHRFG                                                 00695000
+ATCSHRTN EQU   @NM00035                                                 00696000
+@NM00034 EQU   ISTATCVT+1026                                            00697000
+ATCNMCTR EQU   ISTATCVT+1024                                            00698000
+ATCPOIA  EQU   ATCRNO+1                                                 00699000
+@NM00033 EQU   ATCRNO                                                   00700000
+ATCLCLCT EQU   ATCVLCNT+2                                               00701000
+ATCRNCNT EQU   ATCVLCNT                                                 00702000
+ATCHBSIZ EQU   ATCHPGM+2                                                00703000
+ATCHBFNO EQU   ATCHPGM                                                  00704000
+@NM00032 EQU   ISTATCVT+1011                                            00705000
+ATCXRANG EQU   ISTATCVT+1010                                            00706000
+ATCMAXID EQU   ISTATCVT+1009                                            00707000
+ATCMSGSP EQU   ISTATCVT+1008                                            00708000
+ATCCIDM  EQU   ISTATCVT+1006                                            00709000
+ATCACTRM EQU   ISTATCVT+1004                                            00710000
+ATCECTLP EQU   ISTATCVT+1000                                            00711000
+ATCECNET EQU   ISTATCVT+996                                             00712000
+ATCECOPC EQU   ISTATCVT+992                                             00713000
+ATCECSES EQU   ISTATCVT+988                                             00714000
+ATCECDSP EQU   ISTATCVT+984                                             00715000
+ATCECVRY EQU   ISTATCVT+980                                             00716000
+ATCECHLT EQU   ISTATCVT+976                                             00717000
+ATCECMOD EQU   ISTATCVT+972                                             00718000
+ATCVDLOK EQU   ISTATCVT+968                                             00719000
+ATCRDTLK EQU   ISTATCVT+964                                             00720000
+ATCVOCLK EQU   ISTATCVT+960                                             00721000
+ATCITLIM EQU   ISTATCVT+958                                             00722000
+ATCTMINV EQU   ISTATCVT+956                                             00723000
+ATCHOSTA EQU   ISTATCVT+954                                             00724000
+ATCPUNSA EQU   ISTATCVT+952                                             00725000
+ATCSAF   EQU   ISTATCVT+950                                             00726000
+ATCVTMID EQU   ATCSSCPA                                                 00727000
+ATCHCNID EQU   ATCONID+2                                                00728000
+ATCSCNID EQU   ATCONID                                                  00729000
+@NM00031 EQU   ATCBITAN+3                                               00730000
+@NM00030 EQU   ATCBITAN+2                                               00731000
+@NM00029 EQU   ATCFLAG2                                                 00732000
+@NM00028 EQU   ATCFLAG2                                                 00733000
+@NM00027 EQU   ATCFLAG2                                                 00734000
+ATCCRYPF EQU   ATCFLAG2                                                 00735000
+ATCTUNCL EQU   ATCFLAG2                                                 00736000
+ATCTUNRQ EQU   ATCFLAG2                                                 00737000
+ATCTUNAC EQU   ATCFLAG2                                                 00738000
+ATCCDLRA EQU   ATCFLAG2                                                 00739000
+@NM00026 EQU   ATCBITAN                                                 00740000
+@NM00025 EQU   ATCSTAT4                                                 00741000
+@NM00024 EQU   ATCSTAT4                                                 00742000
+@NM00023 EQU   ATCSTAT4                                                 00743000
+@NM00022 EQU   ATCSTAT4                                                 00744000
+@NM00021 EQU   ATCSTAT4                                                 00745000
+ATCPRTAT EQU   ATCSTAT4                                                 00746000
+ATCNCSD  EQU   ATCSTAT4                                                 00747000
+ATCMTST  EQU   ATCSTAT4                                                 00748000
+@NM00020 EQU   ATCPOFLG                                                 00749000
+@NM00019 EQU   ATCPOFLG                                                 00750000
+@NM00018 EQU   ATCPOFLG                                                 00751000
+@NM00017 EQU   ATCPOFLG                                                 00752000
+@NM00016 EQU   ATCPOFLG                                                 00753000
+@NM00015 EQU   ATCPOFLG                                                 00754000
+@NM00014 EQU   ATCPOFLG                                                 00755000
+ATCPOUNS EQU   ATCPOFLG                                                 00756000
+@NM00013 EQU   ATCSTAT+1                                                00757000
+ATCHIP   EQU   ATCSTAT1                                                 00758000
+ATCMDHLT EQU   ATCSTAT1                                                 00759000
+ATCINHLT EQU   ATCSTAT1                                                 00760000
+ATCNETSL EQU   ATCSTAT1                                                 00761000
+ATCQKHLT EQU   ATCSTAT1                                                 00762000
+ATCSNHLT EQU   ATCSTAT1                                                 00763000
+ATCACTIV EQU   ATCSTAT1                                                 00764000
+ATCSTART EQU   ATCSTAT1                                                 00765000
+ATCNOP00 EQU   ISTATCVT+932                                             00766000
+ATCTSBUF EQU   ISTATCVT+928                                             00767000
+ATCFEPT  EQU   ISTATCVT+924                                             00768000
+ATCFDVT  EQU   ISTATCVT+920                                             00769000
+ATCCONFT EQU   ISTATCVT+916                                             00770000
+ATCRDTH  EQU   ISTATCVT+912                                             00771000
+ATCSIBQ  EQU   ISTATCVT+908                                             00772000
+ATCHLTMS EQU   ISTATCVT+904                                             00773000
+ATCECPRM EQU   ISTATCVT+900                                             00774000
+ATCVPARM EQU   ISTATCVT+896                                             00775000
+ATCOCHA  EQU   ISTATCVT+892                                             00776000
+ATCDSPLQ EQU   ISTATCVT+888                                             00777000
+ATCVARYQ EQU   ISTATCVT+884                                             00778000
+ATCHALTQ EQU   ISTATCVT+880                                             00779000
+ATCMODQ  EQU   ISTATCVT+876                                             00780000
+ATCSRT   EQU   ISTATCVT+872                                             00781000
+ATCRDT   EQU   ISTATCVT+868                                             00782000
+ATCSDVT  EQU   ISTATCVT+864                                             00783000
+ATCDLRPT EQU   ISTATCVT+860                                             00784000
+ATCBPDA  EQU   ISTATCVT+856                                             00785000
+ATCACDA  EQU   ISTATCVT+852                                             00786000
+ATCMNT   EQU   ISTATCVT+848                                             00787000
+ATCUEP   EQU   ISTATCVT+844                                             00788000
+ATCNODDS EQU   ISTATCVT+840                                             00789000
+ATCITRT  EQU   ISTATCVT+836                                             00790000
+ATCTODVT EQU   ISTATCVT+832                                             00791000
+ATCTRCPT EQU   ISTATCVT+828                                             00792000
+ATCMODTB EQU   ISTATCVT+824                                             00793000
+ATCUSSPT EQU   ISTATCVT+820                                             00794000
+ATCTUBUF EQU   ISTATCVT+816                                             00795000
+ATCTACB  EQU   ISTATCVT+812                                             00796000
+ATCDWA   EQU   ISTATCVT+808                                             00797000
+ATCCFCR2 EQU   ATCPODVT                                                 00798000
+ATCEPA   EQU   ISTATCVT+800                                             00799000
+ATCPULQB EQU   @NM00012+16                                              00800000
+ATCMCQAB EQU   @NM00012+12                                              00801000
+ATCLUSMQ EQU   @NM00012+8                                               00802000
+ATCLUIOQ EQU   @NM00012+4                                               00803000
+ATCIOLQB EQU   @NM00012                                                 00804000
+ATCTSCAP EQU   ATCANYDT                                                 00805000
+ATCTSCCO EQU   ATCLUDVT+4                                               00806000
+ATCTSCSR EQU   ATCLUDVT                                                 00807000
+ATCVTLOD EQU   ISTATCVT+764                                             00808000
+ATCTSCLF EQU   ISTATCVT+760                                             00809000
+ATCTSCLE EQU   ISTATCVT+756                                             00810000
+ATCTSCLB EQU   ISTATCVT+752                                             00811000
+ATCTSCLS EQU   ISTATCVT+748                                             00812000
+ATCTSCCF EQU   ISTATCVT+744                                             00813000
+ATCTSCFV EQU   ISTATCVT+740                                             00814000
+ATCTSCCE EQU   ISTATCVT+736                                             00815000
+ATCTSCCB EQU   ISTATCVT+732                                             00816000
+ATCTSCWS EQU   ISTATCVT+728                                             00817000
+ATCTSCEM EQU   ISTATCVT+724                                             00818000
+ATCTSCNS EQU   ISTATCVT+720                                             00819000
+ATCTSCER EQU   ISTATCVT+716                                             00820000
+ATCTSCPR EQU   ISTATCVT+712                                             00821000
+ATCTSCGR EQU   ISTATCVT+708                                             00822000
+ATCTSCCI EQU   ISTATCVT+704                                             00823000
+ATCTSVT  EQU   ISTATCVT+700                                             00824000
+ATCDVLOD EQU   ISTATCVT+696                                             00825000
+ATCCDCNR EQU   ISTATCVT+692                                             00826000
+ATCCDCNF EQU   ISTATCVT+688                                             00827000
+ATCCDCND EQU   ISTATCVT+684                                             00828000
+ATCCDCNA EQU   ISTATCVT+680                                             00829000
+ATCCDCCP EQU   ISTATCVT+676                                             00830000
+ATCCDFDN EQU   ISTATCVT+672                                             00831000
+ATCCDFIN EQU   ISTATCVT+668                                             00832000
+ATCCDFND EQU   ISTATCVT+664                                             00833000
+ATCCDDEL EQU   ISTATCVT+660                                             00834000
+ATCCDADD EQU   ISTATCVT+656                                             00835000
+ATCTCLIM EQU   ISTATCVT+652                                             00836000
+ATCRACTR EQU   ISTATCVT+648                                             00837000
+ATCRACTI EQU   ISTATCVT+644                                             00838000
+ATCREMOV EQU   ISTATCVT+640                                             00839000
+ATCRACIO EQU   ISTATCVT+636                                             00840000
+ATCADD   EQU   ISTATCVT+632                                             00841000
+ATCPUCRT EQU   ISTATCVT+628                                             00842000
+ATCSMRS  EQU   ISTATCVT+624                                             00843000
+ATCSMRQ  EQU   ISTATCVT+620                                             00844000
+ATCORCPX EQU   ISTATCVT+616                                             00845000
+ATCORCAF EQU   ISTATCVT+612                                             00846000
+ATCFRSTR EQU   ATCGTSTR                                                 00847000
+ATCSTMA  EQU   ISTATCVT+604                                             00848000
+ATCSRTAD EQU   ISTATCVT+600                                             00849000
+ATCOCRT  EQU   ISTATCVT+596                                             00850000
+ATCOCCFS EQU   ISTATCVT+592                                             00851000
+ATCOCCFP EQU   ISTATCVT+588                                             00852000
+ATCSRTDF EQU   ISTATCVT+584                                             00853000
+ATCLUCRT EQU   ISTATCVT+580                                             00854000
+ATCINCY5 EQU   ISTATCVT+576                                             00855000
+ATCINCW3 EQU   ISTATCVT+572                                             00856000
+ATCINCU6 EQU   ISTATCVT+568                                             00857000
+ATCINCTQ EQU   ISTATCVT+564                                             00858000
+ATCINCS1 EQU   ISTATCVT+560                                             00859000
+ATCSRTAB EQU   ISTATCVT+556                                             00860000
+ATCINCRD EQU   ISTATCVT+552                                             00861000
+ATCINCPH EQU   ISTATCVT+548                                             00862000
+ATCINCLQ EQU   ISTATCVT+544                                             00863000
+ATCNOCRT EQU   ISTATCVT+540                                             00864000
+ATCINCF1 EQU   ISTATCVT+536                                             00865000
+ATCINCCI EQU   ISTATCVT+532                                             00866000
+ATCINCCO EQU   ISTATCVT+528                                             00867000
+ATCBLDLA EQU   ISTATCVT+524                                             00868000
+ATCALOAD EQU   ISTATCVT+520                                             00869000
+ATCADEL  EQU   ISTATCVT+516                                             00870000
+ATCESC02 EQU   ISTATCVT+512                                             00871000
+ATCESC01 EQU   ISTATCVT+508                                             00872000
+ATCDEC01 EQU   ISTATCVT+504                                             00873000
+ATCDEC00 EQU   ISTATCVT+500                                             00874000
+ATCCPCRT EQU   ISTATCVT+496                                             00875000
+ATCCPCFR EQU   ISTATCVT+488                                             00876000
+ATCCPCGR EQU   ISTATCVT+484                                             00877000
+ATCCPCPP EQU   ISTATCVT+480                                             00878000
+ATCMSGP  EQU   ISTATCVT+476                                             00879000
+ATCCPCNT EQU   ISTATCVT+472                                             00880000
+ATCAUTHA EQU   ISTATCVT+468                                             00881000
+ATCACCTA EQU   ISTATCVT+464                                             00882000
+ATCAP39  EQU   ISTATCVT+460                                             00883000
+ATCAP36  EQU   ISTATCVT+456                                             00884000
+ATCAP35  EQU   ISTATCVT+452                                             00885000
+ATCAP33  EQU   ISTATCVT+448                                             00886000
+ATCAPCR5 EQU   ISTATCVT+444                                             00887000
+ATCAICPT EQU   ISTATCVT+440                                             00888000
+ATCAPI   EQU   ISTATCVT+436                                             00889000
+ATCAICTN EQU   ISTATCVT+432                                             00890000
+ATCACC01 EQU   ISTATCVT+428                                             00891000
+ATCACC00 EQU   ISTATCVT+424                                             00892000
+ATCLDECB EQU   ATCLDTIL+12                                              00893000
+ATCLDLCK EQU   ATCLDTIL+8                                               00894000
+ATCLDLST EQU   ATCLDTIL+4                                               00895000
+ATCLDNCS EQU   ATCLDTIL                                                 00896000
+ATCNOSPB EQU   ISTATCVT+376                                             00897000
+ATCNSPAB EQU   ISTATCVT+344                                             00898000
+ATCLUSRT EQU   ISTATCVT+312                                             00899000
+ATCPUIOP EQU   ISTATCVT+280                                             00900000
+ATCPUPAB EQU   ISTATCVT+248                                             00901000
+ATCPXPAB EQU   ISTATCVT+216                                             00902000
+ATCPOPAB EQU   ISTATCVT+184                                             00903000
+@NM00011 EQU   ATCVDPAB+16                                              00904000
+ATCFEPAB EQU   ATCVDPAB                                                 00905000
+ATCTCIPB EQU   ISTATCVT+120                                             00906000
+ATCCSPAB EQU   ATCSMPAB+16                                              00907000
+@NM00010 EQU   ATCSMPAB                                                 00908000
+ATCTMRPB EQU   ISTATCVT+56                                              00909000
+ATCITPAB EQU   ISTATCVT+24                                              00910000
+@NM00009 EQU   ATCITRA1                                                 00911000
+ATCITSCP EQU   ATCITRA1                                                 00912000
+ATCITMSG EQU   ATCITRA1                                                 00913000
+ATCITPIU EQU   ATCITRA1                                                 00914000
+ATCITSMS EQU   ATCITRA1                                                 00915000
+ATCITPSS EQU   ATCITRA1                                                 00916000
+ATCITLCK EQU   ATCITRA1                                                 00917000
+ATCITAPI EQU   ATCITRA1                                                 00918000
+ATCITCNT EQU   ATCITFLG                                                 00919000
+ATCITRPH EQU   ATCITCDS                                                 00920000
+ATCITTBL EQU   ATCITFLD+4                                               00921000
+ATCITPRM EQU   ATCITFLD                                                 00922000
+ATCPTCHA EQU   ATCRPTCH+4                                               00923000
+ATCVTLVL EQU   ATCRPTCH                                                 00924000
+RPHUPSTA EQU   ISTRPH+104                                               00925000
+RPHSAV16 EQU   RPHWORK+60                                               00926000
+RPHSAV15 EQU   RPHWORK+56                                               00927000
+RPHSAV14 EQU   RPHWORK+52                                               00928000
+RPHSAV13 EQU   RPHWORK+48                                               00929000
+RPHSAV12 EQU   RPHWORK+44                                               00930000
+RPHSAV11 EQU   RPHWORK+40                                               00931000
+RPHSAV10 EQU   RPHWORK+36                                               00932000
+RPHSAVE9 EQU   RPHWORK+32                                               00933000
+RPHSAVE8 EQU   RPHWORK+28                                               00934000
+RPHSAVE7 EQU   RPHWORK+24                                               00935000
+RPHSAVE6 EQU   RPHWORK+20                                               00936000
+RPHSAVE5 EQU   RPHWORK+16                                               00937000
+RPHSAVE4 EQU   RPHWORK+12                                               00938000
+RPHSAVE3 EQU   RPHWORK+8                                                00939000
+RPHSAVE2 EQU   RPHWORK+4                                                00940000
+RPHSHALF EQU   RPHSAVE1+2                                               00941000
+RPHSBIT8 EQU   RPHSBITS                                                 00942000
+RPHSBIT7 EQU   RPHSBITS                                                 00943000
+RPHSBIT6 EQU   RPHSBITS                                                 00944000
+RPHSBIT5 EQU   RPHSBITS                                                 00945000
+RPHSBIT4 EQU   RPHSBITS                                                 00946000
+RPHSBIT3 EQU   RPHSBITS                                                 00947000
+RPHSBIT2 EQU   RPHSBITS                                                 00948000
+RPHSBIT1 EQU   RPHSBITS                                                 00949000
+RPHSBYTE EQU   RPHSAVE1                                                 00950000
+RPHPABQP EQU   RPHPABQA+1                                               00951000
+RPHPABFG EQU   RPHPABQA                                                 00952000
+RPHCRR   EQU   ISTRPH+32                                                00953000
+RPHSRP34 EQU   RPHSRPRM+2                                               00954000
+RPHSRP12 EQU   RPHSRPRM                                                 00955000
+RPHWEGT  EQU   RPHCSPA                                                  00956000
+RPHMAJCB EQU   ISTRPH+21                                                00957000
+RPHPABOF EQU   ISTRPH+20                                                00958000
+RPHRESUM EQU   RPHRESMA+1                                               00959000
+@NM00008 EQU   RPHWPFLG                                                 00960000
+RPHPURGE EQU   RPHWPFLG                                                 00961000
+RPHPT    EQU   RPHWPFLG                                                 00962000
+RPHWT    EQU   RPHWPFLG                                                 00963000
+RPHRSKEY EQU   RPHWPFLG                                                 00964000
+RPHDVTA  EQU   ISTRPH+12                                                00965000
+RPHTIK   EQU   RPHTSKID+3                                               00966000
+@NM00007 EQU   RPHTSKID                                                 00967000
+RPHRPHAP EQU   RPHRPHA+1                                                00968000
+@NM00006 EQU   RPHRPHA                                                  00969000
+RPHGATE  EQU   RPHRPHA                                                  00970000
+RPHABEND EQU   RPHFLGB                                                  00971000
+RPHUWAIT EQU   RPHFLGB                                                  00972000
+RPHRLCRA EQU   RPHFLGB                                                  00973000
+@NM00005 EQU   RPHFLGB                                                  00974000
+RPHPGCMP EQU   RPHFLGB                                                  00975000
+RPHFBAPS EQU   RPHFLGB                                                  00976000
+RPHBSSP  EQU   RPHFLGB                                                  00977000
+RPHLOCK  EQU   RPHFLGB                                                  00978000
+RPHFNFLG EQU   RPHFSTLC                                                 00979000
+RPHMLTCP EQU   RPHFLAGS                                                 00980000
+RPHSMCLR EQU   RPHFLAGS                                                 00981000
+RPHSMTYP EQU   RPHFLAGS                                                 00982000
+RPHSMQ   EQU   RPHFLAGS                                                 00983000
+RPHAPTYP EQU   RPHFLAGS                                                 00984000
+RPHSPGIN EQU   RPHFLAGS                                                 00985000
+RPHOGIND EQU   RPHFLAGS                                                 00986000
+RPHLNGTH EQU   RPHCNTL+1                                                00987000
+RPHTYPE  EQU   RPHCNTL                                                  00988000
+DYPOCRPH EQU   DYPPACMD                                                 00989000
+DYPTSKID EQU   ISTDYPAB+8                                               00990000
+DYPPACTB EQU   DYPCHAIN                                                 00991000
+DYPFLGS  EQU   ISTDYPAB+2                                               00992000
+DYPLNGTH EQU   ISTDYPAB+1                                               00993000
+DYPTYPE  EQU   ISTDYPAB                                                 00994000
+PABRPHA  EQU   PABRPHFG+1                                               00995000
+PABNODQ  EQU   PABFLAGS                                                 00996000
+PABINHBT EQU   PABFLAGS                                                 00997000
+PABERLOK EQU   PABERRLK                                                 00998000
+PABSSN   EQU   PABFLAGS                                                 00999000
+PABDYNAM EQU   PABFLAGS                                                 01000000
+PABXTND  EQU   PABFLAGS                                                 01001000
+PABPRIOR EQU   PABFLAGS                                                 01002000
+PABAPYP  EQU   PABFLAGS                                                 01003000
+PABDVTA  EQU   ISTPAB+9                                                 01004000
+PABOFFST EQU   ISTPAB+8                                                 01005000
+PABCHNGP EQU   PABCHAIN+1                                               01006000
+PABRSV02 EQU   PABCHAIN                                                 01007000
+PABDELAY EQU   PABCHAIN                                                 01008000
+PABQUED  EQU   PABRUNNG                                                 01009000
+PABRESET EQU   PABCHAIN                                                 01010000
+PABUNCON EQU   PABCHAIN                                                 01011000
+PABCDP   EQU   PABCHAIN                                                 01012000
+PABRESCH EQU   PABCHAIN                                                 01013000
+PABCHNG  EQU   PABCHAIN                                                 01014000
+PABWEQP  EQU   PABWEQA+1                                                01015000
+PABRSV01 EQU   PABWEQA                                                  01016000
+PABWEQG  EQU   PABWEQA                                                  01017000
+LOKXCL   EQU   @NM00002                                                 01018000
+LOKPRY   EQU   @NM00002                                                 01019000
+@NM00003 EQU   @NM00002                                                 01020000
+@NM00001 EQU   LOKCHNG                                                  01021000
+LOKCT    EQU   ISTLOK                                                   01022000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      01023000
+@ENDDATA EQU   *                                                        01024000
+         END   ISTCFMMI,(C'PLS2246',0702,79215)                         01025000

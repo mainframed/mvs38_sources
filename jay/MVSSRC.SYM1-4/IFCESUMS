@@ -1,0 +1,1283 @@
+         TITLE 'IFCESUMS-SUMMARY MODULE FOR IFCEREP0                   *00001000
+                        '                                               00002000
+IFCESUMS CSECT ,                                                   0001 00003000
+@MAINENT DS    0H                                                  0001 00004000
+         USING *,@15                                               0001 00005000
+         B     @PROLOG                                             0001 00006000
+         DC    AL1(16)                                             0001 00007000
+         DC    C'IFCESUMS  78.146'                                 0001 00008000
+         DROP  @15                                                      00009000
+@PROLOG  ST    @14,12(,@13)                                        0001 00010000
+         STM   @00,@04,20(@13)                                     0001 00011000
+         STM   @06,@12,44(@13)                                     0001 00012000
+         BALR  @11,0                                               0001 00013000
+@PSTART  DS    0H                                                  0001 00014000
+         USING @PSTART,@11                                         0001 00015000
+         ST    @13,@SA00001+4                                      0001 00016000
+         LA    @14,@SA00001                                        0001 00017000
+         ST    @14,8(,@13)                                         0001 00018000
+         LR    @13,@14                                             0001 00019000
+*/********************************************************************/ 00020000
+*/*                                                          @Z427VLS*/ 00021000
+*/*      SECTION CONSTRUCTS A PART OF THE HEADER FROM THE RECORD     */ 00022000
+*/*      AND CCHHR TABLE TO DETERMINE IF ANOTHER REC HAS BEEN SUMMED */ 00023000
+*/*      AND MATCHES THIS REC. IF SO NO NEW AREA IS GOTTEN. IF NO    */ 00024000
+*/*      MATCH A NEW AREA IS GOTTEN AND CHAINED TO THIS ONE  @Z427VLS*/ 00025000
+*/*                                                          @Z427VLS*/ 00026000
+*/********************************************************************/ 00027000
+*RETCODE = ZERO;                                           /*@Z427VLS*/ 00028000
+         SLR   @12,@12                                             0081 00029000
+         STH   @12,RETCODE                                         0081 00030000
+* SWES = '00'X;                                            /*@Z427VLS*/ 00031000
+         MVI   SWES,X'00'                                          0082 00032000
+* IF LRTTYP = '34'X | LRTTYP = '32'X THEN  /* TCAM OR CONVERTED REC  */ 00033000
+         CLI   LRTTYP(REG7),X'34'                                  0083 00034000
+         BE    @RT00083                                            0083 00035000
+         CLI   LRTTYP(REG7),X'32'                                  0083 00036000
+         BNE   @RF00083                                            0083 00037000
+@RT00083 DS    0H                                                  0084 00038000
+*   IF LRDISMNT = OFF &                 /* MUST BE AN OBR(30) WITH   */ 00039000
+*      SHRTSW  = OFF &                  /* SHORT SW & DISMOUNT SW OFF*/ 00040000
+*      (LRTCAMID & '0F'X)='0F'X THEN    /* AND TCAM ID SW EQUAL TO 0F*/ 00041000
+         TM    LRDISMNT(REG7),B'00100100'                          0084 00042000
+         BNZ   @RF00084                                            0084 00043000
+         MVC   @TS00001(1),LRTCAMID(REG7)                          0084 00044000
+         NI    @TS00001,X'0F'                                      0084 00045000
+         CLI   @TS00001,X'0F'                                      0084 00046000
+         BNE   @RF00084                                            0084 00047000
+*         TCAMSWIT = ON;                /* THEN TCAM SW IS SET       */ 00048000
+         OI    TCAMSWIT,B'10000000'                                0085 00049000
+* IF  LRTTYP='36'X THEN                 /* SEE IF VTAM       @Z427VLS*/ 00050000
+@RF00084 DS    0H                                                  0086 00051000
+@RF00083 CLI   LRTTYP(REG7),X'36'                                  0086 00052000
+         BNE   @RF00086                                            0086 00053000
+*   TCAMSWIT = ON;                      /* IF YES, TURN ON TCAM SWITC*/ 00054000
+         OI    TCAMSWIT,B'10000000'                                0087 00055000
+* SAVERTYP = LRTTYP & FOXZERO;                             /*@Z427VLS*/ 00056000
+@RF00086 MVC   SAVERTYP(1),LRTTYP(REG7)                            0088 00057000
+         NI    SAVERTYP,X'F0'                                      0088 00058000
+* IF SAVERTYP = '90'X THEN              /* TEST FOR T-TYPE RECORD    */ 00059000
+         CLI   SAVERTYP,X'90'                                      0089 00060000
+         BNE   @RF00089                                            0089 00061000
+*   DO;                                                    /*@Z427VLS*/ 00062000
+*     /*                                                     @Z427VLS*/ 00063000
+*     /* IF DEVICE ID IS ANY OF THE FOLLOWING, THEN THE RECORD IS    */ 00064000
+*     /* TREATED AS AN OBR AND THE EXTRA 8 BYTES IS NOT NEEDED.      */ 00065000
+*     /* OTHERWISE THE MDR-TYPE SWITCH IS SET.               @Z427VLS*/ 00066000
+*     /*                                                     @Z427VLS*/ 00067000
+*     IF LRTRECID ^= '01'X &            /* 3330              @Z427VLS*/ 00068000
+*        LRTRECID ^= '05'X &                                       0091 00069000
+*        LRTRECID ^= '15'X &                                       0091 00070000
+*        LRTRECID ^= '02'X &            /* OR A 2305-2       @Z427VLS*/ 00071000
+*        LRTRECID ^= '04'X &            /* OR A 3211         @Z427VLS*/ 00072000
+*        LRTRECID ^= '12'X &            /* OR A 2305-1       @Z427VLS*/ 00073000
+*        LRTRECID ^= '09'X &            /* OR A 3340         @Z427VLS*/ 00074000
+*        LRTRECID ^= '11'X &            /* OR A 3350         @Z427VLS*/ 00075000
+*        LRTRECID ^= '0A'X &            /* OR A 3330-1       @Z427VLS*/ 00076000
+*        LRTRECID ^= '0C'X &            /* OR 3800           @Z427VLS*/ 00077000
+*        LRTRECID ^= '0D'X &            /* OR A 3895         @Z427VLS*/ 00078000
+*        LRTRECID ^= '0E'X  THEN                                   0091 00079000
+         CLI   LRTRECID(REG7),X'01'                                0091 00080000
+         BE    @RF00091                                            0091 00081000
+         CLI   LRTRECID(REG7),X'05'                                0091 00082000
+         BE    @RF00091                                            0091 00083000
+         CLI   LRTRECID(REG7),X'15'                                0091 00084000
+         BE    @RF00091                                            0091 00085000
+         CLI   LRTRECID(REG7),X'02'                                0091 00086000
+         BE    @RF00091                                            0091 00087000
+         CLI   LRTRECID(REG7),X'04'                                0091 00088000
+         BE    @RF00091                                            0091 00089000
+         CLI   LRTRECID(REG7),X'12'                                0091 00090000
+         BE    @RF00091                                            0091 00091000
+         CLI   LRTRECID(REG7),X'09'                                0091 00092000
+         BE    @RF00091                                            0091 00093000
+         CLI   LRTRECID(REG7),X'11'                                0091 00094000
+         BE    @RF00091                                            0091 00095000
+         CLI   LRTRECID(REG7),X'0A'                                0091 00096000
+         BE    @RF00091                                            0091 00097000
+         CLI   LRTRECID(REG7),X'0C'                                0091 00098000
+         BE    @RF00091                                            0091 00099000
+         CLI   LRTRECID(REG7),X'0D'                                0091 00100000
+         BE    @RF00091                                            0091 00101000
+         CLI   LRTRECID(REG7),X'0E'                                0091 00102000
+         BE    @RF00091                                            0091 00103000
+*          TTYPSWIT = ON;                                  /*@Z427VLS*/ 00104000
+         OI    TTYPSWIT,B'01000000'                                0092 00105000
+*   END;                                                   /*@Z427VLS*/ 00106000
+@RF00091 DS    0H                                                  0094 00107000
+* IF TTYPSWIT = ON |                    /* TEST FOR T TYPE OR TCAM   */ 00108000
+*    TCAMSWIT = ON THEN                 /* RECORDS           @Z427VLS*/ 00109000
+@RF00089 TM    TTYPSWIT,B'11000000'                                0094 00110000
+         BZ    @RF00094                                            0094 00111000
+*      IF TTYPSWIT = ON &               /* TEST FOR T TYPE & VAR SUB */ 00112000
+*         LRVARIDS = ON THEN            /* ID FIELD.  IF VAR SUB ID  */ 00113000
+         TM    TTYPSWIT,B'01000000'                                0095 00114000
+         BNO   @RF00095                                            0095 00115000
+         TM    LRVARIDS(REG7),B'10000000'                          0095 00116000
+         BNO   @RF00095                                            0095 00117000
+*           HDRBUMP=16;                 /* SET BUMP VALUE TO 16      */ 00118000
+         MVC   HDRBUMP(4),@CF00086                                 0096 00119000
+*      ELSE                             /* IF IT IS T TYPE OR TCAM   */ 00120000
+*           HDRBUMP=8;                  /* SET VALUE TO 8    @Z427VLS*/ 00121000
+         B     @RC00095                                            0097 00122000
+@RF00095 MVC   HDRBUMP(4),@CF00063                                 0097 00123000
+* ELSE                                  /* IF IT NEITHER T TYPE OR   */ 00124000
+*    HDRBUMP = ZERO;                    /* TCAM SET VALUE TO ZERO    */ 00125000
+         B     @RC00094                                            0098 00126000
+@RF00094 SLR   @12,@12                                             0098 00127000
+         ST    @12,HDRBUMP                                         0098 00128000
+* HOLDTYPE=SMACCTAB;                    /* BUILD COMPARE VALUE FROM  */ 00129000
+@RC00094 MVC   HOLDTYPE(5),SMACCTAB(REG4)                          0099 00130000
+* HOLDCPUN=LRCPUNOS;               /* CCHHR TABLE(R4) AND CPUSER (R2)*/ 00131000
+         MVC   HOLDCPUN(5),LRCPUNOS(REG7)                          0100 00132000
+* /*                                                         @Z427VLS*/ 00133000
+* /* CHECK FOR SHARED I/O AND CHANGE CUA AND CPU IF REQUIRED @Z427VLS*/ 00134000
+* /*                                                         @Z427VLS*/ 00135000
+* IF SHAREPTR ^= ZERO & (SAVERTYP = '30'X | SAVERTYP = '90'X) THEN 0101 00136000
+         L     @12,SHAREPTR(,R2)                                   0101 00137000
+         LTR   @12,@12                                             0101 00138000
+         BZ    @RF00101                                            0101 00139000
+         CLI   SAVERTYP,X'30'                                      0101 00140000
+         BE    @RT00101                                            0101 00141000
+         CLI   SAVERTYP,X'90'                                      0101 00142000
+         BNE   @RF00101                                            0101 00143000
+@RT00101 DS    0H                                                  0102 00144000
+*   DO;                                                    /*@Z427VLS*/ 00145000
+*     VALIDSHR = OFF;                        /* TURN OFF FOR SEARCH  */ 00146000
+         NI    VALIDSHR,B'11101111'                                0103 00147000
+*     IF SAVERTYP = '90'X THEN               /* MDR RECORD   @Z427VLS*/ 00148000
+         CLI   SAVERTYP,X'90'                                      0104 00149000
+         BNE   @RF00104                                            0104 00150000
+*       SHR34CUA = LRTMCUA;                                /*@Z427VLS*/ 00151000
+         MVC   SHR34CUA(2),LRTMCUA(REG7)                           0105 00152000
+*     ELSE                                                         0106 00153000
+*       IF SHRTSW = ON THEN                                        0106 00154000
+         B     @RC00104                                            0106 00155000
+@RF00104 TM    SHRTSW(REG7),B'00100000'                            0106 00156000
+         BNO   @RF00106                                            0106 00157000
+*         SHR34CUA = LRTSCUA;                /* CUA FOR SHORT OBR    */ 00158000
+         MVC   SHR34CUA(2),LRTSCUA(REG7)                           0107 00159000
+*       ELSE                                                       0108 00160000
+*         SHR34CUA = LRTCUA;                 /* CUA FOR LONG OBR     */ 00161000
+         B     @RC00106                                            0108 00162000
+@RF00106 MVC   SHR34CUA(2),LRTCUA(REG7)                            0108 00163000
+*     SHR34CPU = LRCPUNOS(1:3);              /* CPU FOR COMPARISON   */ 00164000
+@RC00106 DS    0H                                                  0109 00165000
+@RC00104 MVC   SHR34CPU(3),LRCPUNOS(REG7)                          0109 00166000
+*     SHR34XXD = SHR34XXX;                   /* FOR CONTROLLER COMPR */ 00167000
+         MVC   SHR34XXD(5),SHR34XXX                                0110 00168000
+*     SHR34CUX = SHR34CUX & FOXZERO;                       /*@Z427VLS*/ 00169000
+         NI    SHR34CUX,X'F0'                                      0111 00170000
+*     SHR34XDD = ON;                                       /*@Z427VLS*/ 00171000
+         OI    SHR34XDD,B'10000000'                                0112 00172000
+*     DO J = 1 TO SHARENUM BY 1 WHILE(VALIDSHR = OFF);     /*@Z427VLS*/ 00173000
+         LA    @12,1                                               0113 00174000
+         STH   @12,J                                               0113 00175000
+         B     @DE00113                                            0113 00176000
+@DL00113 TM    VALIDSHR,B'00010000'                                0113 00177000
+         BNZ   @DC00113                                            0113 00178000
+*       IF SHAREDX(J) = ON THEN                                    0114 00179000
+         MH    @12,@CH00592                                        0114 00180000
+         L     @10,SHAREPTR(,R2)                                   0114 00181000
+         ST    @12,@TF00001                                        0114 00182000
+         ALR   @12,@10                                             0114 00183000
+         AL    @12,@CF00598                                        0114 00184000
+         TM    SHAREDX-2(@12),B'10000000'                          0114 00185000
+         BNO   @RF00114                                            0114 00186000
+*         DO;                                /* CHECK FOR CONTROLLER */ 00187000
+*           IF SHR34XXD = SHRCUCPU(J) THEN                         0116 00188000
+         LR    @12,@10                                             0116 00189000
+         AL    @12,@TF00001                                        0116 00190000
+         AL    @12,@CF00598                                        0116 00191000
+         CLC   SHR34XXD(5),SHRCUCPU-2(@12)                         0116 00192000
+         BNE   @RF00116                                            0116 00193000
+*             DO;                                          /*@Z427VLS*/ 00194000
+*               /*                                           @Z427VLS*/ 00195000
+*               /* PUT IN CUA FROM SHARE TABLE WITH RECORD UNITS ADDR*/ 00196000
+*               /*                                           @Z427VLS*/ 00197000
+*               HOLDCPUN(4:5) = HOLDCPUN(4:5) && HOLDCPUN(4:5);    0118 00198000
+         XC    HOLDCPUN+3(2),HOLDCPUN+3                            0118 00199000
+*               HOLDCPUN(1:3) = SHARSERB(J);               /*@Z427VLS*/ 00200000
+         LR    @12,@10                                             0119 00201000
+         AL    @12,@TF00001                                        0119 00202000
+         BCTR  @12,0                                               0119 00203000
+         BCTR  @12,0                                               0119 00204000
+         MVC   HOLDCPUN(3),SHARSERB-9(@12)                         0119 00205000
+*               VALIDSHR = ON;                             /*@Z427VLS*/ 00206000
+         OI    VALIDSHR,B'00010000'                                0120 00207000
+*               SHR34CUA = SHR34CUA & ZZZF;  /* KEEP ONLY UNITS BITS*/  00208000
+         NC    SHR34CUA(2),@CB00503                                0121 00209000
+*               SHR34CUA = SHR34CUA | SHARECUB(J); /*SHARED ADDRESS */  00210000
+         AL    @10,@TF00001                                        0122 00211000
+         AL    @10,@CF00600                                        0122 00212000
+         OC    SHR34CUA(2),SHARECUB-7(@10)                         0122 00213000
+*             END;                                         /*@Z427VLS*/ 00214000
+*         END;                                             /*@Z427VLS*/ 00215000
+*       ELSE                                                       0125 00216000
+*         IF SHR34XXX = SHRCUCPU(J) THEN                           0125 00217000
+         B     @RC00114                                            0125 00218000
+@RF00114 LH    @12,J                                               0125 00219000
+         MH    @12,@CH00592                                        0125 00220000
+         L     @10,SHAREPTR(,R2)                                   0125 00221000
+         ST    @12,@TF00001                                        0125 00222000
+         ALR   @12,@10                                             0125 00223000
+         AL    @12,@CF00598                                        0125 00224000
+         CLC   SHR34XXX(5),SHRCUCPU-2(@12)                         0125 00225000
+         BNE   @RF00125                                            0125 00226000
+*           DO;                              /* CUA ONLY.    @Z427VLS*/ 00227000
+*             HOLDCPUN(4:5) = HOLDCPUN(4:5) && HOLDCPUN(4:5);      0127 00228000
+         XC    HOLDCPUN+3(2),HOLDCPUN+3                            0127 00229000
+*             HOLDCPUN(1:3) = SHARSERB(J);                 /*@Z427VLS*/ 00230000
+         LR    @12,@10                                             0128 00231000
+         AL    @12,@TF00001                                        0128 00232000
+         BCTR  @12,0                                               0128 00233000
+         BCTR  @12,0                                               0128 00234000
+         MVC   HOLDCPUN(3),SHARSERB-9(@12)                         0128 00235000
+*             VALIDSHR = ON;                               /*@Z427VLS*/ 00236000
+         OI    VALIDSHR,B'00010000'                                0129 00237000
+*             SHR34CUA = SHARECUB(J);        /*SHARED ADDRESS       */  00238000
+         AL    @10,@TF00001                                        0130 00239000
+         AL    @10,@CF00600                                        0130 00240000
+         MVC   SHR34CUA(2),SHARECUB-7(@10)                         0130 00241000
+*           END;                                           /*@Z427VLS*/ 00242000
+*     END;                                                 /*@Z427VLS*/ 00243000
+@RF00125 DS    0H                                                  0132 00244000
+@RC00114 LA    @12,1                                               0132 00245000
+         AH    @12,J                                               0132 00246000
+         STH   @12,J                                               0132 00247000
+@DE00113 L     @10,SHAREPTR(,R2)                                   0132 00248000
+         CH    @12,SHARENUM(,@10)                                  0132 00249000
+         BNH   @DL00113                                            0132 00250000
+@DC00113 DS    0H                                                  0133 00251000
+*     IF VALIDSHR = ON THEN                                        0133 00252000
+         TM    VALIDSHR,B'00010000'                                0133 00253000
+         BNO   @RF00133                                            0133 00254000
+*       DO;                                                /*@Z427VLS*/ 00255000
+*         IF SAVERTYP = '90'X THEN                                 0135 00256000
+         CLI   SAVERTYP,X'90'                                      0135 00257000
+         BNE   @RF00135                                            0135 00258000
+*           LRTMCUA = SHR34CUA;           /* REPLACE IN RECORD       */ 00259000
+         MVC   LRTMCUA(2,REG7),SHR34CUA                            0136 00260000
+*         ELSE                                                     0137 00261000
+*           IF SHRTSW = ON THEN                                    0137 00262000
+         B     @RC00135                                            0137 00263000
+@RF00135 TM    SHRTSW(REG7),B'00100000'                            0137 00264000
+         BNO   @RF00137                                            0137 00265000
+*             LRTSCUA = SHR34CUA;         /* REPLACE IN RECORD       */ 00266000
+         MVC   LRTSCUA(2,REG7),SHR34CUA                            0138 00267000
+*           ELSE                                                   0139 00268000
+*             LRTCUA = SHR34CUA;          /* REPLACE IN RECORD       */ 00269000
+         B     @RC00137                                            0139 00270000
+@RF00137 MVC   LRTCUA(2,REG7),SHR34CUA                             0139 00271000
+*       END;                                               /*@Z427VLS*/ 00272000
+@RC00137 DS    0H                                                  0140 00273000
+@RC00135 DS    0H                                                  0141 00274000
+*   END;                                                   /*@Z427VLS*/ 00275000
+@RF00133 DS    0H                                                  0142 00276000
+* RESPECIFY (REG4) UNRESTRICTED;                           /*@Z427VLS*/ 00277000
+@RF00101 DS    0H                                                  0143 00278000
+*/********************************************************************/ 00279000
+*/* SET UP FOR SEARCH ON MATCH.  FOUND SWITCH IS SET OFF.  IF A MATCH*/ 00280000
+*/* IS FOUND THEN IT IS SET ON.  OTHERWISE, THE FORWARD POINTER IS   */ 00281000
+*/* SET TO REG6.  THE SEARCH STOPS WHEN A MATCH IS FOUND OR REG6 = 0.*/ 00282000
+*/********************************************************************/ 00283000
+*RESPECIFY (REG6) RESTRICTED;                              /*@Z427VLS*/ 00284000
+*FOUND = OFF;                                              /*@Z427VLS*/ 00285000
+         NI    FOUND,B'11011111'                                   0144 00286000
+*REG6 = REG5;                                              /*@Z427VLS*/ 00287000
+         LR    REG6,REG5                                           0145 00288000
+*DO WHILE (REG6 ^= ZERO & FOUND = OFF);                    /*@Z427VLS*/ 00289000
+         B     @DE00146                                            0146 00290000
+@DL00146 DS    0H                                                  0147 00291000
+*  SAVER6 = REG6;                                          /*@Z427VLS*/ 00292000
+         ST    REG6,SAVER6                                         0147 00293000
+*  IF HOLDID = RECORDID THEN       /* DOES THIS REC MATCH PREV RECS  */ 00294000
+         CLC   HOLDID(10),RECORDID(REG6)                           0148 00295000
+         BNE   @RF00148                                            0148 00296000
+*    DO;                                                   /*@Z427VLS*/ 00297000
+*      IF TCAMSWIT = ON & SMCTCAM = ON THEN                        0150 00298000
+         TM    TCAMSWIT,B'10000000'                                0150 00299000
+         BNO   @RF00150                                            0150 00300000
+         TM    SMCTCAM(REG6),B'10000000'                           0150 00301000
+         BNO   @RF00150                                            0150 00302000
+*        DO;                                               /*@Z427VLS*/ 00303000
+*           IF (SHRTSW = ON & LRTTYPID ^= X3790) |                 0152 00304000
+*              (SHRTSW = OFF & LRDEVTYP ^= X3790) THEN             0152 00305000
+         TM    SHRTSW(REG7),B'00100000'                            0152 00306000
+         BNO   @GL00018                                            0152 00307000
+         CLC   LRTTYPID(2,REG7),X3790                              0152 00308000
+         BNE   @RT00152                                            0152 00309000
+@GL00018 TM    SHRTSW(REG7),B'00100000'                            0152 00310000
+         BNZ   @RF00152                                            0152 00311000
+         CLC   LRDEVTYP(2,REG7),X3790                              0152 00312000
+         BE    @RF00152                                            0152 00313000
+@RT00152 DS    0H                                                  0153 00314000
+*              IF LRTERMNL = SMTERMNL THEN   /* SAME TERMINAL NAME   */ 00315000
+         CLC   LRTERMNL(8,REG7),SMTERMNL(REG6)                     0153 00316000
+         BNE   @RF00153                                            0153 00317000
+*                 FOUND = ON;                              /*@Z427VLS*/ 00318000
+         OI    FOUND,B'00100000'                                   0154 00319000
+*              ELSE                                                0155 00320000
+*                 REG6 = FWARDPTR;                         /*@Z427VLS*/ 00321000
+         B     @RC00153                                            0155 00322000
+@RF00153 L     REG6,FWARDPTR(,REG6)                                0155 00323000
+*           ELSE                                                   0156 00324000
+*              FOUND = ON;                                 /*@Z427VLS*/ 00325000
+         B     @RC00152                                            0156 00326000
+@RF00152 OI    FOUND,B'00100000'                                   0156 00327000
+*        END;                                              /*@Z427VLS*/ 00328000
+*      ELSE                                                        0158 00329000
+*        IF TCAMSWIT = ON |                  /* TCAM OR 8 BYTE SW ON */ 00330000
+*           SMCTCAM  = ON THEN               /* BOTH THEN NEXT AREA  */ 00331000
+         B     @RC00150                                            0158 00332000
+@RF00150 TM    TCAMSWIT,B'10000000'                                0158 00333000
+         BO    @RT00158                                            0158 00334000
+         TM    SMCTCAM(REG6),B'10000000'                           0158 00335000
+         BNO   @RF00158                                            0158 00336000
+@RT00158 DS    0H                                                  0159 00337000
+*             REG6 = FWARDPTR;                             /*@Z427VLS*/ 00338000
+         L     REG6,FWARDPTR(,REG6)                                0159 00339000
+*        ELSE                                                      0160 00340000
+*           IF TTYPSWIT = ON &               /* TEST FOR VAR SUB ID  */ 00341000
+*              LRVARIDS = ON THEN                                  0160 00342000
+         B     @RC00158                                            0160 00343000
+@RF00158 TM    TTYPSWIT,B'01000000'                                0160 00344000
+         BNO   @RF00160                                            0160 00345000
+         TM    LRVARIDS(REG7),B'10000000'                          0160 00346000
+         BNO   @RF00160                                            0160 00347000
+*              DO;                           /* TEST VAR SUB ID FLDS */ 00348000
+*                K = (LRVARIDF & '0F'X) + 1; /* PICK UP NO.  @Z427VLS*/ 00349000
+         LA    @12,15                                              0162 00350000
+         SLR   @10,@10                                             0162 00351000
+         IC    @10,LRVARIDF(,REG7)                                 0162 00352000
+         NR    @12,@10                                             0162 00353000
+         AL    @12,@CF00052                                        0162 00354000
+         ST    @12,K                                               0162 00355000
+*                IF SMVARID(1:K) = LRVARID(1:K) THEN               0163 00356000
+         BCTR  @12,0                                               0163 00357000
+         EX    @12,@SC00603                                        0163 00358000
+         BNE   @RF00163                                            0163 00359000
+*                   FOUND = ON;                            /*@Z427VLS*/ 00360000
+         OI    FOUND,B'00100000'                                   0164 00361000
+*                ELSE                                              0165 00362000
+*                   REG6 = FWARDPTR;                       /*@Z427VLS*/ 00363000
+         B     @RC00163                                            0165 00364000
+@RF00163 L     REG6,FWARDPTR(,REG6)                                0165 00365000
+*              END;                                        /*@Z427VLS*/ 00366000
+*           ELSE                                                   0167 00367000
+*              /*                                            @Z427VLS*/ 00368000
+*              /* IF BOTH ARE OFF, TEST FOR T-TYPE SW ON.  IF NOT ON */ 00369000
+*              /* ON, SKIP TO NEXT AREA.  IF BOTH NOT OFF, TEST SUB  */ 00370000
+*              /* IS FOR MATCH.  IF NO MATCH, TRY NEXT AREA. @Z427VLS*/ 00371000
+*              /*                                            @Z427VLS*/ 00372000
+*              IF TTYPSWIT = ON THEN                               0167 00373000
+         B     @RC00160                                            0167 00374000
+@RF00160 TM    TTYPSWIT,B'01000000'                                0167 00375000
+         BNO   @RF00167                                            0167 00376000
+*                 IF LRTTYPID = SMTTYPID THEN                      0168 00377000
+         CLC   LRTTYPID(2,REG7),SMTTYPID(REG6)                     0168 00378000
+         BNE   @RF00168                                            0168 00379000
+*                    FOUND = ON;                           /*@Z427VLS*/ 00380000
+         OI    FOUND,B'00100000'                                   0169 00381000
+*                 ELSE                                             0170 00382000
+*                    REG6 = FWARDPTR;                      /*@Z427VLS*/ 00383000
+         B     @RC00168                                            0170 00384000
+@RF00168 L     REG6,FWARDPTR(,REG6)                                0170 00385000
+*              ELSE                                                0171 00386000
+*                 FOUND = ON;                              /*@Z427VLS*/ 00387000
+         B     @RC00167                                            0171 00388000
+@RF00167 OI    FOUND,B'00100000'                                   0171 00389000
+*    END;                                                  /*@Z427VLS*/ 00390000
+*  ELSE                                                            0173 00391000
+*    REG6 = FWARDPTR;                                      /*@Z427VLS*/ 00392000
+         B     @RC00148                                            0173 00393000
+@RF00148 L     REG6,FWARDPTR(,REG6)                                0173 00394000
+*END;                                                      /*@Z427VLS*/ 00395000
+@RC00148 DS    0H                                                  0174 00396000
+@DE00146 LTR   REG6,REG6                                           0174 00397000
+         BZ    @DC00146                                            0174 00398000
+         TM    FOUND,B'00100000'                                   0174 00399000
+         BZ    @DL00146                                            0174 00400000
+@DC00146 DS    0H                                                  0175 00401000
+*/*                                                          @Z427VLS*/ 00402000
+*/*      BUILD A NEW COUNTER AREA, IF ONE DID NOT EXIST      @Z427VLS*/ 00403000
+*/*                                                          @Z427VLS*/ 00404000
+*RESPECIFY (REG3) RESTRICTED;                              /*@Z427VLS*/ 00405000
+*IF REG6 = ZERO THEN                                               0176 00406000
+         SLR   @12,@12                                             0176 00407000
+         CR    REG6,@12                                            0176 00408000
+         BNE   @RF00176                                            0176 00409000
+*  DO;                                                     /*@Z427VLS*/ 00410000
+*      IF SCNTSIZE ^= ZERO THEN              /* IF NO. CTRS ZERO EXIT*/ 00411000
+         LH    @10,SCNTSIZE(,REG9)                                 0178 00412000
+         CR    @10,@12                                             0178 00413000
+         BE    @RF00178                                            0178 00414000
+*        DO;                                               /*@Z427VLS*/ 00415000
+*          REG3=HEADRLEN+(2*SCNTSIZE)+HDRBUMP; /* COMPUTE AREA SIZE  */ 00416000
+         ALR   @10,@10                                             0180 00417000
+         AL    @10,@CF00473                                        0180 00418000
+         AL    @10,HDRBUMP                                         0180 00419000
+         LR    REG3,@10                                            0180 00420000
+*          RESPECIFY (REG15) RESTRICTED;                   /*@Z427VLS*/ 00421000
+*          GEN(GETMAIN EC,LV=(REG3),A=SMWHERE); /* GET AREA CONDIT'AL*/ 00422000
+         GETMAIN EC,LV=(REG3),A=SMWHERE                                 00423000
+*          RETCODE = REG15;                  /* SAVE RETURN CODE     */ 00424000
+         STH   REG15,RETCODE                                       0183 00425000
+*          RESPECIFY (REG15) UNRESTRICTED;                 /*@Z427VLS*/ 00426000
+*          IF RETCODE = ZERO THEN            /* IF R15 ZERO BUILD CTR*/ 00427000
+         LH    @12,RETCODE                                         0185 00428000
+         LTR   @12,@12                                             0185 00429000
+         BNZ   @RF00185                                            0185 00430000
+*            DO;                                           /*@Z427VLS*/ 00431000
+*/*  THE FOLLOWING CODE WILL STORE IN THE COMM TABLE THE ADDRESS OF*/   00432000
+*/*  GETMAIN AND THE LENGTH THES DATA WILL BE USED BY EDSUM TO DUMP*/   00433000
+*/*  THE COUNTERS TO TOURIST DATA SET JUST PRIOR TO CALL IFCEEDIT TO*/  00434000
+*/*  PRINT THE RESULTS SIZE SHOULD ALWAYS BE THE SAME IT IS SAVED   */  00435000
+*/*  FOR EACH GETMAIN IN CASE THIS SHOULD CHANGE WE WILL AVOID A C4 */  00436000
+*             IF DEBUG14 = ON & DUMPNUM ^= TWELVE THEN             0187 00437000
+         TM    DEBUG14(R2),B'00000010'                             0187 00438000
+         BNO   @RF00187                                            0187 00439000
+         LH    @12,DUMPNUM(,R2)                                    0187 00440000
+         C     @12,@CF00065                                        0187 00441000
+         BE    @RF00187                                            0187 00442000
+*               DO;                                        /*@Z427VLS*/ 00443000
+*                 DUMPADR(DUMPNUM) = SMWHERE;              /*@Z427VLS*/ 00444000
+         LR    @10,@12                                             0189 00445000
+         SLA   @10,3                                               0189 00446000
+         L     @08,SMWHERE                                         0189 00447000
+         ST    @08,DUMPADR-8(@10,R2)                               0189 00448000
+*                 DUMPSIZE(DUMPNUM) = REG3;                /*@Z427VLS*/ 00449000
+         ST    REG3,DUMPSIZE-8(@10,R2)                             0190 00450000
+*                 DUMPNUM = DUMPNUM + 1;                   /*@Z427VLS*/ 00451000
+         AL    @12,@CF00052                                        0191 00452000
+         STH   @12,DUMPNUM(,R2)                                    0191 00453000
+*               END;                                       /*@Z427VLS*/ 00454000
+*              /******************************************************/ 00455000
+*              /*                                            @Z427VLS*/ 00456000
+*              /*  IF NO CHAIN EXISTS BUILD A CHAIN WITH ONE ELEMENT */ 00457000
+*              /*                                            @Z427VLS*/ 00458000
+*              /******************************************************/ 00459000
+*              IF REG5 = ZERO THEN           /* DOES CHAIN EXIST     */ 00460000
+@RF00187 LTR   REG5,REG5                                           0193 00461000
+         BNZ   @RF00193                                            0193 00462000
+*                  REG5 = SMWHERE;           /* BUILD W/PTR TO FIRST */ 00463000
+         L     REG5,SMWHERE                                        0194 00464000
+*               ELSE                                               0195 00465000
+*                  SAVER6 -> FWARDPTR = SMWHERE; /* SET FORWARD PTR  */ 00466000
+         B     @RC00193                                            0195 00467000
+@RF00193 L     @12,SMWHERE                                         0195 00468000
+         L     @10,SAVER6                                          0195 00469000
+         ST    @12,FWARDPTR(,@10)                                  0195 00470000
+*               REG6 = SMWHERE;              /* PTR TO CHAIN AREAS   */ 00471000
+@RC00193 L     REG6,SMWHERE                                        0196 00472000
+*               EDTABPTR = REG9;             /* INITIALIZING HEADER  */ 00473000
+         ST    REG9,EDTABPTR(,REG6)                                0197 00474000
+*               FWARDPTR = ZERO;             /* ZERO FWARDPTR TO LAST*/ 00475000
+         SLR   @12,@12                                             0198 00476000
+         ST    @12,FWARDPTR(,REG6)                                 0198 00477000
+*               SCCOUNT = ZERO;              /* SET COUNT TO 0       */ 00478000
+         STH   @12,SCCOUNT(,REG6)                                  0199 00479000
+*               RECORDID = HOLDID;           /* SET UP HEADER AREA   */ 00480000
+         MVC   RECORDID(10,REG6),HOLDID                            0200 00481000
+*                IF (RECORDID & FOXZERO) = '40'X THEN              0201 00482000
+         MVC   @TS00001(1),RECORDID(REG6)                          0201 00483000
+         NI    @TS00001,X'F0'                                      0201 00484000
+         CLI   @TS00001,X'40'                                      0201 00485000
+         BNE   @RF00201                                            0201 00486000
+*                 RECORDID(1) = '40'X;                    /* @ZA17693*/ 00487000
+         MVI   RECORDID(REG6),X'40'                                0202 00488000
+*               SMCWITCH = SMCWITCH&&SMCWITCH;  /* SET SWITCHES TO 0 */ 00489000
+@RF00201 XC    SMCWITCH(2,REG6),SMCWITCH(REG6)                     0203 00490000
+*               /*                                           @Z427VLS*/ 00491000
+*               /*      ZERO  COUNTERS. INITIALIZE TERM NAME AND     */ 00492000
+*               /*      TCAM SWITCHES IN COUNTER.            @Z427VLS*/ 00493000
+*               /*                                           @Z427VLS*/ 00494000
+*               REG3 = REG6;                 /* SET WORK REG @Z427VLS*/ 00495000
+         LR    REG3,REG6                                           0204 00496000
+*               IF TCAMSWIT = ON THEN        /* IF TCAM INITIALIZE AS*/ 00497000
+         TM    TCAMSWIT,B'10000000'                                0205 00498000
+         BNO   @RF00205                                            0205 00499000
+*                 DO;                                      /*@Z427VLS*/ 00500000
+*                   SMCTCAM = ON;            /* SET TCAM SWITCH      */ 00501000
+         OI    SMCTCAM(REG6),B'10000000'                           0207 00502000
+*                   SMTERMNL = LRTERMNL;     /* BRING OVER TERM NAME */ 00503000
+         MVC   SMTERMNL(8,REG6),LRTERMNL(REG7)                     0208 00504000
+*                   REG3 = REG3+8;                         /*@Z427VLS*/ 00505000
+         AL    REG3,@CF00063                                       0209 00506000
+*                 END;                                     /*@Z427VLS*/ 00507000
+*               ELSE                                               0211 00508000
+*                 /*                                         @Z427VLS*/ 00509000
+*                 /*    INITIALIZE FOR T-TYPE RECORD         @Z427VLS*/ 00510000
+*                 /*                                         @Z427VLS*/ 00511000
+*                 IF TTYPSWIT = ON THEN      /* IF T-TYPE REC        */ 00512000
+         B     @RC00205                                            0211 00513000
+@RF00205 TM    TTYPSWIT,B'01000000'                                0211 00514000
+         BNO   @RF00211                                            0211 00515000
+*                   DO;                                    /*@Z427VLS*/ 00516000
+*                     SMTRECID = LRTRECID;   /* SET RECORD ID        */ 00517000
+         MVC   SMTRECID(1,REG6),LRTRECID(REG7)                     0213 00518000
+*                     SMTTYPID = LRTTYPID;   /* T-TYPE SUB ID        */ 00519000
+         MVC   SMTTYPID(2,REG6),LRTTYPID(REG7)                     0214 00520000
+*                     SMTTYP0 = SMTTYP0 && SMTTYP0;        /*@Z427VLS*/ 00521000
+         XC    SMTTYP0(5,REG6),SMTTYP0(REG6)                       0215 00522000
+*                     REG3 = REG3 + 8;                     /*@Z427VLS*/ 00523000
+         LA    @12,8                                               0216 00524000
+         ALR   REG3,@12                                            0216 00525000
+*                     IF LRVARIDS = ON THEN   /* VAR SUB ID? @Z427VLS*/ 00526000
+         TM    LRVARIDS(REG7),B'10000000'                          0217 00527000
+         BNO   @RF00217                                            0217 00528000
+*                       DO;                                /*@Z427VLS*/ 00529000
+*                         K = (LRVARIDF & '0F'X) + 1; /* SET SIZE    */ 00530000
+         LA    @10,15                                              0219 00531000
+         SLR   @08,@08                                             0219 00532000
+         IC    @08,LRVARIDF(,REG7)                                 0219 00533000
+         NR    @10,@08                                             0219 00534000
+         AL    @10,@CF00052                                        0219 00535000
+         ST    @10,K                                               0219 00536000
+*                         SMVARID(1:K) = LRVARID(1:K);     /*@Z427VLS*/ 00537000
+         BCTR  @10,0                                               0220 00538000
+         EX    @10,@SM00605                                        0220 00539000
+*                         REG3 = REG3 + 8;    /* ADJUST CTR PTR      */ 00540000
+         ALR   REG3,@12                                            0221 00541000
+*                       END;                               /*@Z427VLS*/ 00542000
+*                   END;                                   /*@Z427VLS*/ 00543000
+@RF00217 DS    0H                                                  0224 00544000
+*                 /*                                         @Z427VLS*/ 00545000
+*                 /*  ZERO COUNTER LOOP                      @Z427VLS*/ 00546000
+*                 /*                                         @Z427VLS*/ 00547000
+*                 DO J=SCNTSIZE TO 1 BY -1 ;     /* ZERO NO. CTRS    */ 00548000
+@RF00211 DS    0H                                                  0224 00549000
+@RC00205 LH    @12,SCNTSIZE(,REG9)                                 0224 00550000
+         STH   @12,J                                               0224 00551000
+         B     @DE00224                                            0224 00552000
+@DL00224 DS    0H                                                  0225 00553000
+*                   REG3 -> SCCOUNTR(J) = ZERO;  /* FOUND IN TABLE   */ 00554000
+         LR    @10,@12                                             0225 00555000
+         ALR   @10,@10                                             0225 00556000
+         SLR   @08,@08                                             0225 00557000
+         STH   @08,SCCOUNTR-2(@10,REG3)                            0225 00558000
+*                 END;                                     /*@Z427VLS*/ 00559000
+         BCTR  @12,0                                               0226 00560000
+         STH   @12,J                                               0226 00561000
+@DE00224 LTR   @12,@12                                             0226 00562000
+         BP    @DL00224                                            0226 00563000
+*            END;                                          /*@Z427VLS*/ 00564000
+*          ELSE                                                    0228 00565000
+*            EXIT = ON;                      /* CAN'T BUILD CTRS,EXIT*/ 00566000
+         B     @RC00185                                            0228 00567000
+@RF00185 OI    EXIT,B'00001000'                                    0228 00568000
+*        END;                                              /*@Z427VLS*/ 00569000
+*      ELSE                                                        0230 00570000
+*        DO;                                               /*@Z427VLS*/ 00571000
+         B     @RC00178                                            0230 00572000
+@RF00178 DS    0H                                                  0231 00573000
+*           EXIT = ON;                       /* EXIT, NO COUNTERS    */ 00574000
+         OI    EXIT,B'00001000'                                    0231 00575000
+*           RETCODE = ZERO;                  /* GOOD RETURN CODE     */ 00576000
+         SLR   @12,@12                                             0232 00577000
+         STH   @12,RETCODE                                         0232 00578000
+*        END;                                              /*@Z427VLS*/ 00579000
+*  END;                                                    /*@Z427VLS*/ 00580000
+@RC00178 DS    0H                                                  0235 00581000
+*/********************************************************************/ 00582000
+*/*                                                          @Z427VLS*/ 00583000
+*/*      SUM RECORD SECTION                                  @Z427VLS*/ 00584000
+*/*                                                          @Z427VLS*/ 00585000
+*/********************************************************************/ 00586000
+*IF EXIT = OFF THEN                                                0235 00587000
+@RF00176 TM    EXIT,B'00001000'                                    0235 00588000
+         BNZ   @RF00235                                            0235 00589000
+*  DO;                                                     /*@Z427VLS*/ 00590000
+*    RESPECIFY(REG8) RESTRICTED;                           /*@Z427VLS*/ 00591000
+*    R2 = REG7;   /*SET ADDRESSABILITY FOR SUM TABLE R2 WILL BE      */ 00592000
+         LR    R2,REG7                                             0238 00593000
+*                 /*RESTORED UPON EXIT FROM ESUMS            @Z427VLS*/ 00594000
+*    SCCOUNT = SCCOUNT + 1;                                /*@Z427VLS*/ 00595000
+         LA    @12,1                                               0239 00596000
+         AH    @12,SCCOUNT(,REG6)                                  0239 00597000
+         STH   @12,SCCOUNT(,REG6)                                  0239 00598000
+*    DO REG8 = CONTRPTR BY 6 WHILE( STFLAG ^= 'FF'X);      /*@Z427VLS*/ 00599000
+         L     REG8,CONTRPTR(,REG9)                                0240 00600000
+         B     @DE00240                                            0240 00601000
+@DL00240 DS    0H                                                  0241 00602000
+*      IF SUMFLAG = ON THEN        /* IS THIS ENTRY A NORMAL SUM     */ 00603000
+         TM    SUMFLAG(REG8),B'10000000'                           0241 00604000
+         BNO   @RF00241                                            0241 00605000
+*        DO;                                               /*@Z427VLS*/ 00606000
+*          /*                                                @Z427VLS*/ 00607000
+*          /*      SUM-SPECIAL ROUTINE ENTRY                 @Z427VLS*/ 00608000
+*          /*      SETS REGS AS FOLLOWS                      @Z427VLS*/ 00609000
+*          /*            R3   PTR TO COUNTER TO BE USED      @Z427VLS*/ 00610000
+*          /*            R8   PTR TO CURRENT ELEMENT OF TABLE        */ 00611000
+*          /*            R9   PTR TO SUMMARY TABLE           @Z427VLS*/ 00612000
+*          /*            R14  TRN POINT                      @Z427VLS*/ 00613000
+*          /*            R15  ENTRY POINT                    @Z427VLS*/ 00614000
+*          /*                                                @Z427VLS*/ 00615000
+*          SMTABELM=REG8 ;                   /* SAVE CURR ENTRY PTR  */ 00616000
+         ST    REG8,SMTABELM(,REG9)                                0243 00617000
+*          REG3=REG6+HEADRLEN+(2*SCOFFSET)+HDRBUMP;        /*@Z427VLS*/ 00618000
+         LA    REG3,22                                             0244 00619000
+         ALR   REG3,REG6                                           0244 00620000
+         LH    @12,SCOFFSET(,REG8)                                 0244 00621000
+         ALR   @12,@12                                             0244 00622000
+         ALR   REG3,@12                                            0244 00623000
+         AL    REG3,HDRBUMP                                        0244 00624000
+*          SUMSPEC = REG9 + STSPCPTR;        /* SET ENTRY PTR R9+    */ 00625000
+         LR    @12,REG9                                            0245 00626000
+         AH    @12,STSPCPTR(,REG8)                                 0245 00627000
+         ST    @12,SUMSPEC                                         0245 00628000
+*          CALL SPECIAL;                     /* OFFSET FROM TAB ENTRY*/ 00629000
+         LR    @15,@12                                             0246 00630000
+         BALR  @14,@15                                             0246 00631000
+*          REG8=SMTABELM;                    /* RESET REG 8  @Z427VLS*/ 00632000
+         L     REG8,SMTABELM(,REG9)                                0247 00633000
+*        END;                                              /*@Z427VLS*/ 00634000
+*      ELSE                                                        0249 00635000
+*        DO;                                               /*@Z427VLS*/ 00636000
+         B     @RC00241                                            0249 00637000
+@RF00241 DS    0H                                                  0250 00638000
+*          /**********************************************************/ 00639000
+*          /*                                                @Z427VLS*/ 00640000
+*          /* NORMAL SUMMARY PROCESSING - A MASK IS USED.  IF THE    */ 00641000
+*          /* FLAG IS OFF, NOTHING WILL BE DONE.  IF IT IS ON, ONE   */ 00642000
+*          /* WILL BE ADDED TO THE INDICATED COUNTER.        @Z427VLS*/ 00643000
+*          /*                                                @Z427VLS*/ 00644000
+*          /**********************************************************/ 00645000
+*          IF STFLAG = '00'X THEN       /* SUM TO ADD > ONE BIT?     */ 00646000
+         CLI   STFLAG(REG8),X'00'                                  0250 00647000
+         BNE   @RF00250                                            0250 00648000
+*            DO;                                           /*@Z427VLS*/ 00649000
+*              SUMSPEC = LROFFSET + R2;   /* OFFSET FROM ENTRY       */ 00650000
+         LR    @12,R2                                              0252 00651000
+         AH    @12,LROFFSET(,REG8)                                 0252 00652000
+         ST    @12,SUMSPEC                                         0252 00653000
+*              IF (SUMMARY & STMASK) = STMASK THEN                 0253 00654000
+         MVC   @TS00001(1),SUMMARY(@12)                            0253 00655000
+         NC    @TS00001(1),STMASK(REG8)                            0253 00656000
+         CLC   @TS00001(1),STMASK(REG8)                            0253 00657000
+         BNE   @RF00253                                            0253 00658000
+*                DO;                                       /*@Z427VLS*/ 00659000
+*                  REG3=REG6+HDRBUMP;   /* UP PTR BY COMPUTED VALUE  */ 00660000
+         LR    REG3,REG6                                           0255 00661000
+         AL    REG3,HDRBUMP                                        0255 00662000
+*                  REG3 -> SCCOUNTR(SCOFFSET+1) =                  0256 00663000
+*                          REG3 -> SCCOUNTR(SCOFFSET+1) + 1;       0256 00664000
+         LH    @12,SCOFFSET(,REG8)                                 0256 00665000
+         ALR   @12,@12                                             0256 00666000
+         LA    @10,1                                               0256 00667000
+         AH    @10,SCCOUNTR(@12,REG3)                              0256 00668000
+         STH   @10,SCCOUNTR(@12,REG3)                              0256 00669000
+*                END;                                      /*@Z427VLS*/ 00670000
+*            END;                                          /*@Z427VLS*/ 00671000
+*          ELSE                                                    0259 00672000
+*            DO;                                           /*@Z427VLS*/ 00673000
+         B     @RC00250                                            0259 00674000
+@RF00250 DS    0H                                                  0260 00675000
+*              RESPECIFY (REG12) RESTRICTED;               /*@Z427VLS*/ 00676000
+*              SHIFT = REG8 -> SUMMARY; /*GET FIRST BYTE OF SUM ENTRY*/ 00677000
+         SLR   @10,@10                                             0261 00678000
+         IC    @10,SUMMARY(,REG8)                                  0261 00679000
+         STH   @10,SHIFT                                           0261 00680000
+*              SRL(SHIFT,4);            /* ISOLATE SHIFT BITS@XA21975*/ 00681000
+         LR    @04,@10                                             0262 00682000
+         SRL   @04,4                                               0262 00683000
+         STH   @04,SHIFT                                           0262 00684000
+*              SHIFT = SHIFT + 24;      /* INCR TO ISOLATE BITS      */ 00685000
+         LA    @04,24                                              0263 00686000
+         AH    @04,SHIFT                                           0263 00687000
+         STH   @04,SHIFT                                           0263 00688000
+*              REG12 = LROFFSET + REG7; /* POINT TO LOGREC BYTE      */ 00689000
+         LR    REG12,REG7                                          0264 00690000
+         AH    REG12,LROFFSET(,REG8)                               0264 00691000
+*              REG12 = REG12->SUMMARY;  /* PUT BYTE FROM LOGREC IN 12*/ 00692000
+         SLR   @15,@15                                             0265 00693000
+         IC    @15,SUMMARY(,REG12)                                 0265 00694000
+         LR    REG12,@15                                           0265 00695000
+*              SLL(REG12,SHIFT);        /* ISOLATE BITS TO BE ADDED  */ 00696000
+         SLL   REG12,0(@04)                                        0266 00697000
+*              SHIFT = 32 - ((REG8 -> SUMMARY) & '0F'X);   /*@Z427VLS*/ 00698000
+         N     @10,@CF00571                                        0267 00699000
+         LCR   @10,@10                                             0267 00700000
+         AL    @10,@CF00591                                        0267 00701000
+         STH   @10,SHIFT                                           0267 00702000
+*                                       /* SUBTRACT THE LENGTH OF FLD*/ 00703000
+*              SRL(REG12,SHIFT);        /* RIGHT ALIGN THE BITS      */ 00704000
+         SRL   REG12,0(@10)                                        0268 00705000
+*              REG3 = REG6 + HDRBUMP;   /* POINT TO CTRS TO BE UPDTED*/ 00706000
+         LR    REG3,REG6                                           0269 00707000
+         AL    REG3,HDRBUMP                                        0269 00708000
+*              REG3 -> SCCOUNTR(SCOFFSET+1) =                      0270 00709000
+*                      REG3 -> SCCOUNTR(SCOFFSET+1) + REG12;       0270 00710000
+         LH    @10,SCOFFSET(,REG8)                                 0270 00711000
+         ALR   @10,@10                                             0270 00712000
+         LR    @04,REG12                                           0270 00713000
+         AH    @04,SCCOUNTR(@10,REG3)                              0270 00714000
+         STH   @04,SCCOUNTR(@10,REG3)                              0270 00715000
+*              RESPECIFY (REG12) UNRESTRICTED;             /*@Z427VLS*/ 00716000
+*            END;                                          /*@Z427VLS*/ 00717000
+*        END;                                              /*@Z427VLS*/ 00718000
+@RC00250 DS    0H                                                  0274 00719000
+*    END;                                                  /*@Z427VLS*/ 00720000
+@RC00241 AL    REG8,@CF00078                                       0274 00721000
+@DE00240 CLI   STFLAG(REG8),X'FF'                                  0274 00722000
+         BNE   @DL00240                                            0274 00723000
+*    RETCODE = ZERO;                    /* SET RTN CODE SUCCESSFUL   */ 00724000
+         SLR   @12,@12                                             0275 00725000
+         STH   @12,RETCODE                                         0275 00726000
+*    RESPECIFY (REG8) UNRESTRICTED;                        /*@Z427VLS*/ 00727000
+*  END;                                                    /*@Z427VLS*/ 00728000
+*RESPECIFY (REG15) RESTRICTED;                             /*@Z427VLS*/ 00729000
+@RF00235 DS    0H                                                  0279 00730000
+*REG15 = RETCODE;                                          /*@Z427VLS*/ 00731000
+         LH    REG15,RETCODE                                       0279 00732000
+*RETURN;                                                   /*@Z427VLS*/ 00733000
+@EL00001 L     @13,4(,@13)                                         0280 00734000
+@EF00001 DS    0H                                                  0280 00735000
+@ER00001 L     @14,12(,@13)                                        0280 00736000
+         LM    @00,@04,20(@13)                                     0280 00737000
+         LM    @06,@12,44(@13)                                     0280 00738000
+         BR    @14                                                 0280 00739000
+*RESPECIFY (R2,REG7,REG3,REG5,REG6,REG8,REG9,REG15) UNRESTRICTED;  0281 00740000
+*END   IFCESUMS                                            /*@Z427VLS*/ 00741000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.      * 00742000
+*/*%INCLUDE SYSLIB  (COMTABLE)                                        * 00743000
+*;                                                                 0282 00744000
+@DATA    DS    0H                                                       00745000
+@CH00592 DC    H'11'                                                    00746000
+@SC00603 CLC   SMVARID(0,REG6),LRVARID(REG7)                            00747000
+@SM00605 MVC   SMVARID(0,REG6),LRVARID(REG7)                            00748000
+         DS    0F                                                       00749000
+@SA00001 DS    18F                                                      00750000
+@TF00001 DS    F                                                        00751000
+         DS    0F                                                       00752000
+@CF00052 DC    F'1'                                                     00753000
+@CF00078 DC    F'6'                                                     00754000
+@CF00063 DC    F'8'                                                     00755000
+@CF00065 DC    F'12'                                                    00756000
+@CF00086 DC    F'16'                                                    00757000
+@CF00473 DC    F'22'                                                    00758000
+@CF00591 DC    F'32'                                                    00759000
+@CF00598 DC    F'-9'                                                    00760000
+@CF00600 DC    F'-4'                                                    00761000
+@CF00571 DC    XL4'0F'                                                  00762000
+         DS    0D                                                       00763000
+SAVER6   DS    A                                                        00764000
+K        DS    F                                                        00765000
+SUMSPEC  DS    A                                                        00766000
+HDRBUMP  DS    F                                                        00767000
+SMWHERE  DS    A                                                        00768000
+J        DS    H                                                        00769000
+RETCODE  DS    H                                                        00770000
+SHIFT    DS    H                                                        00771000
+@TS00001 DS    CL1                                                      00772000
+@CB00503 DC    X'000F'                                                  00773000
+SWES     DC    X'00'                                                    00774000
+         ORG   SWES                                                     00775000
+TCAMSWIT DS    BL1                                                      00776000
+TTYPSWIT EQU   SWES+0                                                   00777000
+FOUND    EQU   SWES+0                                                   00778000
+VALIDSHR EQU   SWES+0                                                   00779000
+EXIT     EQU   SWES+0                                                   00780000
+         ORG   SWES+1                                                   00781000
+HOLDID   DS    CL10                                                     00782000
+         ORG   HOLDID                                                   00783000
+HOLDTYPE DS    CL5                                                      00784000
+HOLDCPUN DS    CL5                                                      00785000
+         ORG   HOLDID+10                                                00786000
+X3790    DC    X'40F1'                                                  00787000
+@NM00012 DS    CL10                                                     00788000
+         ORG   @NM00012                                                 00789000
+SHR34XXX DS    CL5                                                      00790000
+         ORG   SHR34XXX                                                 00791000
+SHR34CUA DS    CL2                                                      00792000
+SHR34CPU DS    CL3                                                      00793000
+         ORG   @NM00012+5                                               00794000
+SHR34XXD DS    CL5                                                      00795000
+         ORG   SHR34XXD                                                 00796000
+@NM00013 DS    CL2                                                      00797000
+         ORG   @NM00013                                                 00798000
+SHR34XDD DS    BL1                                                      00799000
+@NM00014 EQU   @NM00013+0                                               00800000
+SHR34CUX DS    BL1                                                      00801000
+         ORG   SHR34XXD+2                                               00802000
+@NM00015 DS    CL3                                                      00803000
+         ORG   @NM00012+10                                              00804000
+SAVERTYP DS    CL1                                                      00805000
+SAVECUA  DS    CL3                                                      00806000
+SUPERZAP DC    3CL10'SUPERZAP'                                          00807000
+PATCH    DC    20H'0'                                                   00808000
+IFCESUMS CSECT                                                          00809000
+         DC    S(SUPERZAP)                                              00810000
+IFCESUMS CSECT                                                          00811000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00812000
+@01      EQU   01                                                       00813000
+@02      EQU   02                                                       00814000
+@03      EQU   03                                                       00815000
+@04      EQU   04                                                       00816000
+@05      EQU   05                                                       00817000
+@06      EQU   06                                                       00818000
+@07      EQU   07                                                       00819000
+@08      EQU   08                                                       00820000
+@09      EQU   09                                                       00821000
+@10      EQU   10                                                       00822000
+@11      EQU   11                                                       00823000
+@12      EQU   12                                                       00824000
+@13      EQU   13                                                       00825000
+@14      EQU   14                                                       00826000
+@15      EQU   15                                                       00827000
+R2       EQU   @02                                                      00828000
+REG3     EQU   @03                                                      00829000
+REG4     EQU   @04                                                      00830000
+REG5     EQU   @05                                                      00831000
+REG6     EQU   @06                                                      00832000
+REG7     EQU   @07                                                      00833000
+REG8     EQU   @08                                                      00834000
+REG9     EQU   @09                                                      00835000
+REG12    EQU   @12                                                      00836000
+REG15    EQU   @15                                                      00837000
+R0       EQU   @00                                                      00838000
+R1       EQU   @01                                                      00839000
+R10      EQU   @10                                                      00840000
+R11      EQU   @11                                                      00841000
+R12      EQU   @12                                                      00842000
+R13      EQU   @13                                                      00843000
+R14      EQU   @14                                                      00844000
+R15      EQU   @15                                                      00845000
+R3       EQU   @03                                                      00846000
+R4       EQU   @04                                                      00847000
+R5       EQU   @05                                                      00848000
+R6       EQU   @06                                                      00849000
+R7       EQU   @07                                                      00850000
+R8       EQU   @08                                                      00851000
+R9       EQU   @09                                                      00852000
+PARM     EQU   0                                                        00853000
+RECTYPE  EQU   PARM                                                     00854000
+SWITCHES EQU   PARM+2                                                   00855000
+DEBUG    EQU   PARM+4                                                   00856000
+DEBUG14  EQU   DEBUG+1                                                  00857000
+DEBUGA   EQU   PARM+8                                                   00858000
+MISC     EQU   PARM+12                                                  00859000
+PRINTES  EQU   MISC                                                     00860000
+OPENCLSE EQU   PARM+13                                                  00861000
+OPENIO   EQU   OPENCLSE                                                 00862000
+CLOSEIO  EQU   OPENCLSE+2                                               00863000
+DATENOW  EQU   PARM+17                                                  00864000
+STDT     EQU   PARM+23                                                  00865000
+STDATE   EQU   STDT                                                     00866000
+PSTD     EQU   STDATE+1                                                 00867000
+ENDDT    EQU   PARM+31                                                  00868000
+ENDDATE  EQU   ENDDT                                                    00869000
+PEND     EQU   ENDDATE+1                                                00870000
+STTIME1  EQU   PARM+39                                                  00871000
+ENDTIME1 EQU   PARM+43                                                  00872000
+STTIME2  EQU   PARM+47                                                  00873000
+ENDTIME2 EQU   PARM+51                                                  00874000
+STRTDATE EQU   PARM+55                                                  00875000
+@NM00007 EQU   PARM+75                                                  00876000
+ERRID    EQU   PARM+92                                                  00877000
+IDTIMEA  EQU   ERRID+6                                                  00878000
+IDTIME   EQU   IDTIMEA                                                  00879000
+CCHHRLNG EQU   PARM+112                                                 00880000
+ADIOHND  EQU   PARM+124                                                 00881000
+ADIFCMSG EQU   PARM+128                                                 00882000
+ADEDITB  EQU   PARM+132                                                 00883000
+EVPTR    EQU   PARM+136                                                 00884000
+SORTADR  EQU   PARM+140                                                 00885000
+CUAPTR   EQU   PARM+152                                                 00886000
+DEVPTR   EQU   PARM+156                                                 00887000
+MODPTR   EQU   PARM+160                                                 00888000
+SERPTR   EQU   PARM+164                                                 00889000
+VOLPTR   EQU   PARM+168                                                 00890000
+CPUPTR   EQU   PARM+172                                                 00891000
+CPCUAPTR EQU   PARM+176                                                 00892000
+LIBADPTR EQU   PARM+180                                                 00893000
+SYMCDPTR EQU   PARM+184                                                 00894000
+SYSUMPTR EQU   PARM+188                                                 00895000
+TRENPTR  EQU   PARM+192                                                 00896000
+SHAREPTR EQU   PARM+196                                                 00897000
+MERDCPTR EQU   PARM+208                                                 00898000
+DUMPTABL EQU   PARM+228                                                 00899000
+DUMPNUM  EQU   DUMPTABL                                                 00900000
+DUMPINFO EQU   DUMPTABL+4                                               00901000
+DUMPADR  EQU   DUMPINFO                                                 00902000
+DUMPSIZE EQU   DUMPINFO+4                                               00903000
+TRENDONE EQU   0                                                        00904000
+TREGEN   EQU   TRENDONE+8                                               00905000
+TRECCH0  EQU   TREGEN+8                                                 00906000
+TREND2   EQU   0                                                        00907000
+TRENDKEY EQU   TREND2                                                   00908000
+TRENDRT  EQU   TRENDKEY+1                                               00909000
+TRENCPUS EQU   TRENDKEY+3                                               00910000
+TRENDITM EQU   TRENDKEY+4                                               00911000
+EVTABLE  EQU   0                                                        00912000
+EVSTOP   EQU   EVTABLE                                                  00913000
+EVKEY    EQU   EVTABLE+6                                                00914000
+SORTABLE EQU   0                                                        00915000
+SORTKEY  EQU   SORTABLE                                                 00916000
+SORTCCHR EQU   SORTABLE+5                                               00917000
+SYSUMONE EQU   0                                                        00918000
+SYSUM2   EQU   0                                                        00919000
+SYSUMKEY EQU   SYSUM2                                                   00920000
+SYSRT    EQU   SYSUMKEY+1                                               00921000
+SYSCPUS  EQU   SYSUMKEY+3                                               00922000
+SYSITEM  EQU   SYSUMKEY+4                                               00923000
+SHARE    EQU   0                                                        00924000
+SHARENUM EQU   SHARE                                                    00925000
+SHAREIO  EQU   SHARE+2                                                  00926000
+SHRCUCPU EQU   SHAREIO                                                  00927000
+SHARECUA EQU   SHRCUCPU                                                 00928000
+SHAREDX  EQU   SHARECUA                                                 00929000
+SHARECUB EQU   SHAREIO+5                                                00930000
+SHARSERB EQU   SHAREIO+7                                                00931000
+EDITLOAD EQU   0                                                        00932000
+EDITABLE EQU   EDITLOAD+4                                               00933000
+CUA      EQU   0                                                        00934000
+CUAVAL   EQU   CUA+2                                                    00935000
+DEVICE   EQU   0                                                        00936000
+MODELS   EQU   0                                                        00937000
+DEVSERAL EQU   0                                                        00938000
+VOLUME   EQU   0                                                        00939000
+CPUS     EQU   0                                                        00940000
+CPUCUAS  EQU   0                                                        00941000
+CPUCUAV  EQU   CPUCUAS+2                                                00942000
+LIBADR   EQU   0                                                        00943000
+SYMCODE  EQU   0                                                        00944000
+SYMVAL   EQU   SYMCODE+2                                                00945000
+MERIDIAN EQU   0                                                        00946000
+SPECIAL  EQU   0                                                        00947000
+SUMMARY  EQU   0                                                        00948000
+SMCOUNTS EQU   0                                                        00949000
+EDTABPTR EQU   SMCOUNTS                                                 00950000
+FWARDPTR EQU   SMCOUNTS+4                                               00951000
+SCCOUNT  EQU   SMCOUNTS+8                                               00952000
+RECORDID EQU   SMCOUNTS+10                                              00953000
+SMCWITCH EQU   SMCOUNTS+20                                              00954000
+SMCTCAM  EQU   SMCWITCH                                                 00955000
+SCCOUNTR EQU   SMCOUNTS+22                                              00956000
+@NM00017 EQU   0                                                        00957000
+SMTERMNL EQU   @NM00017+22                                              00958000
+@NM00019 EQU   0                                                        00959000
+SMVARID  EQU   @NM00019+22                                              00960000
+SMTRECID EQU   SMVARID                                                  00961000
+SMTTYPID EQU   SMVARID+1                                                00962000
+SMTTYP0  EQU   SMVARID+3                                                00963000
+SMLOGREC EQU   0                                                        00964000
+@NM00021 EQU   SMLOGREC                                                 00965000
+LRTTYP   EQU   @NM00021                                                 00966000
+LRSWITCH EQU   @NM00021+2                                               00967000
+LRSWCH2  EQU   LRSWITCH+1                                               00968000
+SHRTSW   EQU   LRSWCH2                                                  00969000
+LRDISMNT EQU   LRSWCH2                                                  00970000
+LRTRECID EQU   SMLOGREC+4                                               00971000
+@NM00026 EQU   SMLOGREC+5                                               00972000
+LRVARIDF EQU   @NM00026                                                 00973000
+LRVARIDS EQU   LRVARIDF                                                 00974000
+LRCPUNOS EQU   SMLOGREC+17                                              00975000
+LRTMCUA  EQU   SMLOGREC+24                                              00976000
+LRVARID  EQU   SMLOGREC+26                                              00977000
+LRTTYPID EQU   LRVARID                                                  00978000
+LRTSCUA  EQU   LRVARID+4                                                00979000
+LRDEVTYP EQU   SMLOGREC+54                                              00980000
+LRTCUA   EQU   SMLOGREC+58                                              00981000
+LRTCAMID EQU   SMLOGREC+70                                              00982000
+LRTERMNL EQU   SMLOGREC+72                                              00983000
+SMACCTAB EQU   0                                                        00984000
+SMSUMTAB EQU   0                                                        00985000
+STHEADER EQU   SMSUMTAB                                                 00986000
+CONTRPTR EQU   STHEADER                                                 00987000
+SMTABELM EQU   STHEADER+8                                               00988000
+SCNTSIZE EQU   STHEADER+12                                              00989000
+STCNTROL EQU   0                                                        00990000
+STFLAG   EQU   STCNTROL                                                 00991000
+SUMFLAG  EQU   STFLAG                                                   00992000
+STMASK   EQU   STCNTROL+1                                               00993000
+LROFFSET EQU   STCNTROL+2                                               00994000
+STSPCPTR EQU   LROFFSET                                                 00995000
+SCOFFSET EQU   STCNTROL+4                                               00996000
+IFCMSG   EQU   0                                                        00997000
+IOHND    EQU   0                                                        00998000
+TRECCH   EQU   TRECCH0                                                  00999000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    01000000
+@NM00033 EQU   STHEADER+4                                               01001000
+@NM00032 EQU   SMLOGREC+71                                              01002000
+@NM00031 EQU   SMLOGREC+60                                              01003000
+@NM00030 EQU   SMLOGREC+56                                              01004000
+@NM00029 EQU   SMLOGREC+42                                              01005000
+@NM00028 EQU   LRVARID+2                                                01006000
+@NM00027 EQU   SMLOGREC+22                                              01007000
+@NM00025 EQU   LRSWCH2                                                  01008000
+@NM00024 EQU   LRSWCH2                                                  01009000
+@NM00023 EQU   LRSWITCH                                                 01010000
+@NM00022 EQU   @NM00021+1                                               01011000
+@NM00020 EQU   @NM00019                                                 01012000
+@NM00018 EQU   @NM00017                                                 01013000
+@NM00016 EQU   SMCWITCH                                                 01014000
+MODEL    EQU   MERIDIAN+2                                               01015000
+MRDNUMBR EQU   MERIDIAN                                                 01016000
+SYMVAL2  EQU   SYMVAL+2                                                 01017000
+SYMVAL1  EQU   SYMVAL                                                   01018000
+SYMCDNUM EQU   SYMCODE                                                  01019000
+LIBVAL   EQU   LIBADR+2                                                 01020000
+LIBADNUM EQU   LIBADR                                                   01021000
+CPUCUX3  EQU   CPUCUAV+5                                                01022000
+CPUCUX2  EQU   CPUCUAV+3                                                01023000
+CPUCUX1  EQU   CPUCUAV                                                  01024000
+CPCUANUM EQU   CPUCUAS                                                  01025000
+CPUVAL   EQU   CPUS+2                                                   01026000
+CPUNUM   EQU   CPUS                                                     01027000
+VOLVAL   EQU   VOLUME+2                                                 01028000
+VOLNUM   EQU   VOLUME                                                   01029000
+SERVAL   EQU   DEVSERAL+2                                               01030000
+SERNUM   EQU   DEVSERAL                                                 01031000
+MODVAL   EQU   MODELS+2                                                 01032000
+MODNUM   EQU   MODELS                                                   01033000
+MDRVAL   EQU   DEVICE+204                                               01034000
+MDRNUM   EQU   DEVICE+202                                               01035000
+DEVVAL   EQU   DEVICE+2                                                 01036000
+DEVNUM   EQU   DEVICE                                                   01037000
+CUA2     EQU   CUAVAL+2                                                 01038000
+CUA1     EQU   CUAVAL                                                   01039000
+CUANUM   EQU   CUA                                                      01040000
+LOADPTR  EQU   EDITABLE+8                                               01041000
+LOADNAME EQU   EDITABLE                                                 01042000
+EDITNUM  EQU   EDITLOAD                                                 01043000
+SHARLET  EQU   SHAREIO+10                                               01044000
+SHARSERA EQU   SHRCUCPU+2                                               01045000
+SYSTEMP  EQU   SYSUM2+9                                                 01046000
+SYSPERM  EQU   SYSUM2+7                                                 01047000
+SYSDEV   EQU   SYSUM2+5                                                 01048000
+SYSOLDA  EQU   SYSITEM                                                  01049000
+SYS3705  EQU   SYSITEM                                                  01050000
+SYSOLD   EQU   SYSCPUS                                                  01051000
+SYSCPU   EQU   SYSCPUS                                                  01052000
+SYSCUA   EQU   SYSRT                                                    01053000
+SYSGROUP EQU   SYSUMKEY                                                 01054000
+SYSUMEOD EQU   SYSUMONE+96                                              01055000
+SYSUMPER EQU   SYSUMONE+92                                              01056000
+SYSUMPEA EQU   SYSUMONE+88                                              01057000
+SYSUMPEI EQU   SYSUMONE+84                                              01058000
+SYSUMCH  EQU   SYSUMONE+20                                              01059000
+SYSUMMCN EQU   SYSUMONE+16                                              01060000
+SYSUMMCR EQU   SYSUMONE+12                                              01061000
+SYSUMNXT EQU   SYSUMONE+8                                               01062000
+SYSUMIPL EQU   SYSUMONE+4                                               01063000
+SYSUMNUM EQU   SYSUMONE                                                 01064000
+SORTCORE EQU   SORTCCHR                                                 01065000
+SORTTIME EQU   SORTKEY+1                                                01066000
+SORTYEAR EQU   SORTKEY                                                  01067000
+EVLETTER EQU   EVKEY+5                                                  01068000
+EVSERIAL EQU   EVKEY+2                                                  01069000
+EVMODEL  EQU   EVKEY                                                    01070000
+EVNUM    EQU   EVTABLE+4                                                01071000
+EVDAY    EQU   EVSTOP+1                                                 01072000
+EVYEAR   EQU   EVSTOP                                                   01073000
+TRETMP   EQU   TREND2+10                                                01074000
+TREPRM   EQU   TREND2+8                                                 01075000
+TRENDDEV EQU   TREND2+6                                                 01076000
+TRENDDAT EQU   TRENDKEY+5                                               01077000
+TRENDOD  EQU   TRENDITM                                                 01078000
+TREND037 EQU   TRENDITM                                                 01079000
+TRENDOLD EQU   TRENCPUS                                                 01080000
+TRENDCPU EQU   TRENCPUS                                                 01081000
+@NM00011 EQU   TRENDRT+1                                                01082000
+TRENDCUA EQU   TRENDRT                                                  01083000
+TRENDGRP EQU   TRENDKEY                                                 01084000
+TREPRE   EQU   TREGEN+72                                                01085000
+TRECCHF  EQU   TREGEN+68                                                01086000
+TRECCHE  EQU   TREGEN+64                                                01087000
+TRECCHD  EQU   TREGEN+60                                                01088000
+TRECCHC  EQU   TREGEN+56                                                01089000
+TRECCHB  EQU   TREGEN+52                                                01090000
+TRECCHA  EQU   TREGEN+48                                                01091000
+TRECCH9  EQU   TREGEN+44                                                01092000
+TRECCH8  EQU   TREGEN+40                                                01093000
+TRECCH7  EQU   TREGEN+36                                                01094000
+TRECCH6  EQU   TREGEN+32                                                01095000
+TRECCH5  EQU   TREGEN+28                                                01096000
+TRECCH4  EQU   TREGEN+24                                                01097000
+TRECCH3  EQU   TREGEN+20                                                01098000
+TRECCH2  EQU   TREGEN+16                                                01099000
+TRECCH1  EQU   TREGEN+12                                                01100000
+TREMCH   EQU   TREGEN+4                                                 01101000
+TREIPL   EQU   TREGEN                                                   01102000
+TRENUM   EQU   TRENDONE+4                                               01103000
+TRENEXT  EQU   TRENDONE                                                 01104000
+@NM00010 EQU   PARM+212                                                 01105000
+RECLNGT1 EQU   PARM+204                                                 01106000
+FRAMEPTR EQU   PARM+200                                                 01107000
+PRINTADR EQU   PARM+148                                                 01108000
+ADCPUT   EQU   PARM+144                                                 01109000
+LINECT   EQU   PARM+120                                                 01110000
+RECLNGTH EQU   CCHHRLNG+6                                               01111000
+@NM00009 EQU   CCHHRLNG+5                                               01112000
+RECCCHHR EQU   CCHHRLNG                                                 01113000
+USERPGM  EQU   PARM+102                                                 01114000
+IDTSEC   EQU   IDTIME+3                                                 01115000
+IDSEC    EQU   IDTIME+2                                                 01116000
+IDMIN    EQU   IDTIME+1                                                 01117000
+IDHOUR   EQU   IDTIME                                                   01118000
+IDASID   EQU   ERRID+4                                                  01119000
+IDCPU    EQU   ERRID+3                                                  01120000
+@NM00008 EQU   ERRID+2                                                  01121000
+IDVALUE  EQU   ERRID                                                    01122000
+NUMDAYS  EQU   PARM+88                                                  01123000
+SORTNUM  EQU   PARM+84                                                  01124000
+TABSIZE  EQU   PARM+80                                                  01125000
+SYSRETRN EQU   @NM00007                                                 01126000
+@NM00006 EQU   PARM+72                                                  01127000
+WRTHRSH  EQU   PARM+69                                                  01128000
+RDTHRSH  EQU   PARM+66                                                  01129000
+TERM     EQU   PARM+58                                                  01130000
+EVSDAY   EQU   STRTDATE+1                                               01131000
+EVSYEAR  EQU   STRTDATE                                                 01132000
+PENSEC2  EQU   ENDTIME2+2                                               01133000
+PENMIN2  EQU   ENDTIME2+1                                               01134000
+PENHOUR2 EQU   ENDTIME2                                                 01135000
+PSTSEC2  EQU   STTIME2+2                                                01136000
+PSTMIN2  EQU   STTIME2+1                                                01137000
+PSTHOUR2 EQU   STTIME2                                                  01138000
+PENSEC1  EQU   ENDTIME1+2                                               01139000
+PENMIN1  EQU   ENDTIME1+1                                               01140000
+PENHOUR1 EQU   ENDTIME1                                                 01141000
+PSTSEC1  EQU   STTIME1+2                                                01142000
+PSTMIN1  EQU   STTIME1+1                                                01143000
+PSTHOUR1 EQU   STTIME1                                                  01144000
+@NM00005 EQU   ENDDT+4                                                  01145000
+PENDY    EQU   PEND+1                                                   01146000
+PENYR    EQU   PEND                                                     01147000
+@NM00004 EQU   ENDDATE                                                  01148000
+@NM00003 EQU   STDT+4                                                   01149000
+PSTDY    EQU   PSTD+1                                                   01150000
+PSTYR    EQU   PSTD                                                     01151000
+@NM00002 EQU   STDATE                                                   01152000
+YEARNOW  EQU   DATENOW+4                                                01153000
+@NM00001 EQU   DATENOW+3                                                01154000
+DAYNOW   EQU   DATENOW                                                  01155000
+CSNAP    EQU   CLOSEIO                                                  01156000
+CDRCTWRK EQU   CLOSEIO                                                  01157000
+CSYSIN   EQU   CLOSEIO                                                  01158000
+CACCDEV  EQU   CLOSEIO                                                  01159000
+CACCIN   EQU   CLOSEIO                                                  01160000
+CSERLOG  EQU   CLOSEIO                                                  01161000
+CEREPPT  EQU   CLOSEIO                                                  01162000
+CTOURIST EQU   CLOSEIO                                                  01163000
+OSNAP    EQU   OPENIO                                                   01164000
+ODRCTWRK EQU   OPENIO                                                   01165000
+OSYSIN   EQU   OPENIO                                                   01166000
+OACCDEV  EQU   OPENIO                                                   01167000
+OACCIN   EQU   OPENIO                                                   01168000
+OSERLOG  EQU   OPENIO                                                   01169000
+OEREPPT  EQU   OPENIO                                                   01170000
+OTOURIST EQU   OPENIO                                                   01171000
+PASSFLAG EQU   MISC                                                     01172000
+PLOGREC  EQU   MISC                                                     01173000
+ERRORID  EQU   MISC                                                     01174000
+PSUM     EQU   PRINTES                                                  01175000
+PEDIT    EQU   PRINTES                                                  01176000
+PHIST    EQU   MISC                                                     01177000
+PACC     EQU   MISC                                                     01178000
+PZERO    EQU   MISC                                                     01179000
+DEBUG63  EQU   DEBUGA+3                                                 01180000
+DEBUG62  EQU   DEBUGA+3                                                 01181000
+DEBUG61  EQU   DEBUGA+3                                                 01182000
+DEBUG60  EQU   DEBUGA+3                                                 01183000
+DEBUG59  EQU   DEBUGA+3                                                 01184000
+DEBUG58  EQU   DEBUGA+3                                                 01185000
+DEBUG57  EQU   DEBUGA+3                                                 01186000
+DEBUG56  EQU   DEBUGA+3                                                 01187000
+DEBUG55  EQU   DEBUGA+2                                                 01188000
+DEBUG54  EQU   DEBUGA+2                                                 01189000
+DEBUG53  EQU   DEBUGA+2                                                 01190000
+DEBUG52  EQU   DEBUGA+2                                                 01191000
+DEBUG51  EQU   DEBUGA+2                                                 01192000
+DEBUG50  EQU   DEBUGA+2                                                 01193000
+DEBUG49  EQU   DEBUGA+2                                                 01194000
+DEBUG48  EQU   DEBUGA+2                                                 01195000
+DEBUG47  EQU   DEBUGA+1                                                 01196000
+DEBUG46  EQU   DEBUGA+1                                                 01197000
+DEBUG45  EQU   DEBUGA+1                                                 01198000
+DEBUG44  EQU   DEBUGA+1                                                 01199000
+DEBUG43  EQU   DEBUGA+1                                                 01200000
+DEBUG42  EQU   DEBUGA+1                                                 01201000
+DEBUG41  EQU   DEBUGA+1                                                 01202000
+DEBUG40  EQU   DEBUGA+1                                                 01203000
+DEBUG39  EQU   DEBUGA                                                   01204000
+DEBUG38  EQU   DEBUGA                                                   01205000
+DEBUG37  EQU   DEBUGA                                                   01206000
+DEBUG36  EQU   DEBUGA                                                   01207000
+DEBUG35  EQU   DEBUGA                                                   01208000
+DEBUG34  EQU   DEBUGA                                                   01209000
+DEBUG33  EQU   DEBUGA                                                   01210000
+DEBUG32  EQU   DEBUGA                                                   01211000
+DEBUG31  EQU   DEBUG+3                                                  01212000
+DEBUG30  EQU   DEBUG+3                                                  01213000
+DEBUG29  EQU   DEBUG+3                                                  01214000
+DEBUG28  EQU   DEBUG+3                                                  01215000
+DEBUG27  EQU   DEBUG+3                                                  01216000
+DEBUG26  EQU   DEBUG+3                                                  01217000
+DEBUG25  EQU   DEBUG+3                                                  01218000
+DEBUG24  EQU   DEBUG+3                                                  01219000
+DEBUG23  EQU   DEBUG+2                                                  01220000
+DEBUG22  EQU   DEBUG+2                                                  01221000
+DEBUG21  EQU   DEBUG+2                                                  01222000
+DEBUG20  EQU   DEBUG+2                                                  01223000
+DEBUG19  EQU   DEBUG+2                                                  01224000
+DEBUG18  EQU   DEBUG+2                                                  01225000
+DEBUG17  EQU   DEBUG+2                                                  01226000
+DEBUG16  EQU   DEBUG+2                                                  01227000
+DEBUG15  EQU   DEBUG+1                                                  01228000
+DEBUG13  EQU   DEBUG+1                                                  01229000
+DEBUG12  EQU   DEBUG+1                                                  01230000
+DEBUG11  EQU   DEBUG+1                                                  01231000
+DEBUG10  EQU   DEBUG+1                                                  01232000
+DEBUG9   EQU   DEBUG+1                                                  01233000
+DEBUG8   EQU   DEBUG+1                                                  01234000
+DEBUG7   EQU   DEBUG                                                    01235000
+DEBUG6   EQU   DEBUG                                                    01236000
+DEBUG5   EQU   DEBUG                                                    01237000
+DEBUG4   EQU   DEBUG                                                    01238000
+DEBUG3   EQU   DEBUG                                                    01239000
+DEBUG2   EQU   DEBUG                                                    01240000
+DEBUG1   EQU   DEBUG                                                    01241000
+DEBUG0   EQU   DEBUG                                                    01242000
+SORTBRK  EQU   SWITCHES+1                                               01243000
+COREFAIL EQU   SWITCHES+1                                               01244000
+ANALYSIS EQU   SWITCHES+1                                               01245000
+SHIFT3RD EQU   SWITCHES+1                                               01246000
+DEVEXCL  EQU   SWITCHES+1                                               01247000
+ZEROALL  EQU   SWITCHES+1                                               01248000
+NOTALL   EQU   SWITCHES+1                                               01249000
+NOSDR    EQU   SWITCHES                                                 01250000
+TIMESEQ  EQU   SWITCHES                                                 01251000
+SYSUM    EQU   SWITCHES                                                 01252000
+PARMTHR  EQU   SWITCHES                                                 01253000
+TREND    EQU   SWITCHES                                                 01254000
+SHORTOBR EQU   SWITCHES                                                 01255000
+PARMMES  EQU   SWITCHES                                                 01256000
+RDESUM   EQU   SWITCHES                                                 01257000
+PCCHFRAM EQU   RECTYPE+1                                                01258000
+PMCHFRAM EQU   RECTYPE+1                                                01259000
+PTTYP    EQU   RECTYPE+1                                                01260000
+PEOD     EQU   RECTYPE                                                  01261000
+PMIH     EQU   RECTYPE                                                  01262000
+PDDR     EQU   RECTYPE                                                  01263000
+PIPL     EQU   RECTYPE                                                  01264000
+PSOFT    EQU   RECTYPE                                                  01265000
+POBR     EQU   RECTYPE                                                  01266000
+PCHAN    EQU   RECTYPE                                                  01267000
+PMCH     EQU   RECTYPE                                                  01268000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      01269000
+@RC00095 EQU   @RC00094                                                 01270000
+@RF00116 EQU   @RC00114                                                 01271000
+@RC00167 EQU   @RC00148                                                 01272000
+@RC00160 EQU   @RC00148                                                 01273000
+@RC00158 EQU   @RC00148                                                 01274000
+@RC00150 EQU   @RC00148                                                 01275000
+@RC00185 EQU   @RC00178                                                 01276000
+@RF00253 EQU   @RC00250                                                 01277000
+@RC00152 EQU   @RC00150                                                 01278000
+@RC00163 EQU   @RC00160                                                 01279000
+@RC00168 EQU   @RC00167                                                 01280000
+@RC00153 EQU   @RC00152                                                 01281000
+@ENDDATA EQU   *                                                        01282000
+         END   IFCESUMS                                                 01283000

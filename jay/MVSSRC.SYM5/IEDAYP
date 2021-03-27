@@ -1,0 +1,364 @@
+         TITLE 'IEDAYP  -  TIOC TPOSTING ROUTINE'                       00050010
+*********************************************************************** 00100010
+*C000000-999999                                                @OY14094 00150010
+*********************************************************************** 00200010
+*                                                                       00250010
+*01* MODULE-NAME = IEDAYP                                               00300010
+*                                                                       00350010
+*01* DESCRIPTIVE-NAME = TIOC TPOSTING ROUTINE                           00400010
+*                                                                       00450010
+*01* COPYRIGHT = NONE                                                   00500010
+*                                                                       00550010
+*01* STATUS = 00                                                        00600010
+*                                                                       00650010
+*01* FUNCTION = PERFORMS TPOSTING AND UPDATING OF TCAM                  00700010
+*               CONTROL BLOCKS WHILE SYNCHRONIZED WITH OTHER            00750010
+*               TCAM TASKS VIA THE TCAM DISPATCHER.                     00800010
+*                                                                       00850010
+*01* NOTES = N/A                                                        00900010
+*                                                                       00950010
+*02*   DEPENDENCIES = N/A                                               01000010
+*                                                                       01050010
+*02*   RESTRICTIONS = N/A                                               01100010
+*                                                                       01150010
+*02*   REGISTER-CONVENTIONS = SEE REGISTER EQUATES                      01200010
+*                                                                       01250010
+*02*   PATCH-LABEL = AYPEND                                             01300010
+*                                                                       01350010
+*01* MODULE-TYPE = ASSEMBLER LANGUAGE CSECT                             01400010
+*                                                                       01450010
+*02*   PROCESSOR = ASSEMFX-370R                                         01500010
+*                                                                       01550010
+*02*   MODULE-SIZE = SEE EXTERNAL SYMBOL DICTIONARY TYPE SD ID 01       01600010
+*                                                                       01650010
+*02*   ATTRIBUTES = REENTRANT, REFRESHABLE, PROBLEM STATE, TCAM'S       01700010
+*                   PROTECTION KEY                                      01750010
+*                                                                       01800010
+*01* ENTRY-POINT = IEDAYP+2                                             01850010
+*                                                                       01900010
+*02*   PURPOSE = SEE FUNCTION                                           01950010
+*                                                                       02000010
+*02*   LINKAGE = FROM TCAM DISPATCHER VIA BRANCH                        02050010
+*                                                                       02100010
+*01* INPUT = REGISTER 01 CONTAINS ADDRESS OF ELEMENT TPOSTED            02150010
+*            REGISTER 11 CONTAINS ADDRESS OF TCAM DISPATCHER            02200010
+*            REGISTER 13 CONTAINS ADDRESS OF AVTSAVE2                   02250010
+*                                                                       02300010
+*01* OUTPUT = REGISTER 01 CONTAINS ADDRESS OF A CHAIN OF 0 OR MORE      02350010
+*                         ELEMENTS TO BE TPOSTED                        02400010
+*             REGISTER 11 CONTAINS ADDRESS OF TCAM DISPATCHER           02450010
+*             REGISTER 13 CONTAINS ADDRESS OF AVTSAVE2                  02500010
+*                                                                       02550010
+*01* EXIT-NORMAL = TO TCAM DISPATCHER AT ENTRY POINT DSPCHAIN           02600010
+*                                                                       02650010
+*01* EXIT-ERROR = NONE                                                  02700010
+*                                                                       02750010
+*01* EXTERNAL-REFERENCES -                                              02800010
+*                                                                       02850010
+*02*   ROUTINES = TERMINAL NAME TABLE ROUTINE                           02900010
+*                                                                       02950010
+*02*   DATA-AREAS = AVTSAVE2 IS USED AS A WORK AREA BY IEDAYP.          03000010
+*                   (SEE SEQUENCE NUMBER 744000)                        03050010
+*                                                                       03100010
+*02*   CONTROL-BLOCKS = SEE MAPPING MACROS AT END OF LISTING            03150010
+*                                                                       03200010
+*01* TABLES = N/A                                                       03250010
+*                                                                       03300010
+*01* MACROS = NONE                                                      03350010
+*                                                                       03400010
+*                                                                       03450010
+****END OF SPECIFICATIONS********************************************   03500010
+         EJECT                                                          03550010
+IEDAYP   CSECT                                                          03600010
+*                                                                       03650010
+*   REGISTER EQUATES                                                    03700010
+*                                                                       03750010
+RWRK0    EQU   0                        WORK REGISTER                   03800010
+RWRK1    EQU   1                        WORK REGISTER                   03850010
+REVN2    EQU   2                        WORK REGISTER                   03900010
+RODD3    EQU   3                        WORK REGISTER                   03950010
+REVN4    EQU   4                        WORK REGISTER                   04000010
+RMASK    EQU   4                        ADDR OF MASK BYTE               04050010
+RWRK4    EQU   4                        WORK REGISTER                   04100010
+RODD5    EQU   5                        WORK REGISTER                   04150010
+RFLAG    EQU   6                        ADDR OF FLAG BYTE               04200010
+RWRK6    EQU   6                        WORK REGISTER                   04250010
+RQCB     EQU   7                        QCB POINTER                     04300010
+RTSB     EQU   8                        TSB POINTER                     04350010
+RTPST    EQU   9                        ADDR OF TPOST WORK AREA         04400010
+RTSI     EQU   10                       TSI POINTER                     04450010
+RDISP    EQU   11                       ADDR OF TCAM DISPATCHER         04500010
+RBASE    EQU   12                       BASE REGISTER                   04550010
+RAVT     EQU   13                       AVT POINTER                     04600010
+RLINK    EQU   14                       LINK REGISTER                   04650010
+RWRK14   EQU   14                       WORK REGISTER                   04700010
+REPA     EQU   15                       ENTRY POINT ADDR                04750010
+*                                                                       04800010
+*   MASKS AND DISPLACEMENTS                                             04850010
+*                                                                       04900010
+E0       EQU   0                        NULL DISPLACEMENT               04950010
+E1       EQU   1                        DECIMAL 1                       05000010
+E7       EQU   7                        DECIMAL 7                       05050010
+ELEVEN   EQU   11                       NUMBER OF BITS TO CHECK         05100010
+SIXTEEN  EQU   16                       SHIFT TO GET INTO HI-BYTES      05150010
+INHB3705 EQU   4                        OFFSET TO 3705 INHIBIT BYTE     05200010
+USEINHIB EQU   X'10'                    3705 TIMEOUT INHIBIT SETTING    05250010
+OFF      EQU   X'FF'                    ALL BITS OFF FLAG               05300010
+*                                                                       05350010
+*   TCAM SUB-TASK CONTROL BLOCK                                         05400010
+*                                                                       05450010
+         DC    AL1(DSPMCPL2,0)          STCB                            05500010
+*                                                                       05550010
+*   ESTABLISH ADDRESSABILITY                                            05600010
+*                                                                       05650010
+         USING *,RBASE                  BASE ADDR                       05700010
+         LR    RBASE,REPA               LOAD BASE REGISTER              05750010
+         B     GETPTRS                  GO GET POINTERS                 05800010
+IEDAYP   IEDHJN ,                                                       05850010
+         USING IEDQDISP,RDISP           DISPATCHER ADDRESSABLE          05900010
+         USING AVTSAVE2,RAVT            AVT ADDRESSABLE                 05950010
+*                                                                       06000010
+*   GET POINTERS TO CONTROL BLOCKS                                      06050010
+*                                                                       06100010
+GETPTRS  EQU   *                                                        06150010
+         LA    RWRK0,TSBRCB-TSB         GET OFFSET OF RCB IN TSB        06200010
+         LR    RTSB,RWRK1               GET RCB ADDR                    06250010
+         SR    RTSB,RWRK0               GET TSB ADDR                    06300010
+         USING TSB,RTSB                 TSB ADDRESSABLE                 06350010
+         L     RTSI,AVTTSOPT            GET TSI ADDR                    06400010
+         USING IEDQTSI,RTSI             TSI ADDRESSABLE                 06450010
+         SR    RQCB,RQCB                ASSUME NO QCB                   06500010
+         LH    RWRK1,TSBASRCE           GET TERMINAL INDEX              06550010
+         LTR   RWRK1,RWRK1              TERMINAL INDEX ZERO             06600010
+         BZ    PICKUP                   YES                             06650010
+         L     REPA,AVTRNMPT            EPA OF TERM TBL RTN             06700010
+         BALR  RLINK,REPA               GE GET TRM ADDR                 06750010
+         USING IEDQTRM,RWRK1            TRM ADDR RETURNED IN 1          06800010
+         L     RQCB,TRMDESTQ-E1         TERM DEST QCB ADDR              06850010
+         USING IEDQQCB,RQCB             QCB ADDRESSABLE                 06900010
+*                                                                       06950010
+*   IF THIS TERMINAL IS NOT IN A TIME SHARING SESSION,                  07000010
+*   EXIT TO THE TCAM DISPATCHER                                         07050010
+*                                                                       07100010
+         TM    QCBFLAG,QCBTSSES         IS QCB IN TS SESSION            07150010
+         BNO   DSPDISP                  NO, EXIT                        07200010
+*                                                                       07250010
+*   PICK UP TSBTPOST & ZERO IT USING COMPARE & SWAP.                    07300010
+*   THIS WILL SYNCHRONIZE THIS ROUTINE WITH OTHER ASYNCHRONOUS          07350010
+*   ROUTINES USING THIS FIELD.  ACTIONS REQUESTED AFTER THIS            07400010
+*   POINT WILL REQUIRE IEDAYP TO BE TPOSTED AGAIN.                      07450010
+*                                                                       07500010
+PICKUP   EQU   *                                                        07550010
+         LM    REVN2,RODD3,TSBTPOST     GET CURRENT SETTINGS            07600010
+         SR    REVN4,REVN4              CLEAR                           07650010
+         LR    RODD5,REVN4              CLEAR                           07700010
+RETRY    EQU   *                                                        07750010
+         CDS   REVN2,REVN4,TSBTPOST     ZERO TPOST FLAGS                07800010
+         BNZ   RETRY                    RETRY UNTIL DONE                07850010
+*                                                                       07900010
+         STM   REVN2,RODD3,AYPTPOST     SAVE IN WORK AREA               07950010
+         LA    RTPST,AYPTPOST           GET ADDR OF SAVE AREA           08000010
+         USING TSBTPOST,RTPST           TSB REFERENCES WILL NOW         08050010
+*                                       REFERENCE THE WORK AREA COPY    08100010
+         ST    REVN4,AYPCHAIN           CLR ELEM CHAIN POINTER          08150010
+         LTR   RQCB,RQCB                ANY TERMINAL FOR THIS USER      08200010
+         BZ    PASTQCB                  NO, SKIP QCB PROCESSING         08250010
+*                                                                       08300010
+*   RECONNECT A USER TO HIS OLD ENVIROMENT BY STORING HIS               08350010
+*   OLD ASID IN HIS NEW QCB                                             08400010
+*                                                                       08450010
+         TM    TSBTPFLG,TSBNEWID        SHOULD ASID BE UPDATED          08500010
+         BNO   GO                       NO, SKIP ASID UPDATING          08550010
+         L     REVN2,TSBASCBA           ASCB ADDRESS                    08600010
+         LH    REVN4,ASCBASID-ASCB(,REVN2)  GET OLD ASID                08650010
+         TM    QCBTSOF1,QCBDELAY        QCB ON DELAY QUEUE              08700010
+         BNZ   DELAYQ                   YES, ASID IS RELOCATED          08750010
+         STH   REVN4,QCBTJID            STORE OLD ASID                  08800010
+         B     GO                       PROCESS TSBTPOST                08850010
+DELAYQ   EQU   *                                                        08900010
+         STH   REVN4,QCBLINK+E1         STORE ASID IN QCB ON DELAY Q    08950010
+*                                                                       09000010
+*   SET & RESET BITS AS INDICATED IN TSB TPOST                          09050010
+*                                                                       09100010
+GO       EQU   *                                                        09150010
+         LA    RFLAG,QCBFLAG            .SET AND/OR RESET               09200010
+         LA    RMASK,TSBFLAGM           .BITS IN                        09250010
+         BAL   RLINK,SST                .QCBFLAG                        09300010
+*                                                                       09350010
+         LA    RFLAG,QCBTSOF2           .SET AND/OR RESET               09400010
+         LA    RMASK,TSBF2M             .BITS IN                        09450010
+         BAL   RLINK,SST                .QCBTSOF2                       09500010
+*                                                                       09550010
+         LA    RFLAG,QCBTSOF1           .SET AND/OR RESET               09600010
+         LA    RMASK,TSBF1M             .BITS IN                        09650010
+         BAL   RLINK,SST                .QCBTSOF1                       09700010
+         SPACE 2                                                        09750010
+*---------------------------------------------------------------------* 09800010
+*     CHECK FOR 3705 IF QCBINHBN WAS SET/RESET.                       * 09850010
+*---------------------------------------------------------------------* 09900010
+         TM    TSBF2M,QCBINHBN          ANYTHING TO DO WITH TIMEOUT     09950010
+         BZ    TPOST                    NO,SKIP 3705 PROCESSING         10000010
+         TM    TRMDSORG,TRMLGB          IS TERMINAL ATTACHED VIA 3705   10050010
+         BZ    TPOST                    NO SKIP 3705 PROCESSING         10100010
+         TM    TRMSTATE,TRMOPTFN        ARE THERE ANY OPTION FIELDS     10150010
+         LA    RWRK4,TRMOPNO            ASSUME NONE - GET START OF      10200010
+*                                       DEVICE DEPENDENT FIELDS         10250010
+         BZ    NOPTION                  BRANCH IF NONE                  10300010
+         SR    RWRK14,RWRK14            CLEAR REGISTER                  10350010
+         IC    RWRK14,TRMOPNO           NUMBER OF OPTION FIELDS         10400010
+         LA    RWRK4,TRMOPT(RWRK14)     GET START OF DEVICE             10450010
+*                                       DEPENDENT FIELDS                10500010
+NOPTION  EQU   *                                                        10550010
+         LH    RWRK14,TRMDEVFL          GET DEVICE DEPENDENT FLAGS      10600010
+         LA    REPA,ELEVEN              SET UP FOR BIT SEARCH           10650010
+         SLL   RWRK14,SIXTEEN           SHIFT BITS TO HI-ORDER 2 BYTES  10700010
+         SR    RWRK6,RWRK6              CLEAR REGISTER                  10750010
+         SPACE 1                                                        10800010
+*---------------------------------------------------------------------* 10850010
+*    COUNT THE BITS ON AND SKIP THAT MANY FIELDS.                     * 10900010
+*---------------------------------------------------------------------* 10950010
+SHIFT    EQU   *                                                        11000010
+         LTR   RWRK14,RWRK14            CHECK HI-ORDER BIT ON           11050010
+         BNM   CHKCOUNT                 NOT ON,DON'T COUNT              11100010
+         LA    RWRK6,E1(,RWRK6)         ON,COUNT                        11150010
+CHKCOUNT EQU   *                                                        11200010
+         SLL   RWRK14,E1                SHIFT TO CHECK NEXT BIT         11250010
+         BCT   REPA,SHIFT               CHECK ALL 12 BITS               11300010
+         SPACE 1                                                        11350010
+*---------------------------------------------------------------------* 11400010
+*    RWRK6 NOW HAS NUMBER OF FIELDS TO SKIP TO GET TO DEVICE          * 11450010
+*     DEPENDENT FIELD.                                                * 11500010
+*---------------------------------------------------------------------* 11550010
+         LTR   RWRK6,RWRK6              ANY FIELDS TO SKIP              11600010
+         BZ    SETMODE                  NO,GO SET 3705 FIELD            11650010
+         SR    RWRK14,RWRK14            CLEAR FOR IC INSTRUCTION        11700010
+SKIP     EQU   *                                                        11750010
+         IC    RWRK14,AVTEZERO(,RWRK4)  GET FIELD LENGTH                11800010
+         LA    RWRK4,E1(RWRK14,RWRK4)   SKIP OVER FIELD                 11850010
+         BCT   RWRK6,SKIP               DO IT FOR EACH FIELD            11900010
+         SPACE 1                                                        11950010
+*---------------------------------------------------------------------* 12000010
+*    RWRK4 NOW POINTS TO 3705 DEVICE DEPENDENT FIELD.                 * 12050010
+*---------------------------------------------------------------------* 12100010
+SETMODE  EQU   *                                                        12150010
+         TM    TSBF2V,QCBINHBN          SET OR RESET 3705 INHIBIT       12200010
+         BZ    TIMEOUT                  SET 3705 INHIBIT BIT OFF        12250010
+         OI    INHB3705(RWRK4),USEINHIB TURN INHIBIT BIT ON             12300010
+         B     TPOST                     DO TPOSTING                    12350010
+TIMEOUT  EQU   *                                                        12400010
+         NI    INHB3705(RWRK4),OFF-USEINHIB   TURN INHIBIT BIT OFF      12450010
+         SPACE 2                                                        12500010
+*                                                                       12550010
+*   DO TPOSTING AS INDICATED IN TSBTPOST                                12600010
+*                                                                       12650010
+TPOST    EQU   *                                                        12700010
+         TM    TSBTPFLG,TSBTPQCB        TPOST TERM. DEST. QCB           12750010
+         BNO   PASTQCB                  NO, DON'T TPOST QCB             12800010
+*                                                                       12850010
+         TM    QCBTSOF1,QCBDELAY        IS QCB ON DELAY QUEUE           12900010
+         BNO   NODELAY                  NO, CAN TPOST QCB               12950010
+*                                                                       13000010
+         TM    TSIDYQFG,TSIDYPOS        DELAY QCB TPOSTED               13050010
+         BO    PASTQCB                  YES, CAN'T TPOST QCB            13100010
+*                                                                       13150010
+         OI    TSIDYQFG,TSIDYPOS        SHOW DELAY QCB TPOSTED          13200010
+         LA    RQCB,TSIDYQFG            GET DELAY QUEUE QCB ADDR        13250010
+         B     POSTQCB                  GO POST                         13300010
+*                                                                       13350010
+NODELAY  EQU   *                                                        13400010
+         TM    QCBTSOF2,QCBPOSTO        QCB ALREADY TPOSTED             13450010
+         BO    PASTQCB                  YES, DON'T TPOST                13500010
+         OI    QCBTSOF2,QCBPOSTO        SHOW QCB TPOSTED                13550010
+*                                                                       13600010
+POSTQCB  EQU   *                                                        13650010
+         STCM  RQCB,E7,QCBELCHN         STORE QCB ADDR                  13700010
+         MVI   QCBPRI,PRIDESTQ          SET TPOST PRIORITY              13750010
+         MVC   QCBLINK,AYPCHANB         LINK TO NEXT ELEMENT            13800010
+         ST    RQCB,AYPCHAIN            ADD THIS ELEM TO CHAIN          13850010
+         DROP  RQCB                     RQCB MAY HAVE TSI ADDR          13900010
+*                                                                       13950010
+PASTQCB  EQU   *                                                        14000010
+         TM    TSBTPFLG,TSBTPAYI        TPOST TSINPUT                   14050010
+         BNO   PASTTSI                  NO, DON'T TPOST TSI             14100010
+*                                                                       14150010
+         TM    TSIFLAG,TSIPOST          TSI ALREADY TPOSTED             14200010
+         BO    PASTTSI                  YES, DON'T TPOST AGAIN  YM03998 14250010
+         OI    TSIFLAG,TSIPOST          SHOW TSI TPOSTED                14300010
+*                                                                       14350010
+         STCM  RTSI,E7,TSIELCHN         STORE 'QCB' ADDR                14400010
+         MVI   TSIPRI,PRIBFRTB          SET PRIORITY                    14450010
+         MVC   TSILINK,AYPCHANB         LINK TO NEXT ELEMENT            14500010
+         ST    RTSI,AYPCHAIN            ADD THIS ELEM TO CHAIN          14550010
+*                                                                       14600010
+PASTTSI  EQU   *                                                        14650010
+         L     RWRK1,AYPCHAIN           GET CHAIN OF ELEM'S             14700010
+         B     DSPCHAIN                 EXIT TO DISPATCHER              14750010
+         DROP  RTSB,RTPST                                               14800010
+*                                                                       14850010
+**********************************************************************  14900010
+*                                                                       14950010
+*   PERFORM BIT SETTINGS IN A FLAG BYTE                                 15000010
+*                                                                       15050010
+*   REGISTERS AT ENTRY--                                                15100010
+*        RMASK - ADDR OF MASK BYTE.  CONTAINS ONES IN BIT               15150010
+*                POSITIONS WHICH ARE TO BE SET OR RESET IN THE          15200010
+*                FLAG BYTE.                                             15250010
+*              - AT THIS ADDRESS +1 IS A 'VALUE' BYTE, CONTAINING       15300010
+*                THE VALUE (1 OR 0) TO WHICH THE CORRESPONDING          15350010
+*                BIT IN THE FLAG BYTE SHOULD BE SET.                    15400010
+*        RODD5 - WORK REGISTER.                                         15450010
+*        ALL THE ABOVE REGISTERS MAY BE ALTERED.                        15500010
+*        RFLAG - ADDR OF FLAG BYTE                                      15550010
+*        RLINK - RETURN ADDRESS.                                        15600010
+*                                                                       15650010
+SST      EQU  *                                                         15700010
+         CLI   E0(RMASK),E0             ANY ACTION REQUESTED            15750010
+         BER   RLINK                    NO, RETURN                      15800010
+*                                                                       15850010
+         IC    RODD5,E1(,RMASK)         GET VALUE BYTE                  15900010
+         IC    RMASK,E0(,RMASK)         GET MASK BYTE                   15950010
+         NR    RODD5,RMASK              CLEAR IRRELEVANT BITS           16000010
+*                                       IN THE VALUE BYTE               16050010
+         EX    RODD5,OR                 SET BITS AS REQUIRED            16100010
+         LCR   RMASK,RMASK              GET 2'S COMPLEMENT              16150010
+         BCTR  RMASK,E0                 GET 1'S COMPLEMENT              16200010
+         OR    RMASK,RODD5              SET BIT POSITIONS NOT           16250010
+*                                       TO BE RESET                     16300010
+         EX    RMASK,AND                RESET BITS AS REQUIRED          16350010
+         BR    RLINK                    RETURN                          16400010
+*                                                                       16450010
+OR       OI    E0(RFLAG),*-*            EXECUTED OR                     16500010
+AND      NI    E0(RFLAG),*-*            EXECUTED AND                    16550010
+*                                                                    *  16600010
+**********************************************************************  16650010
+*                                                                    *  16700010
+AYPEND   DC    9F'0'                    PATCH AREA                      16750010
+         EJECT                                                          16800010
+         TAVTD                                                          16850010
+         EJECT                                                          16900010
+*                                                                       16950010
+*   WORK AREA                                                           17000010
+*                                                                       17050010
+IEDQAVTD DSECT                                                          17100010
+         ORG   AVTSAVE2                                                 17150010
+         DS    3F                       RESERVED                        17200010
+AYPTPOST DS    2F                       TPOST WORK AREA                 17250010
+AYPBYTE  DS    X                        BYTE-SIZE WORK AREA             17300010
+AYPCHAIN DS    0A                       POINTER TO CHAIN OF             17350010
+         DS    X                        ELEMENTS TO TPOST               17400010
+AYPCHANB DS    AL3                      BYTE BOUNDARY POINTER           17450010
+         EJECT                                                          17500010
+         TDISPD                                                         17550010
+         EJECT                                                          17600010
+         TPRIOR                                                         17650010
+         EJECT                                                          17700010
+         TQCBD                                                          17750010
+         EJECT                                                          17800010
+         TTRMD                                                          17850010
+         EJECT                                                          17900010
+         IKJTSB LIST=YES                                                17950010
+         EJECT                                                          18000010
+         TTSID                                                          18050010
+         EJECT                                                          18100010
+         IHAASCB                                                        18150010
+         END                                                            18200010

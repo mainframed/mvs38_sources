@@ -1,0 +1,831 @@
+         TITLE 'ISTINCRS - READ RECORD ROUTINE'                         00001000
+ISTINCRS CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'ISTINCRS  78.336'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  STM   @14,@12,12(@13)                                     0001 00009000
+         BALR  @12,0                                               0001 00010000
+@PSTART  DS    0H                                                  0001 00011000
+         USING @PSTART,@12                                         0001 00012000
+         ST    @13,@SA00001+4                                      0001 00013000
+         LA    @09,@SA00001                                        0001 00014000
+         ST    @09,8(,@13)                                         0001 00015000
+         LR    @13,@09                                             0001 00016000
+         PRINT OFF                                                      00017000
+         PRINT ON                                                       00018000
+*   RDPRMPTR=R1;                    /* REBASE PARM LIST      @ZA03720*/ 00019000
+         LR    RDPRMPTR,R1                                         0058 00020000
+*   DCBPTR=RSPDCBA;                 /* ADDR OF DCB           @ZA03720*/ 00021000
+         L     DCBPTR,RSPDCBA(,RDPRMPTR)                           0059 00022000
+*   IF RSPMEMBN=XZEROS THEN         /* IF ZERO NO NEED TO FIND       */ 00023000
+         CLC   RSPMEMBN(8,RDPRMPTR),XZEROS                         0060 00024000
+         BNE   @RF00060                                            0060 00025000
+*     RTNCDE=0;                     /* INDICATE FIND NOT NEEDED      */ 00026000
+         SLR   @09,@09                                             0061 00027000
+         ST    @09,RTNCDE                                          0061 00028000
+*   ELSE                                                           0062 00029000
+*     DO;                                                          0062 00030000
+         B     @RC00060                                            0062 00031000
+@RF00060 DS    0H                                                  0063 00032000
+*       R3=ADDR(RSPMEMBN);          /* ADDR OF MEMBER NAME           */ 00033000
+         LA    R3,RSPMEMBN(,RDPRMPTR)                              0063 00034000
+*       GEN REFS(DCBPTR,R3)(FIND (2),(3),D);/*               @ZA03720*/ 00035000
+         FIND (2),(3),D                                                 00036000
+*       IF R15^=0 THEN              /* TEST FOR ERROR FROM FIND      */ 00037000
+         LTR   R15,R15                                             0065 00038000
+         BZ    @RF00065                                            0065 00039000
+*         RTNCDE=12;                /* MEMBER NOT FOUND      @ZA03720*/ 00040000
+         MVC   RTNCDE(4),@CF00032                                  0066 00041000
+*       ELSE                        /* MEMBER FOUND          @ZA03720*/ 00042000
+*         DO;                       /*                       @ZA03720*/ 00043000
+         B     @RC00065                                            0067 00044000
+@RF00065 DS    0H                                                  0068 00045000
+*           DONTREAD='0'B;          /* INDICATE READ REQUIRD @ZA03720*/ 00046000
+         NI    DONTREAD,B'01111111'                                0068 00047000
+*           RTNCDE=0;               /* INDICATE FIND SUCCESS @ZA03720*/ 00048000
+         SLR   @09,@09                                             0069 00049000
+         ST    @09,RTNCDE                                          0069 00050000
+*         END;                      /*                       @ZA03720*/ 00051000
+*     END;                                                         0071 00052000
+@RC00065 DS    0H                                                  0072 00053000
+*   IF RTNCDE=0 THEN                /* READ A RECORD         @ZA03720*/ 00054000
+@RC00060 L     @09,RTNCDE                                          0072 00055000
+         LTR   @09,@09                                             0072 00056000
+         BNZ   @RF00072                                            0072 00057000
+*     CALL READRTN;                 /* YES - READ SUBRTN     @ZA03720*/ 00058000
+         BAL   @14,READRTN                                         0073 00059000
+*   GOTO EXIT;                      /* RETURN                @ZA03720*/ 00060000
+*                                                                  0074 00061000
+         B     EXIT                                                0074 00062000
+*   /*****************************************************************/ 00063000
+*   /*                                                               */ 00064000
+*   /* SYNAD ROUTINE                                                 */ 00065000
+*   /*                                                               */ 00066000
+*   /*****************************************************************/ 00067000
+*                                                                  0075 00068000
+*ISTINFRT:                          /*                       @XM06409*/ 00069000
+*   IOERR='1'B;                     /* INDICATE I/O ERROR    @ZA03721*/ 00070000
+ISTINFRT OI    IOERR,B'01000000'                                   0075 00071000
+*   GEN EXIT NOSEQFLOW(BR  R14);    /* RETURN TO SYSTEM TO CLEAN UP     00072000
+*                                      DCB                   @ZA03721*/ 00073000
+*                                                                  0076 00074000
+         BR  R14                                                        00075000
+*   /*****************************************************************/ 00076000
+*   /*                                                               */ 00077000
+*   /* EODAD ROUTINE                                                 */ 00078000
+*   /*                                                               */ 00079000
+*   /*****************************************************************/ 00080000
+*                                                                  0077 00081000
+*ISTINFRU:                          /*                       @XM06409*/ 00082000
+*   RTNCDE=4;                       /* INDICATE EODAD        @ZA03720*/ 00083000
+ISTINFRU MVC   RTNCDE(4),@CF00040                                  0077 00084000
+*EXIT:                                                             0078 00085000
+*   RETURN CODE(RTNCDE);            /* RETURN TO CALLER      @ZA03720*/ 00086000
+EXIT     L     @15,RTNCDE                                          0078 00087000
+         L     @13,4(,@13)                                         0078 00088000
+         L     @14,12(,@13)                                        0078 00089000
+         LM    @00,@12,20(@13)                                     0078 00090000
+         BR    @14                                                 0078 00091000
+*READRTN:                                                          0079 00092000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA,RETREG);/*                @ZA03720*/ 00093000
+*                                                                  0079 00094000
+READRTN  DS    0H                                                  0080 00095000
+*   /*****************************************************************/ 00096000
+*   /*                                                               */ 00097000
+*   /* THIS ROUTINE READS A BLOCK FROM VTAMLST. IT DEBLOCKS THE DATA */ 00098000
+*   /* AND PASSES ONE RECORD AT A TIME TO INCRD.                     */ 00099000
+*   /*                                                               */ 00100000
+*   /*****************************************************************/ 00101000
+*                                                                  0080 00102000
+*   R14SAVE=R14;                    /* SAVE RETURN ADDRESS   @ZA03720*/ 00103000
+         ST    R14,R14SAVE                                         0080 00104000
+*   IF DONTREAD='0'B THEN           /* IS RECORD IN BUFFER   @ZA03720*/ 00105000
+         TM    DONTREAD,B'10000000'                                0081 00106000
+         BNZ   @RF00081                                            0081 00107000
+*     DO;                           /* NO                    @ZA03720*/ 00108000
+*       R3=BUFRADR;                 /* BUFFER ADDR FOR READ  @ZA03720*/ 00109000
+         L     @09,@CA00659                                        0083 00110000
+         L     R3,BUFRADR-BUFRADR(,@09)                            0083 00111000
+*       GEN FLOWS(ISTINFRT,ISTINFRU);                              0084 00112000
+*                                           /*               @ZA03720*/ 00113000
+              READ DECB,SF,(2),(3),'S'                                  00114000
+              CHECK DECB                                                00115000
+*       IF IOERR='1'B THEN          /* WAS THERE AN I/O ERROR      0085 00116000
+*                                                            @ZA03721*/ 00117000
+         TM    IOERR,B'01000000'                                   0085 00118000
+         BNO   @RF00085                                            0085 00119000
+*         DO;                       /* YES                   @ZA03721*/ 00120000
+*           IOERR='0'B;             /* RESET ERROR FLAG      @ZA03721*/ 00121000
+         NI    IOERR,B'10111111'                                   0087 00122000
+*           RTNCDE=8;               /* INDICATE I/O ERROR    @ZA03721*/ 00123000
+         MVC   RTNCDE(4),@CF00042                                  0088 00124000
+*           GOTO READOUT;           /* EXIT READ ROUTINE     @ZA03721*/ 00125000
+         B     READOUT                                             0089 00126000
+*         END;                      /*                       @ZA03721*/ 00127000
+*       RECNUMBR=((DCBBLKSI-RESIDCT)/RCDSIZE);/* COMPUTE NUMBER OF 0091 00128000
+*                                      RECORDS IN EACK BLOCK @ZA03720*/ 00129000
+@RF00085 LH    @04,DCBBLKSI+52(,DCBPTR)                            0091 00130000
+         L     @09,IOBSTPTR                                        0091 00131000
+         SH    @04,RESIDCT(,@09)                                   0091 00132000
+         SRDA  @04,32                                              0091 00133000
+         D     @04,@CF00306                                        0091 00134000
+         STH   @05,RECNUMBR                                        0091 00135000
+*       DATAPTR=BUFRADR;            /* POINT TO FIRST RECORD @ZA03720*/ 00136000
+         L     @09,@CA00659                                        0092 00137000
+         L     @09,BUFRADR-BUFRADR(,@09)                           0092 00138000
+         ST    @09,DATAPTR                                         0092 00139000
+*       DONTREAD='1'B;              /* INDICATE DATA AVAIL   @ZA03720*/ 00140000
+         OI    DONTREAD,B'10000000'                                0093 00141000
+*     END;                          /*                       @ZA03720*/ 00142000
+*   RECNUMBR=RECNUMBR-1;            /* DECREMENT RECORD CNT  @ZA03720*/ 00143000
+@RF00081 LH    @09,RECNUMBR                                        0095 00144000
+         BCTR  @09,0                                               0095 00145000
+         STH   @09,RECNUMBR                                        0095 00146000
+*   CRDBUFR=RECORD;                 /* MOVE RECORD INTO BUFFER     0096 00147000
+*                                      PROVIDED BY INCRD     @ZA03720*/ 00148000
+         L     @11,RSPBUFA(,RDPRMPTR)                              0096 00149000
+         L     @10,DATAPTR                                         0096 00150000
+         MVC   CRDBUFR(80,@11),RECORD(@10)                         0096 00151000
+*   IF RECNUMBR^=0 THEN             /* ANY MORE RECORDS LEFT @ZA03720*/ 00152000
+         LTR   @09,@09                                             0097 00153000
+         BZ    @RF00097                                            0097 00154000
+*     DATAPTR=DATAPTR+RCDSIZE;      /* YES - POINT TO NEXT RECORD  0098 00155000
+*                                                            @ZA03720*/ 00156000
+         AL    @10,@CF00306                                        0098 00157000
+         ST    @10,DATAPTR                                         0098 00158000
+*   ELSE                            /* NO - NO RECORDS LEFT  @ZA03720*/ 00159000
+*     DONTREAD='0'B;                /* INDICATE TO READ NEXT BLOCK 0099 00160000
+*                                                            @ZA03720*/ 00161000
+         B     @RC00097                                            0099 00162000
+@RF00097 NI    DONTREAD,B'01111111'                                0099 00163000
+*   RTNCDE=0;                       /* INDICATE SUCCESSFUL READ    0100 00164000
+*                                                            @ZA03720*/ 00165000
+@RC00097 SLR   @11,@11                                             0100 00166000
+         ST    @11,RTNCDE                                          0100 00167000
+*READOUT:                                                          0101 00168000
+*   R14=R14SAVE;                    /* RESTORE RETURN ADDR   @ZA03720*/ 00169000
+READOUT  L     R14,R14SAVE                                         0101 00170000
+*   END READRTN;                    /*                       @ZA03720*/ 00171000
+@EL00002 DS    0H                                                  0102 00172000
+@EF00002 DS    0H                                                  0102 00173000
+@ER00002 BR    @14                                                 0102 00174000
+*   END ISTINCRS                                                   0103 00175000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.      * 00176000
+*/*%INCLUDE SYSLIB  (IHADCBDF)                                        * 00177000
+*/*%INCLUDE SYSLIB  (IHADCB  )                                        * 00178000
+*/*%INCLUDE SYSLIB  (IEZIOB  )                                        * 00179000
+*;                                                                 0103 00180000
+@DATA    DS    0H                                                       00181000
+         DS    0F                                                       00182000
+@SA00001 DS    18F                                                      00183000
+         DS    0F                                                       00184000
+@CF00040 DC    F'4'                                                     00185000
+@CF00042 DC    F'8'                                                     00186000
+@CF00032 DC    F'12'                                                    00187000
+@CF00306 DC    F'80'                                                    00188000
+@CA00659 DC    A(BUFRADR)                                               00189000
+         DS    0D                                                       00190000
+DATAPTR  DS    A                                                        00191000
+RTNCDE   DC    F'0'                                                     00192000
+R14SAVE  DC    A(0)                                                     00193000
+RECNUMBR DS    H                                                        00194000
+XZEROS   DC    X'0000000000000000'                                      00195000
+CRSSW    DC    XL1'0'                                                   00196000
+         ORG   CRSSW                                                    00197000
+DONTREAD DS    BL1                                                      00198000
+IOERR    EQU   CRSSW+0                                                  00199000
+         ORG   CRSSW+1                                                  00200000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00201000
+@01      EQU   01                                                       00202000
+@02      EQU   02                                                       00203000
+@03      EQU   03                                                       00204000
+@04      EQU   04                                                       00205000
+@05      EQU   05                                                       00206000
+@06      EQU   06                                                       00207000
+@07      EQU   07                                                       00208000
+@08      EQU   08                                                       00209000
+@09      EQU   09                                                       00210000
+@10      EQU   10                                                       00211000
+@11      EQU   11                                                       00212000
+@12      EQU   12                                                       00213000
+@13      EQU   13                                                       00214000
+@14      EQU   14                                                       00215000
+@15      EQU   15                                                       00216000
+RDPRMPTR EQU   @08                                                      00217000
+DCBPTR   EQU   @02                                                      00218000
+R0       EQU   @00                                                      00219000
+R1       EQU   @01                                                      00220000
+R3       EQU   @03                                                      00221000
+R14      EQU   @14                                                      00222000
+R15      EQU   @15                                                      00223000
+         ENTRY ISTINFRT                                                 00224000
+         ENTRY ISTINFRU                                                 00225000
+         EXTRN BUFRADR                                                  00226000
+IHADCB   EQU   0                                                        00227000
+IHADCS00 EQU   0                                                        00228000
+DCBFDAD  EQU   IHADCS00+5                                               00229000
+IHADCS01 EQU   0                                                        00230000
+DCBDVTBL EQU   IHADCS01                                                 00231000
+IHADCS11 EQU   0                                                        00232000
+DCBRELB  EQU   IHADCS11                                                 00233000
+DCBREL   EQU   DCBRELB+1                                                00234000
+DCBBUFCB EQU   IHADCS11+4                                               00235000
+DCBDSORG EQU   IHADCS11+10                                              00236000
+DCBDSRG1 EQU   DCBDSORG                                                 00237000
+DCBDSRG2 EQU   DCBDSORG+1                                               00238000
+DCBIOBAD EQU   IHADCS11+12                                              00239000
+DCBODEB  EQU   DCBIOBAD                                                 00240000
+DCBLNP   EQU   DCBODEB                                                  00241000
+DCBQSLM  EQU   DCBLNP                                                   00242000
+DCBIOBAA EQU   DCBODEB+1                                                00243000
+IHADCS50 EQU   0                                                        00244000
+DCBSVCXL EQU   IHADCS50                                                 00245000
+DCBEODAD EQU   IHADCS50+4                                               00246000
+DCBBFALN EQU   DCBEODAD                                                 00247000
+DCBHIARC EQU   DCBBFALN                                                 00248000
+DCBBFTEK EQU   DCBHIARC                                                 00249000
+DCBBFT   EQU   DCBBFTEK                                                 00250000
+DCBEXLST EQU   IHADCS50+8                                               00251000
+DCBRECFM EQU   DCBEXLST                                                 00252000
+DCBRECLA EQU   DCBRECFM                                                 00253000
+IHADCS24 EQU   0                                                        00254000
+DCBOFLGS EQU   IHADCS24+8                                               00255000
+DCBOFLWR EQU   DCBOFLGS                                                 00256000
+DCBIFLG  EQU   IHADCS24+9                                               00257000
+DCBIBPCT EQU   DCBIFLG                                                  00258000
+DCBMACR  EQU   IHADCS24+10                                              00259000
+DCBMACR1 EQU   DCBMACR                                                  00260000
+DCBMRFE  EQU   DCBMACR1                                                 00261000
+DCBMRGET EQU   DCBMRFE                                                  00262000
+DCBMRAPG EQU   DCBMACR1                                                 00263000
+DCBMRRD  EQU   DCBMRAPG                                                 00264000
+DCBMRCI  EQU   DCBMACR1                                                 00265000
+DCBMRMVG EQU   DCBMRCI                                                  00266000
+DCBMRLCG EQU   DCBMACR1                                                 00267000
+DCBMRABC EQU   DCBMACR1                                                 00268000
+DCBMRPT1 EQU   DCBMRABC                                                 00269000
+DCBMRSBG EQU   DCBMRPT1                                                 00270000
+DCBMRCRL EQU   DCBMACR1                                                 00271000
+DCBMRCHK EQU   DCBMRCRL                                                 00272000
+DCBMRRDX EQU   DCBMRCHK                                                 00273000
+DCBMRDMG EQU   DCBMACR1                                                 00274000
+DCBMACR2 EQU   DCBMACR+1                                                00275000
+DCBMRPUT EQU   DCBMACR2                                                 00276000
+DCBMRWRT EQU   DCBMACR2                                                 00277000
+DCBMRMVP EQU   DCBMACR2                                                 00278000
+DCBMR5WD EQU   DCBMACR2                                                 00279000
+DCBMRLDM EQU   DCBMR5WD                                                 00280000
+DCBMRLCP EQU   DCBMRLDM                                                 00281000
+DCBMR4WD EQU   DCBMACR2                                                 00282000
+DCBMRPT2 EQU   DCBMR4WD                                                 00283000
+DCBMRTMD EQU   DCBMRPT2                                                 00284000
+DCBMR3WD EQU   DCBMACR2                                                 00285000
+DCBMRCTL EQU   DCBMR3WD                                                 00286000
+DCBMRSTK EQU   DCBMRCTL                                                 00287000
+DCBMR1WD EQU   DCBMACR2                                                 00288000
+DCBMRSWA EQU   DCBMR1WD                                                 00289000
+DCBMRDMD EQU   DCBMRSWA                                                 00290000
+IHADCS25 EQU   0                                                        00291000
+DCBMACRF EQU   IHADCS25+2                                               00292000
+DCBMACF1 EQU   DCBMACRF                                                 00293000
+DCBMFFE  EQU   DCBMACF1                                                 00294000
+DCBMFGET EQU   DCBMFFE                                                  00295000
+DCBMFAPG EQU   DCBMACF1                                                 00296000
+DCBMFRD  EQU   DCBMFAPG                                                 00297000
+DCBMFCI  EQU   DCBMACF1                                                 00298000
+DCBMFMVG EQU   DCBMFCI                                                  00299000
+DCBMFLCG EQU   DCBMACF1                                                 00300000
+DCBMFABC EQU   DCBMACF1                                                 00301000
+DCBMFPT1 EQU   DCBMFABC                                                 00302000
+DCBMFSBG EQU   DCBMFPT1                                                 00303000
+DCBMFCRL EQU   DCBMACF1                                                 00304000
+DCBMFCHK EQU   DCBMFCRL                                                 00305000
+DCBMFDMG EQU   DCBMACF1                                                 00306000
+DCBMACF2 EQU   DCBMACRF+1                                               00307000
+DCBMFPUT EQU   DCBMACF2                                                 00308000
+DCBMFWRT EQU   DCBMACF2                                                 00309000
+DCBMFMVP EQU   DCBMACF2                                                 00310000
+DCBMF5WD EQU   DCBMACF2                                                 00311000
+DCBMFLDM EQU   DCBMF5WD                                                 00312000
+DCBMFLCP EQU   DCBMFLDM                                                 00313000
+DCBMF4WD EQU   DCBMACF2                                                 00314000
+DCBMFPT2 EQU   DCBMF4WD                                                 00315000
+DCBMFTMD EQU   DCBMFPT2                                                 00316000
+DCBMF3WD EQU   DCBMACF2                                                 00317000
+DCBMFCTL EQU   DCBMF3WD                                                 00318000
+DCBMFSTK EQU   DCBMFCTL                                                 00319000
+DCBMF1WD EQU   DCBMACF2                                                 00320000
+DCBMFSWA EQU   DCBMF1WD                                                 00321000
+DCBMFDMD EQU   DCBMFSWA                                                 00322000
+DCBDEBAD EQU   IHADCS25+4                                               00323000
+DCBIFLGS EQU   DCBDEBAD                                                 00324000
+DCBIFPCT EQU   DCBIFLGS                                                 00325000
+IHADCS26 EQU   0                                                        00326000
+DCBWRITE EQU   IHADCS26                                                 00327000
+DCBREAD  EQU   DCBWRITE                                                 00328000
+DCBWRITA EQU   DCBREAD+1                                                00329000
+IHADCS36 EQU   0                                                        00330000
+DCBGERR  EQU   IHADCS36                                                 00331000
+DCBPERR  EQU   DCBGERR                                                  00332000
+DCBCHECK EQU   DCBPERR                                                  00333000
+DCBOPTCD EQU   DCBCHECK                                                 00334000
+DCBOPTH  EQU   DCBOPTCD                                                 00335000
+DCBOPTO  EQU   DCBOPTH                                                  00336000
+DCBOPTZ  EQU   DCBOPTCD                                                 00337000
+DCBGERRA EQU   DCBCHECK+1                                               00338000
+DCBPERRA EQU   DCBGERRA                                                 00339000
+DCBSYNAD EQU   IHADCS36+4                                               00340000
+DCBCIND1 EQU   IHADCS36+8                                               00341000
+DCBCIND2 EQU   IHADCS36+9                                               00342000
+DCBBLKSI EQU   IHADCS36+10                                              00343000
+DCBIOBA  EQU   IHADCS36+16                                              00344000
+DCBCICB  EQU   DCBIOBA                                                  00345000
+IHADCS52 EQU   0                                                        00346000
+DCBDIRCT EQU   IHADCS52                                                 00347000
+DCBQSWS  EQU   DCBDIRCT                                                 00348000
+DCBUSASI EQU   DCBQSWS                                                  00349000
+DCBQADFS EQU   DCBUSASI                                                 00350000
+DCBBUFOF EQU   DCBDIRCT+1                                               00351000
+IHADCS37 EQU   0                                                        00352000
+DCBFLAG1 EQU   IHADCS37                                                 00353000
+IHADCS38 EQU   0                                                        00354000
+DCBEOBR  EQU   IHADCS38                                                 00355000
+DCBPOINT EQU   IHADCS38+12                                              00356000
+DCBCNTRL EQU   DCBPOINT                                                 00357000
+IOBPREFX EQU   0                                                        00358000
+IOBCFLG1 EQU   IOBPREFX                                                 00359000
+IOBSTDRD EQU   0                                                        00360000
+IOBFLAG1 EQU   IOBSTDRD                                                 00361000
+IOBCYCCK EQU   IOBFLAG1                                                 00362000
+IOBRSTRT EQU   IOBFLAG1                                                 00363000
+IOBFLAG2 EQU   IOBSTDRD+1                                               00364000
+IOBPURGE EQU   IOBFLAG2                                                 00365000
+IOBRDHA0 EQU   IOBFLAG2                                                 00366000
+IOBSENS0 EQU   IOBSTDRD+2                                               00367000
+IOBS0B7  EQU   IOBSENS0                                                 00368000
+IOBSENS1 EQU   IOBSTDRD+3                                               00369000
+IOBECBPT EQU   IOBSTDRD+4                                               00370000
+IOBFLAG3 EQU   IOBSTDRD+8                                               00371000
+IOBFL3   EQU   IOBFLAG3                                                 00372000
+IOBCNC   EQU   IOBFL3                                                   00373000
+IOBICL   EQU   IOBFL3                                                   00374000
+IOBCSW   EQU   IOBSTDRD+9                                               00375000
+IOBIOCSW EQU   IOBCSW                                                   00376000
+IOBSTBYT EQU   IOBIOCSW+3                                               00377000
+IOBUSTAT EQU   IOBSTBYT                                                 00378000
+IOBCSTAT EQU   IOBSTBYT+1                                               00379000
+IOBSTART EQU   IOBSTDRD+16                                              00380000
+IOBDCBPT EQU   IOBSTDRD+20                                              00381000
+IOBFLAG4 EQU   IOBDCBPT                                                 00382000
+IOBRESTR EQU   IOBSTDRD+24                                              00383000
+IOBINCAM EQU   IOBSTDRD+28                                              00384000
+IOBBTAMF EQU   IOBINCAM                                                 00385000
+ISTRSPRM EQU   0                                                        00386000
+RSPMEMBN EQU   ISTRSPRM+8                                               00387000
+RSPDCBA  EQU   ISTRSPRM+16                                              00388000
+RSPBUFA  EQU   ISTRSPRM+20                                              00389000
+RECORD   EQU   0                                                        00390000
+CRDBUFR  EQU   0                                                        00391000
+IOBPTR   EQU   DECB+16                                                  00392000
+IOBORG01 EQU   IOBPREFX+8                                               00393000
+IOBNIOBA EQU   IOBORG01                                                 00394000
+IOBNFLG1 EQU   IOBNIOBA                                                 00395000
+IOBPRTOV EQU   IOBNFLG1                                                 00396000
+IOBORG02 EQU   IOBPREFX+8                                               00397000
+IOBDQADA EQU   IOBORG02                                                 00398000
+IOBDEQIN EQU   IOBDQADA                                                 00399000
+IOBORG03 EQU   IOBPREFX+12                                              00400000
+IOBSTPTR EQU   IOBPTR                                                   00401000
+IOBORG04 EQU   IOBINCAM                                                 00402000
+IOBORG12 EQU   IOBINCAM                                                 00403000
+IOBFL4   EQU   IOBORG12                                                 00404000
+IOBEXTEN EQU   IOBSTDRD+32                                              00405000
+IOBSEEK  EQU   IOBEXTEN                                                 00406000
+IOBBB    EQU   IOBSEEK+1                                                00407000
+IOBCC    EQU   IOBSEEK+3                                                00408000
+IOBHH    EQU   IOBSEEK+5                                                00409000
+IOBORG05 EQU   IOBEXTEN                                                 00410000
+IOBORG06 EQU   IOBEXTEN                                                 00411000
+IOBNXTPT EQU   IOBORG06+4                                               00412000
+IOBSTATA EQU   IOBNXTPT                                                 00413000
+IOBORG07 EQU   IOBEXTEN+8                                               00414000
+W1IEXTEN EQU   IOBORG07                                                 00415000
+IOBORG08 EQU   IOBEXTEN+8                                               00416000
+IOBINDCT EQU   IOBORG08+4                                               00417000
+IOBUNSQR EQU   IOBORG08+5                                               00418000
+IOBFCHAD EQU   IOBORG08+8                                               00419000
+IOBORG09 EQU   IOBEXTEN+8                                               00420000
+IOBDPLAD EQU   IOBORG09+4                                               00421000
+IOBDTYPE EQU   IOBORG09+8                                               00422000
+IOBDTYP2 EQU   IOBORG09+9                                               00423000
+IOBDSTAT EQU   IOBORG09+10                                              00424000
+IOBSTAT1 EQU   IOBDSTAT                                                 00425000
+IOBORG10 EQU   IOBEXTEN+8                                               00426000
+IOBSEEK2 EQU   IOBORG10                                                 00427000
+IOBORG11 EQU   IOBEXTEN                                                 00428000
+IOBERCT  EQU   IOBORG11                                                 00429000
+IOBUCBXV EQU   IOBERCT                                                  00430000
+IOBNAME  EQU   IOBORG11+4                                               00431000
+IOBORG13 EQU   IOBEXTEN                                                 00432000
+IOBSKADR EQU   IOBORG13                                                 00433000
+CSWSTATS EQU   IOBCSW                                                   00434000
+RESIDCT  EQU   CSWSTATS+5                                               00435000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00436000
+@NM00022 EQU   CSWSTATS                                                 00437000
+IOBSKSS  EQU   IOBSKADR+3                                               00438000
+IOBSK0   EQU   IOBSKADR+2                                               00439000
+IOBSKTT  EQU   IOBSKADR+1                                               00440000
+IOBSKRV  EQU   IOBSKADR                                                 00441000
+IOBCSWSV EQU   IOBORG11+17                                              00442000
+IOBSENSV EQU   IOBORG11+16                                              00443000
+IOBRCD   EQU   IOBORG11+12                                              00444000
+IOBMDREC EQU   IOBORG11+8                                               00445000
+IOBNAMEA EQU   IOBNAME+1                                                00446000
+IOBNAMSZ EQU   IOBNAME                                                  00447000
+IOBERCTA EQU   IOBERCT+1                                                00448000
+IOBRTYPE EQU   IOBUCBXV                                                 00449000
+IOBRDCHP EQU   IOBORG10+20                                              00450000
+IOBNEXTA EQU   IOBORG10+16                                              00451000
+IOBREADA EQU   IOBORG10+12                                              00452000
+IOBBUFC  EQU   IOBORG10+8                                               00453000
+IOBSK2R  EQU   IOBSEEK2+7                                               00454000
+IOBSK2HH EQU   IOBSEEK2+5                                               00455000
+IOBSK2CC EQU   IOBSEEK2+3                                               00456000
+IOBSK2BB EQU   IOBSEEK2+1                                               00457000
+IOBSK2M  EQU   IOBSEEK2                                                 00458000
+IOBCHNPR EQU   IOBORG09+40                                              00459000
+IOBDNCRF EQU   IOBORG09+32                                              00460000
+IOBRSV35 EQU   IOBORG09+24                                              00461000
+IOBDQPTR EQU   IOBORG09+20                                              00462000
+IOBRSV34 EQU   IOBORG09+18                                              00463000
+IOBDBYTN EQU   IOBORG09+16                                              00464000
+IOBDCPND EQU   IOBORG09+12                                              00465000
+IOBSTAT2 EQU   IOBDSTAT+1                                               00466000
+IOBSIORT EQU   IOBSTAT1                                                 00467000
+IOBADDVU EQU   IOBSTAT1                                                 00468000
+IOBBUFF  EQU   IOBSTAT1                                                 00469000
+IOBENQUE EQU   IOBSTAT1                                                 00470000
+IOBPASS2 EQU   IOBSTAT1                                                 00471000
+IOBSYNCH EQU   IOBSTAT1                                                 00472000
+IOBNEWVL EQU   IOBSTAT1                                                 00473000
+IOBABNRM EQU   IOBSTAT1                                                 00474000
+IOBRELEX EQU   IOBDTYP2                                                 00475000
+IOBADDTY EQU   IOBDTYP2                                                 00476000
+IOBTYPE  EQU   IOBDTYP2                                                 00477000
+IOBRQUST EQU   IOBDTYP2                                                 00478000
+IOBSUFFX EQU   IOBDTYP2                                                 00479000
+IOBSBLKL EQU   IOBDTYP2                                                 00480000
+IOBSKEY  EQU   IOBDTYP2                                                 00481000
+IOBRELBL EQU   IOBDTYPE                                                 00482000
+IOBRDEXC EQU   IOBDTYPE                                                 00483000
+IOBDYNBF EQU   IOBDTYPE                                                 00484000
+IOBACTAD EQU   IOBDTYPE                                                 00485000
+IOBFDBCK EQU   IOBDTYPE                                                 00486000
+IOBEXTSC EQU   IOBDTYPE                                                 00487000
+IOBOVFLO EQU   IOBDTYPE                                                 00488000
+IOBVERFY EQU   IOBDTYPE                                                 00489000
+IOBDPLB  EQU   IOBDPLAD+1                                               00490000
+IOBDAYLI EQU   IOBDPLAD                                                 00491000
+IOBDIOBS EQU   IOBORG09+2                                               00492000
+IOBDBYTR EQU   IOBORG09                                                 00493000
+IOBBCHAD EQU   IOBORG08+12                                              00494000
+IOBFCHNB EQU   IOBFCHAD+1                                               00495000
+IOBCOUNT EQU   IOBFCHAD                                                 00496000
+IOBASYN  EQU   IOBORG08+7                                               00497000
+IOBAPP   EQU   IOBORG08+6                                               00498000
+IOBRSV32 EQU   IOBUNSQR                                                 00499000
+IOBRSV31 EQU   IOBUNSQR                                                 00500000
+IOBRSV30 EQU   IOBUNSQR                                                 00501000
+IOBKNRWR EQU   IOBUNSQR                                                 00502000
+IOBKNWR  EQU   IOBUNSQR                                                 00503000
+IOBNTAV2 EQU   IOBUNSQR                                                 00504000
+IOBNTAV1 EQU   IOBUNSQR                                                 00505000
+IOBCPBSY EQU   IOBUNSQR                                                 00506000
+IOBCHNNL EQU   IOBINDCT                                                 00507000
+IOBRSV29 EQU   IOBINDCT                                                 00508000
+IOBRSV28 EQU   IOBINDCT                                                 00509000
+IOBRSV27 EQU   IOBINDCT                                                 00510000
+IOBKEYAD EQU   IOBINDCT                                                 00511000
+IOBOVPTR EQU   IOBINDCT                                                 00512000
+IOBUNSCH EQU   IOBINDCT                                                 00513000
+IOBDEQCP EQU   IOBINDCT                                                 00514000
+IOBCCWAD EQU   IOBORG08                                                 00515000
+W1OEXTEN EQU   W1IEXTEN                                                 00516000
+IOBCCW   EQU   IOBORG06+8                                               00517000
+IOBNXTPB EQU   IOBNXTPT+1                                               00518000
+IOBRSV26 EQU   IOBSTATA                                                 00519000
+IOBRSV25 EQU   IOBSTATA                                                 00520000
+IOBRSV24 EQU   IOBSTATA                                                 00521000
+IOBRSV23 EQU   IOBSTATA                                                 00522000
+IOBRSV22 EQU   IOBSTATA                                                 00523000
+IOBRSV21 EQU   IOBSTATA                                                 00524000
+IOBRSV20 EQU   IOBSTATA                                                 00525000
+IOBAVLFL EQU   IOBSTATA                                                 00526000
+IOBRSV37 EQU   IOBORG06+1                                               00527000
+IOBUCBXG EQU   IOBORG06                                                 00528000
+IOBCPA   EQU   IOBORG05+32                                              00529000
+IOBERINF EQU   IOBORG05+16                                              00530000
+IOBERCCW EQU   IOBORG05+8                                               00531000
+IOBSNDPT EQU   IOBORG05+7                                               00532000
+IOBRCVPT EQU   IOBORG05+6                                               00533000
+IOBWORK  EQU   IOBORG05+1                                               00534000
+IOBUCBX  EQU   IOBORG05                                                 00535000
+IOBR     EQU   IOBSEEK+7                                                00536000
+IOBHH2   EQU   IOBHH+1                                                  00537000
+IOBHH1   EQU   IOBHH                                                    00538000
+IOBCC2   EQU   IOBCC+1                                                  00539000
+IOBCC1   EQU   IOBCC                                                    00540000
+IOBBB2   EQU   IOBBB+1                                                  00541000
+IOBBB1   EQU   IOBBB                                                    00542000
+IOBM     EQU   IOBSEEK                                                  00543000
+IOBRSV46 EQU   IOBFL4                                                   00544000
+IOBRSV47 EQU   IOBFL4                                                   00545000
+IOBENT   EQU   IOBFL4                                                   00546000
+IOBEQP   EQU   IOBFL4                                                   00547000
+IOBBUS   EQU   IOBFL4                                                   00548000
+IOBDCK   EQU   IOBFL4                                                   00549000
+IOBREJ   EQU   IOBFL4                                                   00550000
+IOBOVR   EQU   IOBFL4                                                   00551000
+IOBCRILC EQU   IOBORG04+1                                               00552000
+IOBCRDCC EQU   IOBORG04                                                 00553000
+IOBGQECB EQU   IOBORG03                                                 00554000
+IOBSWAP  EQU   IOBORG02+4                                               00555000
+IOBDQADB EQU   IOBDQADA+1                                               00556000
+IOBRSV13 EQU   IOBDEQIN                                                 00557000
+IOBRSV12 EQU   IOBDEQIN                                                 00558000
+IOBRSV11 EQU   IOBDEQIN                                                 00559000
+IOBRSV10 EQU   IOBDEQIN                                                 00560000
+IOBRSV09 EQU   IOBDEQIN                                                 00561000
+IOBRSV08 EQU   IOBDEQIN                                                 00562000
+IOBRSV07 EQU   IOBDEQIN                                                 00563000
+IOBDEQ   EQU   IOBDEQIN                                                 00564000
+IOBNECB  EQU   IOBORG01+4                                               00565000
+IOBNIOBB EQU   IOBNIOBA+1                                               00566000
+IOBFIRST EQU   IOBNFLG1                                                 00567000
+IOBUPERR EQU   IOBNFLG1                                                 00568000
+IOBSPAN  EQU   IOBNFLG1                                                 00569000
+IOBBKSPC EQU   IOBNFLG1                                                 00570000
+IOBUPDAT EQU   IOBNFLG1                                                 00571000
+IOBREAD  EQU   IOBNFLG1                                                 00572000
+IOBWRITE EQU   IOBNFLG1                                                 00573000
+IOBSEGMT EQU   IOBPRTOV                                                 00574000
+@NM00021 EQU   DECB                                                     00575000
+RSPLIBN  EQU   ISTRSPRM                                                 00576000
+IOBERRCT EQU   IOBSTDRD+30                                              00577000
+IOBRSV19 EQU   IOBINCAM+1                                               00578000
+IOBOLTST EQU   IOBBTAMF                                                 00579000
+IOBRFTMG EQU   IOBBTAMF                                                 00580000
+IOBRSV17 EQU   IOBBTAMF                                                 00581000
+IOBRSV16 EQU   IOBBTAMF                                                 00582000
+IOBRSV15 EQU   IOBBTAMF                                                 00583000
+IOBRSV14 EQU   IOBBTAMF                                                 00584000
+IOBINUSE EQU   IOBBTAMF                                                 00585000
+IOBPRMER EQU   IOBBTAMF                                                 00586000
+IOBRSTRB EQU   IOBRESTR+1                                               00587000
+IOBREPOS EQU   IOBRESTR                                                 00588000
+IOBDCBPB EQU   IOBDCBPT+1                                               00589000
+IOBRSV44 EQU   IOBFLAG4                                                 00590000
+IOBJES3I EQU   IOBFLAG4                                                 00591000
+IOBRSV42 EQU   IOBFLAG4                                                 00592000
+IOBRSV41 EQU   IOBFLAG4                                                 00593000
+IOBRSV40 EQU   IOBFLAG4                                                 00594000
+IOBPMERR EQU   IOBFLAG4                                                 00595000
+IOBCC3WE EQU   IOBFLAG4                                                 00596000
+IOBGDPOL EQU   IOBFLAG4                                                 00597000
+IOBSTRTB EQU   IOBSTART+1                                               00598000
+IOBSIOCC EQU   IOBSTART                                                 00599000
+IOBCSB7  EQU   IOBCSTAT                                                 00600000
+IOBCSB6  EQU   IOBCSTAT                                                 00601000
+IOBCSB5  EQU   IOBCSTAT                                                 00602000
+IOBCSB4  EQU   IOBCSTAT                                                 00603000
+IOBCSB3  EQU   IOBCSTAT                                                 00604000
+IOBCSB2  EQU   IOBCSTAT                                                 00605000
+IOBCSB1  EQU   IOBCSTAT                                                 00606000
+IOBCSB0  EQU   IOBCSTAT                                                 00607000
+IOBUSB7  EQU   IOBUSTAT                                                 00608000
+IOBUSB6  EQU   IOBUSTAT                                                 00609000
+IOBUSB5  EQU   IOBUSTAT                                                 00610000
+IOBUSB4  EQU   IOBUSTAT                                                 00611000
+IOBUSB3  EQU   IOBUSTAT                                                 00612000
+IOBUSB2  EQU   IOBUSTAT                                                 00613000
+IOBUSB1  EQU   IOBUSTAT                                                 00614000
+IOBUSB0  EQU   IOBUSTAT                                                 00615000
+IOBCMDA  EQU   IOBIOCSW                                                 00616000
+IOBLOG   EQU   IOBFL3                                                   00617000
+IOBJAM   EQU   IOBICL                                                   00618000
+IOBMSG   EQU   IOBFL3                                                   00619000
+IOBSDR   EQU   IOBCNC                                                   00620000
+IOBACU   EQU   IOBFL3                                                   00621000
+IOBCDC   EQU   IOBFL3                                                   00622000
+IOBICC   EQU   IOBFL3                                                   00623000
+IOBCCC   EQU   IOBFL3                                                   00624000
+IOBECBPB EQU   IOBECBPT+1                                               00625000
+IOBECBCC EQU   IOBECBPT                                                 00626000
+IOBS1B7  EQU   IOBSENS1                                                 00627000
+IOBS1B6  EQU   IOBSENS1                                                 00628000
+IOBS1B5  EQU   IOBSENS1                                                 00629000
+IOBS1B4  EQU   IOBSENS1                                                 00630000
+IOBS1B3  EQU   IOBSENS1                                                 00631000
+IOBS1B2  EQU   IOBSENS1                                                 00632000
+IOBS1B1  EQU   IOBSENS1                                                 00633000
+IOBS1B0  EQU   IOBSENS1                                                 00634000
+IOBSNSC9 EQU   IOBS0B7                                                  00635000
+IOBS0B6  EQU   IOBSENS0                                                 00636000
+IOBS0B5  EQU   IOBSENS0                                                 00637000
+IOBS0B4  EQU   IOBSENS0                                                 00638000
+IOBS0B3  EQU   IOBSENS0                                                 00639000
+IOBS0B2  EQU   IOBSENS0                                                 00640000
+IOBS0B1  EQU   IOBSENS0                                                 00641000
+IOBS0B0  EQU   IOBSENS0                                                 00642000
+IOBPNCH  EQU   IOBFLAG2                                                 00643000
+IOBSTATO EQU   IOBFLAG2                                                 00644000
+IOBSKUPD EQU   IOBFLAG2                                                 00645000
+IOBALTTR EQU   IOBFLAG2                                                 00646000
+IOBRRT2  EQU   IOBRDHA0                                                 00647000
+IOBRRT3  EQU   IOBPURGE                                                 00648000
+IOBSENSE EQU   IOBFLAG2                                                 00649000
+IOBHALT  EQU   IOBFLAG2                                                 00650000
+IOBSPSVC EQU   IOBRSTRT                                                 00651000
+IOBUNREL EQU   IOBFLAG1                                                 00652000
+IOBIOERR EQU   IOBFLAG1                                                 00653000
+IOBFCREX EQU   IOBCYCCK                                                 00654000
+IOBRPSTN EQU   IOBFLAG1                                                 00655000
+IOBERRTN EQU   IOBFLAG1                                                 00656000
+IOBCMDCH EQU   IOBFLAG1                                                 00657000
+IOBDATCH EQU   IOBFLAG1                                                 00658000
+IOBCNOPA EQU   IOBPREFX+12                                              00659000
+IOBCICB  EQU   IOBPREFX+8                                               00660000
+IOBCECB  EQU   IOBPREFX+4                                               00661000
+IOBCONOP EQU   IOBPREFX+3                                               00662000
+IOBCINOP EQU   IOBPREFX+2                                               00663000
+IOBRSV05 EQU   IOBPREFX+1                                               00664000
+IOBPCI   EQU   IOBCFLG1                                                 00665000
+IOBRSTCH EQU   IOBCFLG1                                                 00666000
+IOBABAPP EQU   IOBCFLG1                                                 00667000
+IOBPTST  EQU   IOBCFLG1                                                 00668000
+IOBRSV04 EQU   IOBCFLG1                                                 00669000
+IOBRSV03 EQU   IOBCFLG1                                                 00670000
+IOBRSV02 EQU   IOBCFLG1                                                 00671000
+IOBRSV01 EQU   IOBCFLG1                                                 00672000
+DCBNOTE  EQU   DCBCNTRL                                                 00673000
+DCBLRECL EQU   IHADCS38+10                                              00674000
+@NM00020 EQU   IHADCS38+8                                               00675000
+DCBEOBW  EQU   IHADCS38+4                                               00676000
+DCBEOBRA EQU   DCBEOBR+1                                                00677000
+DCBNCP   EQU   DCBEOBR                                                  00678000
+@NM00019 EQU   DCBFLAG1                                                 00679000
+DCBSTFLS EQU   DCBFLAG1                                                 00680000
+DCBSTQCK EQU   DCBFLAG1                                                 00681000
+DCBDIRCQ EQU   DCBBUFOF                                                 00682000
+DCBQSTRU EQU   DCBUSASI                                                 00683000
+@NM00018 EQU   DCBUSASI                                                 00684000
+DCBQADF3 EQU   DCBQADFS                                                 00685000
+DCBQADF2 EQU   DCBQADFS                                                 00686000
+DCBQADF1 EQU   DCBQADFS                                                 00687000
+DCBBLBP  EQU   DCBUSASI                                                 00688000
+@NM00017 EQU   DCBUSASI                                                 00689000
+DCBCICBA EQU   DCBCICB+1                                                00690000
+@NM00016 EQU   DCBCICB                                                  00691000
+DCBOFFSW EQU   IHADCS36+15                                              00692000
+DCBOFFSR EQU   IHADCS36+14                                              00693000
+DCBWCPL  EQU   IHADCS36+13                                              00694000
+DCBWCPO  EQU   IHADCS36+12                                              00695000
+DCBCNQSM EQU   DCBCIND2                                                 00696000
+DCBCNFEO EQU   DCBCIND2                                                 00697000
+DCBCNCHS EQU   DCBCIND2                                                 00698000
+DCBCNBFP EQU   DCBCIND2                                                 00699000
+DCBCNIOE EQU   DCBCIND2                                                 00700000
+DCBCNCLO EQU   DCBCIND2                                                 00701000
+DCBCNWRO EQU   DCBCIND2                                                 00702000
+DCBCNSTO EQU   DCBCIND2                                                 00703000
+DCBCNEXB EQU   DCBCIND1                                                 00704000
+@NM00015 EQU   DCBCIND1                                                 00705000
+DCBCNBRM EQU   DCBCIND1                                                 00706000
+@NM00014 EQU   DCBCIND1                                                 00707000
+DCBCNEVA EQU   DCBCIND1                                                 00708000
+DCBCNEVB EQU   DCBCIND1                                                 00709000
+DCBCNSRD EQU   DCBCIND1                                                 00710000
+DCBCNTOV EQU   DCBCIND1                                                 00711000
+DCBSYNA  EQU   DCBSYNAD+1                                               00712000
+DCBIOBL  EQU   DCBSYNAD                                                 00713000
+DCBCHCKA EQU   DCBPERRA                                                 00714000
+DCBOPTJ  EQU   DCBOPTCD                                                 00715000
+DCBOPTT  EQU   DCBOPTCD                                                 00716000
+DCBSRCHD EQU   DCBOPTZ                                                  00717000
+DCBOPTQ  EQU   DCBOPTCD                                                 00718000
+DCBBCKPT EQU   DCBOPTO                                                  00719000
+DCBOPTC  EQU   DCBOPTCD                                                 00720000
+DCBOPTU  EQU   DCBOPTCD                                                 00721000
+DCBOPTW  EQU   DCBOPTCD                                                 00722000
+DCBREADA EQU   DCBWRITA                                                 00723000
+@NM00013 EQU   DCBREAD                                                  00724000
+DCBDEBA  EQU   DCBDEBAD+1                                               00725000
+@NM00012 EQU   DCBIFLGS                                                 00726000
+DCBIFIOE EQU   DCBIFLGS                                                 00727000
+DCBCH12  EQU   DCBIFPCT                                                 00728000
+DCBCH9   EQU   DCBIFPCT                                                 00729000
+DCBIFEC  EQU   DCBIFLGS                                                 00730000
+DCBMFSTI EQU   DCBMFDMD                                                 00731000
+DCBMFAWR EQU   DCBMFSTK                                                 00732000
+DCBMFUIP EQU   DCBMFTMD                                                 00733000
+DCBMFIDW EQU   DCBMFLCP                                                 00734000
+DCBMFWRK EQU   DCBMFMVP                                                 00735000
+DCBMFRDQ EQU   DCBMFWRT                                                 00736000
+DCBMFGTQ EQU   DCBMFPUT                                                 00737000
+DCBMFSTL EQU   DCBMACF2                                                 00738000
+DCBMFCK  EQU   DCBMFDMG                                                 00739000
+DCBMFRDX EQU   DCBMFCHK                                                 00740000
+DCBMFDBF EQU   DCBMFSBG                                                 00741000
+DCBMFRDI EQU   DCBMFLCG                                                 00742000
+DCBMFRDK EQU   DCBMFMVG                                                 00743000
+DCBMFWRQ EQU   DCBMFRD                                                  00744000
+DCBMFPTQ EQU   DCBMFGET                                                 00745000
+DCBMFECP EQU   DCBMACF1                                                 00746000
+DCBTIOT  EQU   IHADCS25                                                 00747000
+DCBMRSTI EQU   DCBMRDMD                                                 00748000
+DCBMRAWR EQU   DCBMRSTK                                                 00749000
+DCBMRUIP EQU   DCBMRTMD                                                 00750000
+DCBMRIDW EQU   DCBMRLCP                                                 00751000
+DCBMRWRK EQU   DCBMRMVP                                                 00752000
+DCBMRRDQ EQU   DCBMRWRT                                                 00753000
+DCBMRGTQ EQU   DCBMRPUT                                                 00754000
+DCBMRSTL EQU   DCBMACR2                                                 00755000
+DCBMRCK  EQU   DCBMRDMG                                                 00756000
+DCBPGFXA EQU   DCBMRRDX                                                 00757000
+DCBMRDBF EQU   DCBMRSBG                                                 00758000
+DCBMRRDI EQU   DCBMRLCG                                                 00759000
+DCBMRRDK EQU   DCBMRMVG                                                 00760000
+DCBMRWRQ EQU   DCBMRRD                                                  00761000
+DCBMRPTQ EQU   DCBMRGET                                                 00762000
+DCBMRECP EQU   DCBMACR1                                                 00763000
+@NM00011 EQU   DCBIFLG                                                  00764000
+DCBIBIOE EQU   DCBIFLG                                                  00765000
+DCBICH12 EQU   DCBIBPCT                                                 00766000
+DCBICH9  EQU   DCBIBPCT                                                 00767000
+DCBIBEC  EQU   DCBIFLG                                                  00768000
+DCBOFIOF EQU   DCBOFLGS                                                 00769000
+DCBOFUEX EQU   DCBOFLGS                                                 00770000
+DCBOFTM  EQU   DCBOFLGS                                                 00771000
+DCBOFPPC EQU   DCBOFLGS                                                 00772000
+DCBOFOPN EQU   DCBOFLGS                                                 00773000
+DCBOFEOV EQU   DCBOFLGS                                                 00774000
+DCBOFLRB EQU   DCBOFLGS                                                 00775000
+DCBOFIOD EQU   DCBOFLWR                                                 00776000
+DCBDDNAM EQU   IHADCS24                                                 00777000
+DCBEXLSA EQU   DCBEXLST+1                                               00778000
+DCBRECKL EQU   DCBRECFM                                                 00779000
+DCBRECCC EQU   DCBRECFM                                                 00780000
+DCBRECSB EQU   DCBRECFM                                                 00781000
+DCBRECBR EQU   DCBRECFM                                                 00782000
+DCBRECTO EQU   DCBRECLA                                                 00783000
+DCBRECL  EQU   DCBRECLA                                                 00784000
+DCBEODA  EQU   DCBEODAD+1                                               00785000
+DCBBFA   EQU   DCBBFTEK                                                 00786000
+DCBH0    EQU   DCBBFTEK                                                 00787000
+DCBBFTKD EQU   DCBBFTEK                                                 00788000
+DCBBFTE  EQU   DCBBFT                                                   00789000
+DCBBFTKR EQU   DCBBFT                                                   00790000
+DCBBFTS  EQU   DCBBFT                                                   00791000
+DCBH1    EQU   DCBBFTEK                                                 00792000
+DCBSVCXA EQU   DCBSVCXL+1                                               00793000
+@NM00010 EQU   DCBSVCXL                                                 00794000
+DCBODEBA EQU   DCBIOBAA                                                 00795000
+@NM00009 EQU   DCBQSLM                                                  00796000
+DCBUPDBT EQU   DCBQSLM                                                  00797000
+DCBUPDCM EQU   DCBQSLM                                                  00798000
+DCB1DVDS EQU   DCBQSLM                                                  00799000
+@NM00008 EQU   DCBDSRG2                                                 00800000
+DCBDSGTR EQU   DCBDSRG2                                                 00801000
+DCBACBM  EQU   DCBDSRG2                                                 00802000
+@NM00007 EQU   DCBDSRG2                                                 00803000
+DCBDSGTQ EQU   DCBDSRG2                                                 00804000
+DCBDSGTX EQU   DCBDSRG2                                                 00805000
+DCBDSGGS EQU   DCBDSRG2                                                 00806000
+DCBDSGU  EQU   DCBDSRG1                                                 00807000
+DCBDSGPO EQU   DCBDSRG1                                                 00808000
+@NM00006 EQU   DCBDSRG1                                                 00809000
+@NM00005 EQU   DCBDSRG1                                                 00810000
+DCBDSGCX EQU   DCBDSRG1                                                 00811000
+DCBDSGDA EQU   DCBDSRG1                                                 00812000
+DCBDSGPS EQU   DCBDSRG1                                                 00813000
+DCBDSGIS EQU   DCBDSRG1                                                 00814000
+DCBBUFL  EQU   IHADCS11+8                                               00815000
+DCBBUFCA EQU   DCBBUFCB+1                                               00816000
+DCBBUFNO EQU   DCBBUFCB                                                 00817000
+DCBDEVT  EQU   DCBREL                                                   00818000
+DCBKEYLE EQU   DCBRELB                                                  00819000
+DCBTRBAL EQU   IHADCS01+6                                               00820000
+@NM00004 EQU   IHADCS01+5                                               00821000
+@NM00003 EQU   IHADCS01+4                                               00822000
+DCBDVTBA EQU   DCBDVTBL+1                                               00823000
+@NM00002 EQU   DCBDVTBL                                                 00824000
+DCBKEYCN EQU   IHADCS00+4                                               00825000
+DCBRELAD EQU   IHADCS00                                                 00826000
+@NM00001 EQU   IHADCB                                                   00827000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00828000
+@RF00072 EQU   EXIT                                                     00829000
+@ENDDATA EQU   *                                                        00830000
+         END   ISTINCRS,(C'PLS1303',0702,78336)                         00831000

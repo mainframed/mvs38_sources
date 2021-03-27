@@ -1,0 +1,433 @@
+         TITLE 'ISTSDCC3-  MHR'                                         00001000
+ISTSDCC3 CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'ISTSDCC3  78.337'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  STM   @14,@12,12(@13)                                     0001 00009000
+         BALR  @12,0                                               0001 00010000
+@PSTART  DS    0H                                                  0001 00011000
+         USING @PSTART,@12                                         0001 00012000
+         PRINT OFF                                                      00013000
+         PRINT ON                                                       00014000
+         USING @DATD,DATREG                                             00015000
+*   DATREG=ADDR(MLCMHDAT);                                         0035 00016000
+         LA    DATREG,MLCMHDAT(,MLCAPTR)                           0035 00017000
+*   SCANPTR=PARMR;                                                 0036 00018000
+         LR    SCANPTR,PARMR                                       0036 00019000
+*   PARMSAVE=PARMR;                 /* SAVE PARM REG                 */ 00020000
+         LR    PARMSAVE,PARMR                                      0037 00021000
+*   TABLEPTR=TABPTR;                                               0038 00022000
+         LR    TABLEPTR,TABPTR                                     0038 00023000
+*   MLCNAME=BLANK;                  /* BLANK MLCNAME                 */ 00024000
+         MVI   MLCNAME+1(MLCAPTR),C' '                             0039 00025000
+         MVC   MLCNAME+2(6,MLCAPTR),MLCNAME+1(MLCAPTR)             0039 00026000
+         MVI   MLCNAME(MLCAPTR),C' '                               0039 00027000
+*   MLCMACRO=BLANK;                 /* BLANK MLCMACRO                */ 00028000
+         MVI   MLCMACRO+1(MLCAPTR),C' '                            0040 00029000
+         MVC   MLCMACRO+2(6,MLCAPTR),MLCMACRO+1(MLCAPTR)           0040 00030000
+         MVI   MLCMACRO(MLCAPTR),C' '                              0040 00031000
+*   NAMELEN=0;                      /* SET CTR TO 0                  */ 00032000
+         SLR   NAMELEN,NAMELEN                                     0041 00033000
+*/********************************************************************/ 00034000
+*/* IF THERE IS NO NAME ON THE MACRO SET UP THE MLCNAME AS BLANKS    */ 00035000
+*/* OTHERWISE MOVE IN THE NAME FROM THE MACRO. HTIS NAME WILL BE USED*/ 00036000
+*/* TO TELL THAT THIS MACRO CAUSED AN ERROR IF ONE IS DETECTED       */ 00037000
+*/********************************************************************/ 00038000
+*                                                                  0042 00039000
+*   IF CHARCOMP^=BLANK THEN         /* 1ST BUFFER CHAR A BLANK?      */ 00040000
+         CLI   CHARCOMP(SCANPTR),C' '                              0042 00041000
+         BE    @RF00042                                            0042 00042000
+*     DO;                                                          0043 00043000
+*       DO WHILE CHARCOMP^=BLANK;   /* NO,FIND BLANK & COUNT CHAR    */ 00044000
+         B     @DE00044                                            0044 00045000
+@DL00044 DS    0H                                                  0045 00046000
+*         NAMELEN=NAMELEN+1;        /* COUNT CHARACTERS              */ 00047000
+         LA    @08,1                                               0045 00048000
+         ALR   NAMELEN,@08                                         0045 00049000
+*         SCANPTR=SCANPTR+1;        /* STEP UP PTR                   */ 00050000
+         ALR   SCANPTR,@08                                         0046 00051000
+*       END;                                                       0047 00052000
+@DE00044 CLI   CHARCOMP(SCANPTR),C' '                              0047 00053000
+         BNE   @DL00044                                            0047 00054000
+*       SCANPTR=PARMSAVE;           /* RESTORE POINTER               */ 00055000
+         LR    SCANPTR,PARMSAVE                                    0048 00056000
+*       IF NAMELEN<=8 THEN          /* NAME LONGER THAN 8            */ 00057000
+         CH    NAMELEN,@CH00051                                    0049 00058000
+         BH    @RF00049                                            0049 00059000
+*         DO;                                                      0050 00060000
+*           MLCNAME(1:NAMELEN)=TEXTBUF(1:NAMELEN);/* MOVE IN NAME    */ 00061000
+         LR    @07,NAMELEN                                         0051 00062000
+         BCTR  @07,0                                               0051 00063000
+         EX    @07,@SM00191                                        0051 00064000
+*           PARMSAVE=PARMR;         /* SAVE REGS 1 & 2 OVER TRT      */ 00065000
+         LR    PARMSAVE,PARMR                                      0052 00066000
+*           TWOSAVE=R2;                                            0053 00067000
+         LR    TWOSAVE,R2                                          0053 00068000
+*           PARMR=0;                /* SET REGS 1 & 2 TO 0           */ 00069000
+         SLR   PARMR,PARMR                                         0054 00070000
+*           R2=0;                                                  0055 00071000
+         SLR   R2,R2                                               0055 00072000
+*           TRT(CHARCOMP,TTABLE1);  /* TRT FIRST CHARACTER           */ 00073000
+         TRT   CHARCOMP(1,SCANPTR),TTABLE1                         0056 00074000
+*           IF PARMR=0 THEN         /* FIRST CHAR VALID?             */ 00075000
+         LTR   PARMR,PARMR                                         0057 00076000
+         BNZ   @RF00057                                            0057 00077000
+*             DO;                                                  0058 00078000
+*               SCANPTR=SCANPTR+1;  /* YES, ADVANCE PTR              */ 00079000
+         AH    SCANPTR,@CH00039                                    0059 00080000
+*               TRT(TEXTBUF,TTABLE2);/* TRT REST OF NAME             */ 00081000
+         TRT   TEXTBUF(256,SCANPTR),TTABLE2                        0060 00082000
+*               IF R2^=1 THEN       /* TRT STOPPED BY BLANK?         */ 00083000
+         CH    R2,@CH00039                                         0061 00084000
+         BE    @RF00061                                            0061 00085000
+*                 DO;                                              0062 00086000
+*                   RCSAVE=8;       /* NO, ERROR CONDITION           */ 00087000
+         LA    RCSAVE,8                                            0063 00088000
+*                 END;                                             0064 00089000
+*               ELSE                /* R2 = 1, GO ON                 */ 00090000
+*                 RCSAVE=0;         /* INDICATE NO ERROR             */ 00091000
+         B     @RC00061                                            0065 00092000
+@RF00061 SLR   RCSAVE,RCSAVE                                       0065 00093000
+*             END;                                                 0066 00094000
+*           ELSE                                                   0067 00095000
+*             RCSAVE=8;             /* PARMR NOT = 0                 */ 00096000
+         B     @RC00057                                            0067 00097000
+@RF00057 LA    RCSAVE,8                                            0067 00098000
+*         END;                                                     0068 00099000
+*       ELSE                        /* NAME > 8                      */ 00100000
+*         DO;                                                      0069 00101000
+         B     @RC00049                                            0069 00102000
+@RF00049 DS    0H                                                  0070 00103000
+*           MLCNAME(1:8)=TEXTBUF(1:8);/* MOVE IN 1ST 8 CHAR          */ 00104000
+         MVC   MLCNAME(8,MLCAPTR),TEXTBUF(SCANPTR)                 0070 00105000
+*           RCSAVE=8;               /* ERROR CONDITION               */ 00106000
+         LA    RCSAVE,8                                            0071 00107000
+*         END;                                                     0072 00108000
+*     END;                                                         0073 00109000
+*   ELSE                            /* FIRST CHAR WAS BLANK          */ 00110000
+*     DO;                                                          0074 00111000
+         B     @RC00042                                            0074 00112000
+@RF00042 DS    0H                                                  0075 00113000
+*       RCSAVE=0;                   /* SIGNIFY NO ERROR              */ 00114000
+         SLR   RCSAVE,RCSAVE                                       0075 00115000
+*     END;                                                         0076 00116000
+*   IF RCSAVE=0 THEN                                               0077 00117000
+@RC00042 LTR   RCSAVE,RCSAVE                                       0077 00118000
+         BNZ   @RF00077                                            0077 00119000
+*     DO;                                                          0078 00120000
+*                                                                  0078 00121000
+*/********************************************************************/ 00122000
+*/* NOW SCAN THE INPUT FOR A MACRO NAME.  WHEN IT IS FOUND BEGIN A   */ 00123000
+*/* SCAN OF THE MACRO NAME TABLE AND COMPARE THE NAME OF THE MACRO   */ 00124000
+*/* THAT IS ON THE INPUT TO THE NAME IN THE TABLE IF THE NAMES ARE   */ 00125000
+*/* NOT THE SAME CONTINUE. IF THE NAME IS FOUND THEN PICK UP THE     */ 00126000
+*/* ADDRESS OF THE ROUTINE ASSOCIATED WITH THE MACRO AND PUT IT IN   */ 00127000
+*/* R0 TO RETURN TO THE CALLER                                       */ 00128000
+*/********************************************************************/ 00129000
+*                                                                  0079 00130000
+*       SCANPTR=PARMSAVE+NAMELEN+1; /* RESET PTR                     */ 00131000
+         LR    SCANPTR,PARMSAVE                                    0079 00132000
+         ALR   SCANPTR,NAMELEN                                     0079 00133000
+         AH    SCANPTR,@CH00039                                    0079 00134000
+*       IF CHARCOMP^=BLANK THEN                                    0080 00135000
+         CLI   CHARCOMP(SCANPTR),C' '                              0080 00136000
+         BE    @RF00080                                            0080 00137000
+*         DO;                                                      0081 00138000
+*           MACLEN=0;               /* ZERO OUT CTR                  */ 00139000
+         SLR   MACLEN,MACLEN                                       0082 00140000
+*           DO WHILE CHARCOMP^=BLANK;/* SCAN FOR BLANKS              */ 00141000
+         B     @DE00083                                            0083 00142000
+@DL00083 DS    0H                                                  0084 00143000
+*             MACLEN=MACLEN+1;      /* KEEP COUNT OF CHAR            */ 00144000
+         LA    @10,1                                               0084 00145000
+         ALR   MACLEN,@10                                          0084 00146000
+*             SCANPTR=SCANPTR+1;    /* ADVANCE PTR                   */ 00147000
+         ALR   SCANPTR,@10                                         0085 00148000
+*           END;                                                   0086 00149000
+@DE00083 CLI   CHARCOMP(SCANPTR),C' '                              0086 00150000
+         BNE   @DL00083                                            0086 00151000
+*           BACKPTR=SCANPTR-MACLEN; /* GET PTR TO MACRO IN TEXT      */ 00152000
+         LR    BACKPTR,SCANPTR                                     0087 00153000
+         SLR   BACKPTR,MACLEN                                      0087 00154000
+*           IF MACLEN<=EIGHT THEN   /* MACNAME > 8?                  */ 00155000
+         CH    MACLEN,@CH00051                                     0088 00156000
+         BH    @RF00088                                            0088 00157000
+*             DO;                                                  0089 00158000
+*               MLCMACRO(1:MACLEN)=MACOP(1:MACLEN);/* MOVE IN MACRO  */ 00159000
+         LR    @07,MACLEN                                          0090 00160000
+         BCTR  @07,0                                               0090 00161000
+         EX    @07,@SM00193                                        0090 00162000
+*               ENTCOUNT=COUNT;     /* PUT # OF ENTRIES IN CTR       */ 00163000
+         SLR   ENTCOUNT,ENTCOUNT                                   0091 00164000
+         ICM   ENTCOUNT,3,COUNT(TABLEPTR)                          0091 00165000
+*               MHTEPTR=TABLEPTR+4; /* SET PTR TO FIRST ENTRY        */ 00166000
+         LA    @07,4                                               0092 00167000
+         LR    MHTEPTR,TABLEPTR                                    0092 00168000
+         ALR   MHTEPTR,@07                                         0092 00169000
+*               RCSAVE=4;           /* INDICATE ERROR DO TABLE SEARCH*/ 00170000
+         LR    RCSAVE,@07                                          0093 00171000
+*               DO WHILE ENTCOUNT^=0&RCSAVE=4;                     0094 00172000
+         B     @DE00094                                            0094 00173000
+@DL00094 DS    0H                                                  0095 00174000
+*                 IF MLCMACRO=MHTMACRO THEN                        0095 00175000
+         CLC   MLCMACRO(8,MLCAPTR),MHTMACRO(MHTEPTR)               0095 00176000
+         BNE   @RF00095                                            0095 00177000
+*                   DO;                                            0096 00178000
+*                     TABPTR=MHTVALUE;/* PUT PTR TO MACRO IN R0      */ 00179000
+         L     TABPTR,MHTVALUE(,MHTEPTR)                           0097 00180000
+*                     RCSAVE=0;     /* INDICATE NO ERROR             */ 00181000
+         SLR   RCSAVE,RCSAVE                                       0098 00182000
+*                   END;                                           0099 00183000
+*                 ELSE              /* MLCMACRO^=MHTMACRO,GO ON      */ 00184000
+*                   DO;                                            0100 00185000
+         B     @RC00095                                            0100 00186000
+@RF00095 DS    0H                                                  0101 00187000
+*                     ENTCOUNT=ENTCOUNT-1;/* STEP DOWN CTR           */ 00188000
+         BCTR  ENTCOUNT,0                                          0101 00189000
+*                     MHTEPTR=MHTEPTR+12;/* STEP UP PTR              */ 00190000
+         AH    MHTEPTR,@CH00163                                    0102 00191000
+*                   END;                                           0103 00192000
+*               END;                                               0104 00193000
+@RC00095 DS    0H                                                  0104 00194000
+@DE00094 LTR   ENTCOUNT,ENTCOUNT                                   0104 00195000
+         BZ    @DC00094                                            0104 00196000
+         CH    RCSAVE,@CH00041                                     0104 00197000
+         BE    @DL00094                                            0104 00198000
+@DC00094 DS    0H                                                  0105 00199000
+*             END;                                                 0105 00200000
+*           ELSE                    /* MACLEN > 8                    */ 00201000
+*             DO;                                                  0106 00202000
+         B     @RC00088                                            0106 00203000
+@RF00088 DS    0H                                                  0107 00204000
+*               MLCMACRO(1:8)=MACOP(1:8);/* MOVE IN FIRST 8 CHAR     */ 00205000
+         MVC   MLCMACRO(8,MLCAPTR),MACOP(BACKPTR)                  0107 00206000
+*               RCSAVE=4;           /* ERROR CONDITION               */ 00207000
+         LA    RCSAVE,4                                            0108 00208000
+*             END;                                                 0109 00209000
+*         END;                                                     0110 00210000
+*       ELSE                        /* CHARCOMP = BLANK              */ 00211000
+*         RCSAVE=4;                 /* INDICATE ERROR                */ 00212000
+         B     @RC00080                                            0111 00213000
+@RF00080 LA    RCSAVE,4                                            0111 00214000
+*     END;                                                         0112 00215000
+*   ELSE                                                           0113 00216000
+*     ;                             /* RCSAVE ^= 0                   */ 00217000
+@RF00077 DS    0H                                                  0114 00218000
+*   PARMR=SCANPTR+1;                /* SET REG 1 FOR RETURN          */ 00219000
+@RC00077 LA    PARMR,1                                             0114 00220000
+         ALR   PARMR,SCANPTR                                       0114 00221000
+*   SVR15=RCSAVE;                   /* REG 15 IN USERS SAVE AREA     */ 00222000
+         ST    RCSAVE,SVR15(,SAVREG)                               0115 00223000
+*   SVR0=TABPTR;                    /* REG 0 IN USERS SAVE AREA      */ 00224000
+         ST    TABPTR,SVR0(,SAVREG)                                0116 00225000
+*   SVR1=PARMR;                     /* REG 1 IN USERS SAVE AREA      */ 00226000
+         ST    PARMR,SVR1(,SAVREG)                                 0117 00227000
+*   DO;                             /* TPEPILOG                      */ 00228000
+*     GEN(PRINT OFF);                                              0119 00229000
+         PRINT OFF                                                      00230000
+*     GEN(PRINT ON);                                               0120 00231000
+         PRINT ON                                                       00232000
+*   END;                            /* TPEPILOG                      */ 00233000
+*   END ISTSDCC3;                                                  0122 00234000
+@EL00001 DS    0H                                                  0122 00235000
+@EF00001 DS    0H                                                  0122 00236000
+@ER00001 LM    @14,@12,12(@13)                                     0122 00237000
+         BR    @14                                                 0122 00238000
+@DATA    DS    0H                                                       00239000
+@CH00039 DC    H'1'                                                     00240000
+@CH00041 DC    H'4'                                                     00241000
+@CH00051 DC    H'8'                                                     00242000
+@CH00163 DC    H'12'                                                    00243000
+@SM00191 MVC   MLCNAME(0,MLCAPTR),TEXTBUF(SCANPTR)                      00244000
+@SM00193 MVC   MLCMACRO(0,MLCAPTR),MACOP(BACKPTR)                       00245000
+@DATD    DSECT                                                          00246000
+         DS    0F                                                       00247000
+ISTSDCC3 CSECT                                                          00248000
+         DS    0F                                                       00249000
+@DATD    DSECT                                                          00250000
+         DS    0D                                                       00251000
+         ORG   *+1-(*-@DATD)/(*-@DATD) INSURE DSECT DATA                00252000
+@ENDDATD EQU   *                                                        00253000
+ISTSDCC3 CSECT                                                          00254000
+         DS    0F                                                       00255000
+@SIZDATD DC    AL1(0)                                                   00256000
+         DC    AL3(@ENDDATD-@DATD)                                      00257000
+         DS    0D                                                       00258000
+TTABLE1  DS    CL256                                                    00259000
+         ORG   TTABLE1                                                  00260000
+TTAB1    DC    91CL1'X'                                                 00261000
+         DC    X'00'                                                    00262000
+         DC    31CL1'X'                                                 00263000
+         DC    2X'00'                                                   00264000
+         DC    68CL1'X'                                                 00265000
+         DC    9X'00'                                                   00266000
+         DC    7CL1'X'                                                  00267000
+         DC    9X'00'                                                   00268000
+         DC    8CL1'X'                                                  00269000
+         DC    8X'00'                                                   00270000
+         DC    22CL1'X'                                                 00271000
+         ORG   TTABLE1+256                                              00272000
+TTABLE2  DS    CL256                                                    00273000
+         ORG   TTABLE2                                                  00274000
+TTAB2    DC    64CL1'X'                                                 00275000
+         DC    X'01'                                                    00276000
+         DC    26CL1'X'                                                 00277000
+         DC    X'00'                                                    00278000
+         DC    31CL1'X'                                                 00279000
+         DC    2X'00'                                                   00280000
+         DC    68CL1'X'                                                 00281000
+         DC    9X'00'                                                   00282000
+         DC    7CL1'X'                                                  00283000
+         DC    9X'00'                                                   00284000
+         DC    8CL1'X'                                                  00285000
+         DC    8X'00'                                                   00286000
+         DC    6CL1'X'                                                  00287000
+         DC    10X'00'                                                  00288000
+         DC    6CL1'x'                                                  00289000
+         ORG   TTABLE2+256                                              00290000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00291000
+@01      EQU   01                                                       00292000
+@02      EQU   02                                                       00293000
+@03      EQU   03                                                       00294000
+@04      EQU   04                                                       00295000
+@05      EQU   05                                                       00296000
+@06      EQU   06                                                       00297000
+@07      EQU   07                                                       00298000
+@08      EQU   08                                                       00299000
+@09      EQU   09                                                       00300000
+@10      EQU   10                                                       00301000
+@11      EQU   11                                                       00302000
+@12      EQU   12                                                       00303000
+@13      EQU   13                                                       00304000
+@14      EQU   14                                                       00305000
+@15      EQU   15                                                       00306000
+ENTCOUNT EQU   @10                                                      00307000
+MHTEPTR  EQU   @09                                                      00308000
+BACKPTR  EQU   @09                                                      00309000
+MACLEN   EQU   @08                                                      00310000
+RCSAVE   EQU   @08                                                      00311000
+TWOSAVE  EQU   @08                                                      00312000
+PARMSAVE EQU   @10                                                      00313000
+NAMELEN  EQU   @09                                                      00314000
+SAVREG   EQU   @13                                                      00315000
+SCANPTR  EQU   @04                                                      00316000
+TABLEPTR EQU   @06                                                      00317000
+PARMR    EQU   @01                                                      00318000
+MLCAPTR  EQU   @05                                                      00319000
+R2       EQU   @02                                                      00320000
+TABPTR   EQU   @00                                                      00321000
+DATREG   EQU   @11                                                      00322000
+ISTMLCA  EQU   0                                                        00323000
+MLCSKDCB EQU   ISTMLCA+12                                               00324000
+MLCFLAGS EQU   ISTMLCA+16                                               00325000
+MLCERBF  EQU   ISTMLCA+28                                               00326000
+MLCERBF1 EQU   MLCERBF                                                  00327000
+MLCERBF2 EQU   MLCERBF+8                                                00328000
+MLCNAME  EQU   MLCERBF2                                                 00329000
+MLCMACRO EQU   MLCERBF2+8                                               00330000
+MLCERBF3 EQU   MLCERBF+32                                               00331000
+MLCPTRS  EQU   ISTMLCA+96                                               00332000
+MLCDAT4  EQU   ISTMLCA+596                                              00333000
+MLCADSAV EQU   ISTMLCA+652                                              00334000
+MLCADDAT EQU   ISTMLCA+724                                              00335000
+MLCMHDAT EQU   ISTMLCA+908                                              00336000
+MLCWRK1  EQU   ISTMLCA+964                                              00337000
+MLCWRK2  EQU   ISTMLCA+1220                                             00338000
+MLCOCPRM EQU   MLCWRK2                                                  00339000
+MLCWRK3  EQU   ISTMLCA+1284                                             00340000
+MLCRDPRM EQU   MLCWRK3                                                  00341000
+MLCWRK4  EQU   ISTMLCA+1348                                             00342000
+MLCTPMSG EQU   MLCWRK4                                                  00343000
+MLCDECB2 EQU   MLCTPMSG+32                                              00344000
+SVAREA   EQU   0                                                        00345000
+SVR15    EQU   SVAREA+16                                                00346000
+SVR0     EQU   SVAREA+20                                                00347000
+SVR1     EQU   SVAREA+24                                                00348000
+CHARCOMP EQU   0                                                        00349000
+TEXTBUF  EQU   0                                                        00350000
+MACOP    EQU   0                                                        00351000
+HEADER   EQU   0                                                        00352000
+COUNT    EQU   HEADER                                                   00353000
+TABENTRY EQU   0                                                        00354000
+MHTMACRO EQU   TABENTRY                                                 00355000
+MHTVALUE EQU   TABENTRY+8                                               00356000
+MACCHAR  EQU   0                                                        00357000
+MACTAB   EQU   0                                                        00358000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00359000
+@NM00003 EQU   HEADER+2                                                 00360000
+SVR12    EQU   SVAREA+68                                                00361000
+SVR11    EQU   SVAREA+64                                                00362000
+SVR10    EQU   SVAREA+60                                                00363000
+SVR9     EQU   SVAREA+56                                                00364000
+SVR8     EQU   SVAREA+52                                                00365000
+SVR7     EQU   SVAREA+48                                                00366000
+SVR6     EQU   SVAREA+44                                                00367000
+SVR5     EQU   SVAREA+40                                                00368000
+SVR4     EQU   SVAREA+36                                                00369000
+SVR3     EQU   SVAREA+32                                                00370000
+SVR2     EQU   SVAREA+28                                                00371000
+SVR14    EQU   SVAREA+12                                                00372000
+SVLSA    EQU   SVAREA+8                                                 00373000
+SVHSA    EQU   SVAREA+4                                                 00374000
+SVRSVD   EQU   SVAREA                                                   00375000
+MLCSTOWL EQU   MLCDECB2                                                 00376000
+MLCDECB1 EQU   MLCTPMSG                                                 00377000
+MLCLDPRM EQU   MLCRDPRM                                                 00378000
+MLCACPRM EQU   MLCOCPRM                                                 00379000
+MLCDCB   EQU   MLCWRK1                                                  00380000
+MLCERDAT EQU   ISTMLCA+852                                              00381000
+MLCERSAV EQU   ISTMLCA+780                                              00382000
+MLCARDAT EQU   MLCADDAT                                                 00383000
+MLCARSAV EQU   MLCADSAV                                                 00384000
+MLCDATRM EQU   MLCDAT4+27                                               00385000
+MLCHDRTP EQU   MLCDAT4+26                                               00386000
+MLCENTLN EQU   MLCDAT4+24                                               00387000
+MLCRLGTH EQU   MLCDAT4+20                                               00388000
+MLCKWKTB EQU   MLCDAT4+16                                               00389000
+MLCKWDPT EQU   MLCDAT4+12                                               00390000
+MLCTBLPT EQU   MLCDAT4+8                                                00391000
+MLCRCSAV EQU   MLCDAT4+4                                                00392000
+MLCSAV   EQU   MLCDAT4                                                  00393000
+MLCSAV4  EQU   ISTMLCA+524                                              00394000
+MLCDAT3  EQU   ISTMLCA+468                                              00395000
+MLCSAV3  EQU   ISTMLCA+396                                              00396000
+MLCDAT2  EQU   ISTMLCA+340                                              00397000
+MLCSAV2  EQU   ISTMLCA+268                                              00398000
+MLCDAT1  EQU   ISTMLCA+212                                              00399000
+MLCSAV1  EQU   ISTMLCA+140                                              00400000
+@NM00002 EQU   ISTMLCA+136                                              00401000
+MLCNCSPL EQU   MLCPTRS+36                                               00402000
+MLCLENT  EQU   MLCPTRS+32                                               00403000
+MLCPTR7  EQU   MLCPTRS+28                                               00404000
+MLCPTR6  EQU   MLCPTRS+24                                               00405000
+MLCPTR5  EQU   MLCPTRS+20                                               00406000
+MLCPTR4  EQU   MLCPTRS+16                                               00407000
+MLCPTR3  EQU   MLCPTRS+12                                               00408000
+MLCPTR2  EQU   MLCPTRS+8                                                00409000
+MLCPTR1  EQU   MLCPTRS+4                                                00410000
+MLCPTR0  EQU   MLCPTRS                                                  00411000
+MLCGETSZ EQU   ISTMLCA+92                                               00412000
+MLCFIII  EQU   MLCERBF3+8                                               00413000
+MLCCNFG2 EQU   MLCERBF3                                                 00414000
+MLCFII   EQU   MLCERBF2+16                                              00415000
+MLCCONFG EQU   MLCERBF1                                                 00416000
+MLCKWD   EQU   ISTMLCA+24                                               00417000
+MLCENT   EQU   ISTMLCA+20                                               00418000
+@NM00001 EQU   MLCFLAGS                                                 00419000
+MLCDREOF EQU   MLCFLAGS                                                 00420000
+MLCINT   EQU   MLCFLAGS                                                 00421000
+MLCVLCON EQU   MLCSKDCB                                                 00422000
+MLCSKEL  EQU   ISTMLCA+8                                                00423000
+MLCRPH   EQU   ISTMLCA+4                                                00424000
+MLCSECCA EQU   ISTMLCA                                                  00425000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00426000
+@RC00049 EQU   @RC00042                                                 00427000
+@RC00080 EQU   @RC00077                                                 00428000
+@RC00057 EQU   @RC00049                                                 00429000
+@RC00088 EQU   @RC00080                                                 00430000
+@RC00061 EQU   @RC00057                                                 00431000
+@ENDDATA EQU   *                                                        00432000
+         END   ISTSDCC3,(C'PLS1534',0702,78337)                         00433000

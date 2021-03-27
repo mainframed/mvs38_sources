@@ -1,0 +1,1097 @@
+         TITLE 'IGCVI10D,  3705 STARTLINE                              *00001000
+                        '                                               00002000
+IGCVI10D CSECT ,                                                   0001 00003000
+@PROLOG  BALR  @12,0                                               0001 00004000
+@PSTART  DS    0H                                                  0001 00005000
+         USING @PSTART,@12                                         0001 00006000
+*                                                                  0390 00007000
+*   /*****************************************************************/ 00008000
+*   /*                                                               */ 00009000
+*   /* INITIALIZATION                                                */ 00010000
+*   /*                                                               */ 00011000
+*   /*****************************************************************/ 00012000
+*                                                                  0390 00013000
+*   ROPCAVT=RPARM;                  /* OPCAVT ADDR                   */ 00014000
+         LR    ROPCAVT,RPARM                                       0390 00015000
+*   RAVT=OPCAVTPT;                  /* TCAM AVT ADDR                 */ 00016000
+         L     RAVT,OPCAVTPT(,ROPCAVT)                             0391 00017000
+*   ROPCE=OPCCOPCE;                 /* OPCE ADDR                     */ 00018000
+         L     ROPCE,OPCCOPCE(,ROPCAVT)                            0392 00019000
+*   OPCFLAG1=0;                     /* CLEAR FLAG                    */ 00020000
+         MVI   OPCFLAG1(ROPCAVT),X'00'                             0393 00021000
+*   GEN NOREFS NOSETS NOEXIT SEQFLOW;                              0394 00022000
+IGCVI10D IEDHJN SKIPID,HJN                                              00023000
+*                                                                  0395 00024000
+*   /*****************************************************************/ 00025000
+*   /*                                                               */ 00026000
+*   /* MAIN PROGRAM LOGIC                                            */ 00027000
+*   /*                                                               */ 00028000
+*   /*****************************************************************/ 00029000
+*                                                                  0395 00030000
+*   IF OPREPRI=PRIMEDFG&OPREFLG1=OPRVI THEN                        0395 00031000
+         CLI   OPREPRI(ROPCE),X'DF'                                0395 00032000
+         BNE   @RF00395                                            0395 00033000
+         CLI   OPREFLG1(ROPCE),X'04'                               0395 00034000
+         BNE   @RF00395                                            0395 00035000
+*     CALL STRTRET;                 /* SPECIAL PRIORITY AND FLAG   0396 00036000
+*                                      INDICATING STARTLINE RETURNED    00037000
+*                                      FROM IEDNSL                   */ 00038000
+         BAL   @14,STRTRET                                         0396 00039000
+*   ELSE                                                           0397 00040000
+*     IF OCRESP=ON THEN             /* IF RESPONSE TO STARTLINE FROM    00041000
+*                                      IGCA010D PROC         @ZM47662*/ 00042000
+         B     @RC00395                                            0397 00043000
+@RF00395 TM    OCRESP(ROPCE),B'00000001'                           0397 00044000
+         BNO   @RF00397                                            0397 00045000
+*       DO;                         /*                       @ZM47662*/ 00046000
+*         OCRESP=OFF;               /*                       @ZM47662*/ 00047000
+         NI    OCRESP(ROPCE),B'11111110'                           0399 00048000
+*         CALL PROCRESP;            /*                       @ZM47662*/ 00049000
+         BAL   @14,PROCRESP                                        0400 00050000
+*       END;                        /*                       @ZM47662*/ 00051000
+*     ELSE                                                         0402 00052000
+*       IF OCPARM^=0 THEN                                          0402 00053000
+         B     @RC00397                                            0402 00054000
+@RF00397 ICM   @15,3,OCPARM(ROPCE)                                 0402 00055000
+         BZ    @RF00402                                            0402 00056000
+*         CALL SNASTRT;             /* NON-ZERO RET CODE MEANS SNA 0403 00057000
+*                                      STARTLINE FROM IGCFA10D,    0403 00058000
+*                                      PROCESS IT                    */ 00059000
+         BAL   @14,SNASTRT                                         0403 00060000
+*       ELSE                                                       0404 00061000
+*         FIRSTREQ=ON;              /* GET FIRST LINE FLAG           */ 00062000
+         B     @RC00402                                            0404 00063000
+@RF00402 OI    FIRSTREQ(ROPCAVT),B'10000000'                       0404 00064000
+*   DO WHILE(FIRSTREQ=ON|MORELINE=ON);/* LOOP FOR GRP,ALL AND FIRST     00065000
+*                                      TIME THROUGH                  */ 00066000
+@RC00402 DS    0H                                                  0405 00067000
+@RC00397 DS    0H                                                  0405 00068000
+@RC00395 B     @DE00405                                            0405 00069000
+@DL00405 DS    0H                                                  0406 00070000
+*     EXITFLAG=OFF;                 /* RESET SO THAT WE DO NOT XCTL     00071000
+*                                      TO OURSELF WHEN PROCESSING A     00072000
+*                                      GROUP FOR MULTIPLE NCPS, ONLY    00073000
+*                                      SOME OF WHICH ARE ACTIVE    0406 00074000
+*                                                            @OZ27693*/ 00075000
+         NI    EXITFLAG(ROPCAVT),B'11011111'                       0406 00076000
+*     CALL STRTREQ;                 /* PROC STARTLINE REQ            */ 00077000
+         BAL   @14,STRTREQ                                         0407 00078000
+*   END;                                                           0408 00079000
+@DE00405 TM    FIRSTREQ(ROPCAVT),B'11000000'                       0408 00080000
+         BNZ   @DL00405                                            0408 00081000
+*   RPARM=ROPCAVT;                  /* SET R1 TO OPC AVT             */ 00082000
+         LR    RPARM,ROPCAVT                                       0409 00083000
+*   IF OPCMODID=VI THEN             /* IF GOING TO RETURN TO VI    0410 00084000
+*                                      INSURE THAT STRTREQ GETS    0410 00085000
+*                                      EXECUTED              @ZM47662*/ 00086000
+         CLC   OPCMODID(2,ROPCAVT),@CC02182                        0410 00087000
+         BNE   @RF00410                                            0410 00088000
+*     OCPARM=0;                     /*                       @ZM47662*/ 00089000
+         SLR   @15,@15                                             0411 00090000
+         STH   @15,OCPARM(,ROPCE)                                  0411 00091000
+*   IF OPCMODID=XCTL00 THEN         /* CLEAR REG 0 PRIOR     @YM03724*/ 00092000
+@RF00410 CLC   OPCMODID(2,ROPCAVT),@CC02184                        0412 00093000
+         BNE   @RF00412                                            0412 00094000
+*     RZERO=0;                      /* TO TRANSFER OF CONTROL        */ 00095000
+         SLR   RZERO,RZERO                                         0413 00096000
+*   ELSE                                                           0414 00097000
+*     ;                             /* TO MODULE IGC0010D.           */ 00098000
+@RF00412 DS    0H                                                  0415 00099000
+*   GEN EXIT REFS(OPCXCTL);                                        0415 00100000
+          XCTL  SF=(E,OPCXCTL(ROPCAVT))                                 00101000
+*                                                                  0416 00102000
+*   /*****************************************************************/ 00103000
+*   /*                                                               */ 00104000
+*   /* PROCESS STARTLINE RETURN THIS ROUTINE IS CALLED FROM THE MAIN */ 00105000
+*   /* PROGRAM LOGIC                                                 */ 00106000
+*   /*                                                               */ 00107000
+*   /*****************************************************************/ 00108000
+*                                                                  0416 00109000
+*STRTRET:                                                          0416 00110000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0416 00111000
+@EL00001 DS    0H                                                  0416 00112000
+@EF00001 DS    0H                                                  0416 00113000
+@ER00001 BR    @14                                                 0416 00114000
+STRTRET  DS    0H                                                  0417 00115000
+*   OPCWRKSP(3)=RRETURN;            /* SAVE RETURN ADDR              */ 00116000
+         ST    RRETURN,OPCWRKSP+8(,ROPCAVT)                        0417 00117000
+*   RPARM=ADDR(NSLGRPNM);           /* GET GROUP NAME AS RETURNED  0418 00118000
+*                                      FROM NSL                      */ 00119000
+         LA    RPARM,NSLGRPNM(,RNSL)                               0418 00120000
+*   CALL WAITLSRH;                  /* FIND OPCE WITH SAME GRPNAME ON   00121000
+*                                      OPCWAITV                      */ 00122000
+         BAL   @14,WAITLSRH                                        0419 00123000
+*   RESPECIFY                                                      0420 00124000
+*     RWORK6 RSTD;                  /* RWORK6 IS USED AS A TEMP SAVE    00125000
+*                                      AREA FOR THE OPCE FOUND BY  0420 00126000
+*                                      WAITLSRCH                     */ 00127000
+*   RWORK6=RPARM;                   /* SAVE OPCE ADDR                */ 00128000
+         LR    RWORK6,RPARM                                        0421 00129000
+*   RZERO->OCLINK=RPARM->OCLINK;    /* UNLINK OPCE FROM CHAIN        */ 00130000
+         LR    @15,RZERO                                           0422 00131000
+         MVC   OCLINK(4,@15),OCLINK(RPARM)                         0422 00132000
+*   RPARM=RNSL;                     /* GET ADDR OF BUFFER RETURNED 0423 00133000
+*                                      FROM NSL                      */ 00134000
+         LR    RPARM,RNSL                                          0423 00135000
+*   RPARM->OCUNIT=BADTIC;           /* 1 BUFFER TO FREE       @YM3737*/ 00136000
+         MVC   OCUNIT(4,RPARM),@CF02125                            0424 00137000
+*   RESPECIFY                                                      0425 00138000
+*     RSAVE RSTD;                   /* REG 13 =SAVE AREA ADDR        */ 00139000
+*   RSAVE=ADDR(OPCSAVE);            /* SAVE AREA ADDR                */ 00140000
+         LA    RSAVE,OPCSAVE(,ROPCAVT)                             0426 00141000
+*   CALL FREEBUF;                   /* FREE BUFFER UNIT              */ 00142000
+         L     @15,OPCFREBF(,ROPCAVT)                              0427 00143000
+         BALR  @14,@15                                             0427 00144000
+*   RESPECIFY                                                      0428 00145000
+*     RSAVE UNRSTD;                                                0428 00146000
+*   ROPCE=RWORK6;                   /* SET UP OPCE ADDR              */ 00147000
+         LR    ROPCE,RWORK6                                        0429 00148000
+*   RESPECIFY                                                      0430 00149000
+*     RWORK6 UNRSTD;                                               0430 00150000
+*   OPCCOPCE=ROPCE;                 /* MAKE ORIGINAL OPCE THE CURRENT   00151000
+*                                      ONE                   @OZ27693*/ 00152000
+         ST    ROPCE,OPCCOPCE(,ROPCAVT)                            0431 00153000
+*   RPARM=OCTRMTBL;                 /* GET TTCIN OF LINE             */ 00154000
+         SLR   RPARM,RPARM                                         0432 00155000
+         ICM   RPARM,3,OCTRMTBL(ROPCE)                             0432 00156000
+*   CALL IEDQTNT;                   /* CONVERT TO TTE                */ 00157000
+         L     @15,AVTRNMPT(,IEDQAPTR)                             0433 00158000
+         BALR  @14,@15                                             0433 00159000
+*   RTERM=RPARM;                    /* SET UP TTE BASE FOR LINE WE 0434 00160000
+*                                      ARE WORKING WITH              */ 00161000
+         LR    RTERM,RPARM                                         0434 00162000
+*   OPCWRKSP(1)=MSGNO20;            /* SET UP MSG NUMB 20            */ 00163000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF00608                        0435 00164000
+*   OPCWRKSP(2)=PARM0;              /* SET UP PARM OF 0              */ 00165000
+         SLR   @15,@15                                             0436 00166000
+         ST    @15,OPCWRKSP+4(,ROPCAVT)                            0436 00167000
+*   CALL NORMEXIT;                  /* DO NORMAL EXIT PROCESSING     */ 00168000
+         BAL   @14,NORMEXIT                                        0437 00169000
+*   RRETURN=OPCWRKSP(3);            /* LOAD RETURN ADDR              */ 00170000
+         L     RRETURN,OPCWRKSP+8(,ROPCAVT)                        0438 00171000
+*   RETURN;                                                        0439 00172000
+@EL00002 DS    0H                                                  0439 00173000
+@EF00002 DS    0H                                                  0439 00174000
+@ER00002 BR    @14                                                 0439 00175000
+*   END;                            /* END OF STRTRET                */ 00176000
+*                                                                  0441 00177000
+*   /*****************************************************************/ 00178000
+*   /*                                                               */ 00179000
+*   /* PROCESS RESPONSE THIS ROUTINE IS CALLED BY MAIN PROGRAM LOGIC */ 00180000
+*   /*                                                               */ 00181000
+*   /*****************************************************************/ 00182000
+*                                                                  0441 00183000
+*PROCRESP:                                                         0441 00184000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0441 00185000
+PROCRESP DS    0H                                                  0442 00186000
+*   OPCWRKSP(3)=RRETURN;            /* SAVE RETURN ADDR              */ 00187000
+         ST    RRETURN,OPCWRKSP+8(,ROPCAVT)                        0442 00188000
+*   RPARM=ADDR(OCBACKUP);           /* SET PTR TO GRPNAME            */ 00189000
+         LA    RPARM,OCBACKUP(,ROPCE)                              0443 00190000
+*   CALL WAITLSRH;                  /* SEARCH WAITL CHAIN FOR OPCE 0444 00191000
+*                                      WITH SAME GRPNAME             */ 00192000
+         BAL   @14,WAITLSRH                                        0444 00193000
+*   RESPECIFY                                                      0445 00194000
+*     RWORK8 RSTD;                  /* TEMP SAVE AREA FOR OPCE AD    */ 00195000
+*   RWORK8=RPARM;                   /* SAVE ADDR OF REAL OPCE        */ 00196000
+         LR    RWORK8,RPARM                                        0446 00197000
+*   RZERO->OCLINK=RPARM->OCLINK;    /* UNLINK OPCE FROM CHAIN        */ 00198000
+         LR    @15,RZERO                                           0447 00199000
+         MVC   OCLINK(4,@15),OCLINK(RPARM)                         0447 00200000
+*   RPARM=OCUNIT;                   /* FREE RESPONSE BUFFER          */ 00201000
+         L     RPARM,OCUNIT(,ROPCE)                                0448 00202000
+*   RPARM->OCUNIT=BADTIC;           /* 1 BUFFER TO FREE       @YM3737*/ 00203000
+         MVC   OCUNIT(4,RPARM),@CF02125                            0449 00204000
+*   RESPECIFY                                                      0450 00205000
+*     RSAVE RSTD;                   /* REG13=SAVE AREA ADDR          */ 00206000
+*   RSAVE=ADDR(OPCSAVE);            /* SAVE AREA ADDR                */ 00207000
+         LA    RSAVE,OPCSAVE(,ROPCAVT)                             0451 00208000
+*   IF OCPARM=1 THEN                /* ON GOOD RESP,CAUSE TERMINAL 0452 00209000
+*                                      PRIMING FOR LINE              */ 00210000
+         CLC   OCPARM(2,ROPCE),@CH00062                            0452 00211000
+         BNE   @RF00452                                            0452 00212000
+*     DO;                           /*                       @YM08579*/ 00213000
+*       CALL FREEBUF;               /* FREE BUF RTN IN QCA   @YM08579*/ 00214000
+         L     @15,OPCFREBF(,ROPCAVT)                              0454 00215000
+         BALR  @14,@15                                             0454 00216000
+*       RESPECIFY                                                  0455 00217000
+*         RSAVE UNRSTD;                                            0455 00218000
+*       CALL STRTLINE;              /*                       @YM08579*/ 00219000
+         BAL   @14,STRTLINE                                        0456 00220000
+*     END;                          /*                       @YM08579*/ 00221000
+*   ELSE                                                           0458 00222000
+*     CALL ERRRESP;                 /* OTHERWISE DO ERROR PROCES   0458 00223000
+*                                      BUFFER MAY BE NEEDED FOR MSG     00224000
+*                                      199                   @YM08579*/ 00225000
+         B     @RC00452                                            0458 00226000
+@RF00452 BAL   @14,ERRRESP                                         0458 00227000
+*   RRETURN=OPCWRKSP(3);            /* LOAD RETURN ADDR              */ 00228000
+@RC00452 L     RRETURN,OPCWRKSP+8(,ROPCAVT)                        0459 00229000
+*   RETURN;                                                        0460 00230000
+@EL00003 DS    0H                                                  0460 00231000
+@EF00003 DS    0H                                                  0460 00232000
+@ER00003 BR    @14                                                 0460 00233000
+*   RESPECIFY                                                      0461 00234000
+*     RWORK8 UNRSTD;                                               0461 00235000
+*   END;                            /* END OF PROCRESP               */ 00236000
+*                                                                  0463 00237000
+*   /*****************************************************************/ 00238000
+*   /*                                                               */ 00239000
+*   /* PROCESS SNA STARTLINE REQUEST THIS ROUTINE IS CALLED FROM MAIN*/ 00240000
+*   /* PROGRAM LOGIC                                                 */ 00241000
+*   /*                                                               */ 00242000
+*   /*****************************************************************/ 00243000
+*                                                                  0463 00244000
+*SNASTRT:                                                          0463 00245000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0463 00246000
+SNASTRT  DS    0H                                                  0464 00247000
+*   OPCWRKSP(3)=RRETURN;            /* SAVE RETURN ADDR              */ 00248000
+         ST    RRETURN,OPCWRKSP+8(,ROPCAVT)                        0464 00249000
+*   OCWTG=OCWTGB;                   /* RESTORE OCWTG TO ORIG         */ 00250000
+         MVC   OCWTG(2,ROPCE),OCWTGB(ROPCE)                        0465 00251000
+*   OPCWRKSP(1)=OCPARM;             /* SAVE RESP MSG NUMB            */ 00252000
+         LH    @15,OCPARM(,ROPCE)                                  0466 00253000
+         ST    @15,OPCWRKSP(,ROPCAVT)                              0466 00254000
+*   RPARM=OCTRMTBL;                 /* TTCIN OF LINE TO PROCESS      */ 00255000
+         SLR   RPARM,RPARM                                         0467 00256000
+         ICM   RPARM,3,OCTRMTBL(ROPCE)                             0467 00257000
+*   CALL IEDQTNT;                   /* CONVERT TO TTE                */ 00258000
+         L     @15,AVTRNMPT(,IEDQAPTR)                             0468 00259000
+         BALR  @14,@15                                             0468 00260000
+*   RTERM=RPARM;                    /* SET UP TTE BASE               */ 00261000
+         LR    RTERM,RPARM                                         0469 00262000
+*   IF OCPARM=GOODSTRT|OCPARM=PARTGOOD/* GOOD RESPONSE PROCESSING    */ 00263000
+*       |OCPARM=LOGICGD THEN                                       0470 00264000
+         LH    @15,OCPARM(,ROPCE)                                  0470 00265000
+         CH    @15,@CH02156                                        0470 00266000
+         BE    @RT00470                                            0470 00267000
+         CH    @15,@CH02158                                        0470 00268000
+         BE    @RT00470                                            0470 00269000
+         CH    @15,@CH02160                                        0470 00270000
+         BNE   @RF00470                                            0470 00271000
+@RT00470 DS    0H                                                  0471 00272000
+*     DO;                                                          0471 00273000
+*       OPCWRKSP(2)=PARM0;          /* SET PARM TO ZERO              */ 00274000
+         SLR   @15,@15                                             0472 00275000
+         ST    @15,OPCWRKSP+4(,ROPCAVT)                            0472 00276000
+*       CALL NORMEXIT;              /* SET UP EXIT                   */ 00277000
+         BAL   @14,NORMEXIT                                        0473 00278000
+*     END;                                                         0474 00279000
+*   ELSE                                                           0475 00280000
+*     DO;                           /* ERROR RESPONSE PROC           */ 00281000
+         B     @RC00470                                            0475 00282000
+@RF00470 DS    0H                                                  0476 00283000
+*       OPCWRKSP(2)=PARM4;          /* SET UP ERROR PARM             */ 00284000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0476 00285000
+*       CALL ERREXIT;               /* ERROR PROCESSING              */ 00286000
+         BAL   @14,ERREXIT                                         0477 00287000
+*     END;                                                         0478 00288000
+*   RRETURN=OPCWRKSP(3);            /* LOAD RETURN ADDR              */ 00289000
+@RC00470 L     RRETURN,OPCWRKSP+8(,ROPCAVT)                        0479 00290000
+*   RETURN;                                                        0480 00291000
+@EL00004 DS    0H                                                  0480 00292000
+@EF00004 DS    0H                                                  0480 00293000
+@ER00004 BR    @14                                                 0480 00294000
+*   END;                            /* END OF SNASTRT                */ 00295000
+*                                                                  0482 00296000
+*   /*****************************************************************/ 00297000
+*   /*                                                               */ 00298000
+*   /* PROCESS STARTLINE REQUEST THIS ROUTINE IS CALLED FROM MAIN    */ 00299000
+*   /* PROGRAM LOGIC                                                 */ 00300000
+*   /*                                                               */ 00301000
+*   /*****************************************************************/ 00302000
+*                                                                  0482 00303000
+*STRTREQ:                                                          0482 00304000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0482 00305000
+STRTREQ  DS    0H                                                  0483 00306000
+*   OPCWRKSP(3)=RRETURN;            /* SAVE RETURN ADDR              */ 00307000
+         ST    RRETURN,OPCWRKSP+8(,ROPCAVT)                        0483 00308000
+*   IF FIRSTREQ=ON THEN                                            0484 00309000
+         TM    FIRSTREQ(ROPCAVT),B'10000000'                       0484 00310000
+         BNO   @RF00484                                            0484 00311000
+*     DO;                           /* IF FIRST REQUEST FIND FIRST 0485 00312000
+*                                      LINE TO PROC                  */ 00313000
+*       FIRSTREQ=OFF;               /* RESET FLAG                    */ 00314000
+         NI    FIRSTREQ(ROPCAVT),B'01111111'                       0486 00315000
+*       CALL GETFIRST;              /* FIND THE FIRST LINE           */ 00316000
+         BAL   @14,GETFIRST                                        0487 00317000
+*     END;                                                         0488 00318000
+*   ELSE                                                           0489 00319000
+*     IF MORELINE=ON THEN                                          0489 00320000
+         B     @RC00484                                            0489 00321000
+@RF00484 TM    MORELINE(ROPCAVT),B'01000000'                       0489 00322000
+         BNO   @RF00489                                            0489 00323000
+*       MORELINE=OFF;               /* RESET LOOP BIT        @YM06057*/ 00324000
+         NI    MORELINE(ROPCAVT),B'10111111'                       0490 00325000
+*     ELSE                                                         0491 00326000
+*       ;                           /*                       @YM06057*/ 00327000
+@RF00489 DS    0H                                                  0492 00328000
+*   RPARM=OCTRMTBL;                 /* TTCIN OF LINE TO PROCESS      */ 00329000
+@RC00484 SLR   RPARM,RPARM                                         0492 00330000
+         ICM   RPARM,3,OCTRMTBL(ROPCE)                             0492 00331000
+*   CALL IEDQTNT;                   /* CONVERT TO TTE                */ 00332000
+         L     @15,AVTRNMPT(,IEDQAPTR)                             0493 00333000
+         BALR  @14,@15                                             0493 00334000
+*   RTERM=RPARM;                    /* SET UP TTE BASE               */ 00335000
+         LR    RTERM,RPARM                                         0494 00336000
+*   IF EXITFLAG=OFF THEN                                           0495 00337000
+         TM    EXITFLAG(ROPCAVT),B'00100000'                       0495 00338000
+         BNZ   @RF00495                                            0495 00339000
+*     DO;                           /* NO ERROR FOUND YET            */ 00340000
+*       CALL SNACHK;                /* CHECK FOR SNA LINE            */ 00341000
+         BAL   @14,SNACHK                                          0497 00342000
+*       IF EXITFLAG=OFF THEN                                       0498 00343000
+         TM    EXITFLAG(ROPCAVT),B'00100000'                       0498 00344000
+         BNZ   @RF00498                                            0498 00345000
+*         DO;                       /* NO PREVIOUS ERROR             */ 00346000
+*           CALL ACT3705;           /* VERIFY 3705 ACTIVE            */ 00347000
+         BAL   @14,ACT3705                                         0500 00348000
+*           IF EXITFLAG=OFF THEN                                   0501 00349000
+         TM    EXITFLAG(ROPCAVT),B'00100000'                       0501 00350000
+         BNZ   @RF00501                                            0501 00351000
+*             DO;                   /* NO ERROR FOUND YET            */ 00352000
+*               CALL LINESTAT;      /* VERFIY STATUS OF LINE         */ 00353000
+         BAL   @14,LINESTAT                                        0503 00354000
+*               IF EXITFLAG=OFF THEN                               0504 00355000
+         TM    EXITFLAG(ROPCAVT),B'00100000'                       0504 00356000
+         BNZ   @RF00504                                            0504 00357000
+*                 DO;               /* NO ERRORS,CONT PROC           */ 00358000
+*                   CALL ACTLINK;   /* BUILD ACT LINK REQ            */ 00359000
+         BAL   @14,ACTLINK                                         0506 00360000
+*                   OPCMODID=SSCPA0;/* CALL SSCP ROUTER              */ 00361000
+         MVC   OPCMODID(2,ROPCAVT),@CC02180                        0507 00362000
+*                 END;                                             0508 00363000
+*             END;                                                 0509 00364000
+*         END;                                                     0510 00365000
+*     END;                                                         0511 00366000
+*   ELSE                                                           0512 00367000
+*     ;                                                            0512 00368000
+@RF00495 DS    0H                                                  0513 00369000
+*   RRETURN=OPCWRKSP(3);            /* LOAD RETURN ADDR              */ 00370000
+@RC00495 L     RRETURN,OPCWRKSP+8(,ROPCAVT)                        0513 00371000
+*   RETURN;                                                        0514 00372000
+@EL00005 DS    0H                                                  0514 00373000
+@EF00005 DS    0H                                                  0514 00374000
+@ER00005 BR    @14                                                 0514 00375000
+*   END;                            /* END OF STRTREQ                */ 00376000
+*                                                                  0516 00377000
+*   /*****************************************************************/ 00378000
+*   /*                                                               */ 00379000
+*   /* GET FIRST LINE TO PROCESS THIS ROUTINE IS CALLED BY STRTREQ.  */ 00380000
+*   /*                                                               */ 00381000
+*   /*****************************************************************/ 00382000
+*                                                                  0516 00383000
+*GETFIRST:                                                         0516 00384000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0516 00385000
+GETFIRST DS    0H                                                  0517 00386000
+*   OPCWRKSP(4)=RRETURN;            /* SAVE RETURN ADDR              */ 00387000
+         ST    RRETURN,OPCWRKSP+12(,ROPCAVT)                       0517 00388000
+*   IF OCRENTRD=ON THEN                                            0518 00389000
+         TM    OCRENTRD(ROPCE),B'10000000'                         0518 00390000
+         BNO   @RF00518                                            0518 00391000
+*     DO;                           /* 2ND ENTRY TO VI               */ 00392000
+*       OCRENTRD=OFF;               /* RESET INDICATOR               */ 00393000
+         NI    OCRENTRD(ROPCE),B'01111111'                         0520 00394000
+*       OCWTG=OCWTGB;               /* RESTORE OCWTG                 */ 00395000
+         MVC   OCWTG(2,ROPCE),OCWTGB(ROPCE)                        0521 00396000
+*     END;                                                         0522 00397000
+*   ELSE                                                           0523 00398000
+*     ;                                                            0523 00399000
+@RF00518 DS    0H                                                  0524 00400000
+*   RPARM=OCTRMTBL;                 /* GET TTCIN OF GRP OR LINE      */ 00401000
+         SLR   RPARM,RPARM                                         0524 00402000
+         ICM   RPARM,3,OCTRMTBL(ROPCE)                             0524 00403000
+*   CALL IEDQTNT;                   /* CONVERT TTCIN TO TTE          */ 00404000
+         L     @15,AVTRNMPT(,IEDQAPTR)                             0525 00405000
+         BALR  @14,@15                                             0525 00406000
+*   RTERM=RPARM;                    /* SET UP TTE BASE               */ 00407000
+         LR    RTERM,RPARM                                         0526 00408000
+*   IF TRMTYPE=TRMGRP THEN                                         0527 00409000
+         LR    @15,RTERM                                           0527 00410000
+         SH    @15,@CH01234                                        0527 00411000
+         CLI   TRMTYPE(@15),X'00'                                  0527 00412000
+         BNE   @RF00527                                            0527 00413000
+*     DO;                           /* IF GROUP TTE THEN DO          */ 00414000
+*       IF TRMSUBST^=0 THEN         /* IF VALID SUBST PTR            */ 00415000
+         ICM   @11,3,TRMSUBST(@15)                                 0529 00416000
+         BZ    @RF00529                                            0529 00417000
+*         OCTRMTBL=TRMSUBST;        /* SAVE LINE TTCIN IN OPCE       */ 00418000
+         MVC   OCTRMTBL(2,ROPCE),TRMSUBST(@15)                     0530 00419000
+*       ELSE                                                       0531 00420000
+*         DO;                       /* NO LINES IN GROUP             */ 00421000
+         B     @RC00529                                            0531 00422000
+@RF00529 DS    0H                                                  0532 00423000
+*           EXITFLAG=ON;            /* INDICATE EXIT                 */ 00424000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0532 00425000
+*           OPCMODID=MOD03;         /* ERROR EXIT MODULE             */ 00426000
+         MVC   OPCMODID(2,ROPCAVT),@CC02178                        0533 00427000
+*           OPCWRKSP(1)=MSG102;     /* ERROR MSG NUMBER              */ 00428000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02162                        0534 00429000
+*           OPCWRKSP(2)=PARM4;      /* PARM VALUE                    */ 00430000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0535 00431000
+*         END;                                                     0536 00432000
+*     END;                                                         0537 00433000
+*   ELSE                                                           0538 00434000
+*     ;                                                            0538 00435000
+@RF00527 DS    0H                                                  0539 00436000
+*   IF EXITFLAG=OFF THEN                                           0539 00437000
+@RC00527 TM    EXITFLAG(ROPCAVT),B'00100000'                       0539 00438000
+         BNZ   @RF00539                                            0539 00439000
+*     DO;                           /* NO ERROR COND FOUND           */ 00440000
+*       RPARM=ADDR(OCBACKUP);       /* GET ADDR OF GRPNAME           */ 00441000
+         LA    RPARM,OCBACKUP(,ROPCE)                              0541 00442000
+*       CALL WAITLSRH;              /* FIND OPCE WITH SAME GRPNAME   */ 00443000
+         BAL   @14,WAITLSRH                                        0542 00444000
+*       IF RPARM=0 THEN                                            0543 00445000
+         LTR   RPARM,RPARM                                         0543 00446000
+         BNZ   @RF00543                                            0543 00447000
+*         DO;                       /* IF OPCE NOT FOUND WITH SAME 0544 00448000
+*                                      GRPNAME THEN DO               */ 00449000
+*           IF OCALLFLG=ON THEN                                    0545 00450000
+         TM    OCALLFLG(ROPCE),B'00000100'                         0545 00451000
+         BNO   @RF00545                                            0545 00452000
+*             DO;                   /* GRP,ALL LOOP                  */ 00453000
+*               OCSOME=OFF;         /* CLEAR STATUS BITS             */ 00454000
+*               OCNONE=OFF;                                        0548 00455000
+         NI    OCSOME(ROPCE),B'11111100'                           0548 00456000
+*             END;                                                 0549 00457000
+*           ELSE                                                   0550 00458000
+*             ;                                                    0550 00459000
+@RF00545 DS    0H                                                  0551 00460000
+*         END;                                                     0551 00461000
+*       ELSE                                                       0552 00462000
+*         DO;                       /* OPCE WITH SAME GRP NAME FOUND */ 00463000
+         B     @RC00543                                            0552 00464000
+@RF00543 DS    0H                                                  0553 00465000
+*           OCWTGB=OCWTG;           /* SAVE OCWTG                    */ 00466000
+         MVC   OCWTGB(2,ROPCE),OCWTG(ROPCE)                        0553 00467000
+*           OCRENTRD=ON;            /* INDICATE 2ND ENTRY            */ 00468000
+         OI    OCRENTRD(ROPCE),B'10000000'                         0554 00469000
+*           OCWTG=VI;               /* SET TO RETURN HERE            */ 00470000
+         MVC   OCWTG(2,ROPCE),@CC02182                             0555 00471000
+*           EXITFLAG=ON;            /* INDICATE EXIT                 */ 00472000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0556 00473000
+*           OPCMODID=XCTL00;        /* MODULE TO GET CONTROL         */ 00474000
+         MVC   OPCMODID(2,ROPCAVT),@CC02184                        0557 00475000
+*           CALL WAITLATT;          /* ATTACH OPCE TO WAITL          */ 00476000
+         BAL   @14,WAITLATT                                        0558 00477000
+*         END;                                                     0559 00478000
+*     END;                                                         0560 00479000
+*   ELSE                                                           0561 00480000
+*     ;                                                            0561 00481000
+@RF00539 DS    0H                                                  0562 00482000
+*   RRETURN=OPCWRKSP(4);            /* RESTORE RETURN ADDR           */ 00483000
+@RC00539 L     RRETURN,OPCWRKSP+12(,ROPCAVT)                       0562 00484000
+*   RETURN;                                                        0563 00485000
+@EL00006 DS    0H                                                  0563 00486000
+@EF00006 DS    0H                                                  0563 00487000
+@ER00006 BR    @14                                                 0563 00488000
+*   END;                            /* END OF GETFIRST               */ 00489000
+*                                                                  0565 00490000
+*   /*****************************************************************/ 00491000
+*   /*                                                               */ 00492000
+*   /* WAITL ATTACH SUBROUTINE. REG 1 MUST POINT TO OPCE ON WAITL    */ 00493000
+*   /* CHAIN AND REG 3 (ROPCE) TO THE OPCE TO BE ATTACHED THIS       */ 00494000
+*   /* ROUTINE IS CALLED BY GETFIRST                                 */ 00495000
+*   /*                                                               */ 00496000
+*   /*****************************************************************/ 00497000
+*                                                                  0565 00498000
+*WAITLATT:                                                         0565 00499000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0565 00500000
+WAITLATT DS    0H                                                  0566 00501000
+*   DO WHILE(RPARM->OCATTACH=ON);   /* IF OPCES ALREADY ATTACHED     */ 00502000
+         B     @DE00566                                            0566 00503000
+@DL00566 DS    0H                                                  0567 00504000
+*     RPARM=RPARM->OCELMPTR;        /* NEXT OPCE                     */ 00505000
+         SLR   @15,@15                                             0567 00506000
+         ICM   @15,7,OCELMPTR(RPARM)                               0567 00507000
+         LR    RPARM,@15                                           0567 00508000
+*   END;                                                           0568 00509000
+@DE00566 TM    OCATTACH(RPARM),B'00000010'                         0568 00510000
+         BO    @DL00566                                            0568 00511000
+*   RPARM->OCELMPTR=ROPCE;          /* OPCE TO ATTACH                */ 00512000
+         STCM  ROPCE,7,OCELMPTR(RPARM)                             0569 00513000
+*   RPARM->OCATTACH=ON;             /* IND ATTACHED OPCE             */ 00514000
+         OI    OCATTACH(RPARM),B'00000010'                         0570 00515000
+*   RETURN;                                                        0571 00516000
+@EL00007 DS    0H                                                  0571 00517000
+@EF00007 DS    0H                                                  0571 00518000
+@ER00007 BR    @14                                                 0571 00519000
+*   END;                            /* END OF WAITLATT               */ 00520000
+*                                                                  0573 00521000
+*   /*****************************************************************/ 00522000
+*   /*                                                               */ 00523000
+*   /* THIS SUBROUTINE CHECKS FOR SNA LINES THIS ROUTINE IS CALLED BY*/ 00524000
+*   /* STRTREQ.                                                      */ 00525000
+*   /*                                                               */ 00526000
+*   /*****************************************************************/ 00527000
+*                                                                  0573 00528000
+*SNACHK:                                                           0573 00529000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0573 00530000
+SNACHK   DS    0H                                                  0574 00531000
+*   IF TRMTYPE=TRMSDLC THEN                                        0574 00532000
+         LR    @15,RTERM                                           0574 00533000
+         AL    @15,@CF01503                                        0574 00534000
+         CLI   TRMTYPE-11(@15),X'21'                               0574 00535000
+         BNE   @RF00574                                            0574 00536000
+*     DO;                           /* IF SNA LINE                   */ 00537000
+*       OCIPLWA=0;                  /* CLEAR FOR USE BY ACT-DE       */ 00538000
+         SLR   @15,@15                                             0576 00539000
+         ST    @15,OCIPLWA(,ROPCE)                                 0576 00540000
+*       OCPTRSAV=0;                 /* CLEARED FOR ACTIVATE USE      */ 00541000
+         ST    @15,OCPTRSAV(,ROPCE)                                0577 00542000
+*       OCWTGB=OCWTG;               /* SAVE CALLER                   */ 00543000
+         MVC   OCWTGB(2,ROPCE),OCWTG(ROPCE)                        0578 00544000
+*       OCWTG=VI;                   /* INDICATE RETURN HERE          */ 00545000
+         MVC   OCWTG(2,ROPCE),@CC02182                             0579 00546000
+*       OCSWITCH=OCTOFA;            /* IND ACT LINK REQ              */ 00547000
+         MVI   OCSWITCH(ROPCE),X'22'                               0580 00548000
+*       OPCMODID=FA;                /* ACT MOD TO GET CONTROL        */ 00549000
+         MVC   OPCMODID(2,ROPCAVT),@CC02186                        0581 00550000
+*       EXITFLAG=ON;                /* IND EXIT                      */ 00551000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0582 00552000
+*       OPCCOPCE=ROPCE;             /* ATTACH OPCE TO OP AVT         */ 00553000
+         ST    ROPCE,OPCCOPCE(,ROPCAVT)                            0583 00554000
+*     END;                                                         0584 00555000
+*   ELSE                                                           0585 00556000
+*     ;                                                            0585 00557000
+@RF00574 DS    0H                                                  0586 00558000
+*   RETURN;                                                        0586 00559000
+@EL00008 DS    0H                                                  0586 00560000
+@EF00008 DS    0H                                                  0586 00561000
+@ER00008 BR    @14                                                 0586 00562000
+*   END;                            /* END OF SNACHK                 */ 00563000
+*                                                                  0588 00564000
+*   /*****************************************************************/ 00565000
+*   /*                                                               */ 00566000
+*   /* THIS SUBROUTINE CHECKS THE ACTIVE STATUS OF THE LINE THIS     */ 00567000
+*   /* ROUTINE IS CALLED BY STRTREQ                                  */ 00568000
+*   /*                                                               */ 00569000
+*   /*****************************************************************/ 00570000
+*                                                                  0588 00571000
+*LINESTAT:                                                         0588 00572000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0588 00573000
+LINESTAT DS    0H                                                  0589 00574000
+*   OPCWRKSP(4)=RRETURN;            /* SAVE RETURN ADDR              */ 00575000
+         ST    RRETURN,OPCWRKSP+12(,ROPCAVT)                       0589 00576000
+*   IF TRMEPMOD=ON THEN                                            0590 00577000
+         LR    @15,RTERM                                           0590 00578000
+         AL    @15,@CF02290                                        0590 00579000
+         TM    TRMEPMOD-1(@15),B'10000000'                         0590 00580000
+         BNO   @RF00590                                            0590 00581000
+*     DO;                           /* IF LINE IS IN EP MODE         */ 00582000
+*       OPCWRKSP(1)=MSG443;         /* SET UP ERROR MSG              */ 00583000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02139                        0592 00584000
+*       OPCWRKSP(2)=PARM4;          /* SET UP PARM VALUE             */ 00585000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0593 00586000
+*       EXITFLAG=ON;                /* INDICATE EXIT                 */ 00587000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0594 00588000
+*       CALL ERREXIT;               /* EXECUTE ERROR PROCESS         */ 00589000
+         BAL   @14,ERREXIT                                         0595 00590000
+*     END;                                                         0596 00591000
+*   ELSE                                                           0597 00592000
+*     DO;                           /* LINE NOT IN EP MODE           */ 00593000
+         B     @RC00590                                            0597 00594000
+@RF00590 DS    0H                                                  0598 00595000
+*       IF OCTOTE=ON THEN                                          0598 00596000
+         TM    OCTOTE(ROPCE),B'01000000'                           0598 00597000
+         BNO   @RF00598                                            0598 00598000
+*         TRMSTOTE=OFF;             /* IF TOTE REQUEST, INDICATE LINE   00599000
+*                                      NOT IN TOTE MODE              */ 00600000
+         LR    @15,RTERM                                           0599 00601000
+         AL    @15,@CF02291                                        0599 00602000
+         NI    TRMSTOTE-3(@15),B'11111110'                         0599 00603000
+*       ELSE                                                       0600 00604000
+*         ;                                                        0600 00605000
+@RF00598 DS    0H                                                  0601 00606000
+*       IF TRMSTOTE=ON THEN                                        0601 00607000
+         LR    @15,RTERM                                           0601 00608000
+         AL    @15,@CF02291                                        0601 00609000
+         TM    TRMSTOTE-3(@15),B'00000001'                         0601 00610000
+         BNO   @RF00601                                            0601 00611000
+*         DO;                       /* IF TOTE OWNS LINE             */ 00612000
+*           OPCWRKSP(1)=MSG49;      /* SET ERROR MSG NUMBER          */ 00613000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02141                        0603 00614000
+*           OPCWRKSP(2)=PARM4;      /* SET PARM VALUE                */ 00615000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0604 00616000
+*           EXITFLAG=ON;            /* INDICATE EXIT                 */ 00617000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0605 00618000
+*           CALL ERREXIT;           /* ERROR PROCESSING              */ 00619000
+         BAL   @14,ERREXIT                                         0606 00620000
+*         END;                                                     0607 00621000
+*       ELSE                                                       0608 00622000
+*         DO;                       /* TOTE DOESNT CONTROL LINE      */ 00623000
+         B     @RC00601                                            0608 00624000
+@RF00601 DS    0H                                                  0609 00625000
+*           IF TRMRSACT=ON THEN                                    0609 00626000
+         LR    @15,RTERM                                           0609 00627000
+         AL    @15,@CF02292                                        0609 00628000
+         TM    TRMRSACT-2(@15),B'10000000'                         0609 00629000
+         BNO   @RF00609                                            0609 00630000
+*             DO;                   /* IF LINE ALREADY ACTIVE        */ 00631000
+*               OPCWRKSP(1)=MSG19;  /* SET ERROR MSG NUMBER          */ 00632000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02143                        0611 00633000
+*               OPCWRKSP(2)=PARM8;  /* SET PARM VALUE                */ 00634000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00046                      0612 00635000
+*               EXITFLAG=ON;        /* INDICATE EXIT                 */ 00636000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0613 00637000
+*               CALL ERREXIT;       /* ERROR PROCESSING              */ 00638000
+         BAL   @14,ERREXIT                                         0614 00639000
+*             END;                                                 0615 00640000
+*           ELSE                                                   0616 00641000
+*             ;                                                    0616 00642000
+@RF00609 DS    0H                                                  0617 00643000
+*         END;                                                     0617 00644000
+*     END;                                                         0618 00645000
+@RC00601 DS    0H                                                  0619 00646000
+*   RRETURN=OPCWRKSP(4);            /* RESTORE RETURN REG            */ 00647000
+@RC00590 L     RRETURN,OPCWRKSP+12(,ROPCAVT)                       0619 00648000
+*   RETURN;                                                        0620 00649000
+@EL00009 DS    0H                                                  0620 00650000
+@EF00009 DS    0H                                                  0620 00651000
+@ER00009 BR    @14                                                 0620 00652000
+*   END;                            /* END OF LINESTAT               */ 00653000
+*                                                                  0622 00654000
+*   /*****************************************************************/ 00655000
+*   /*                                                               */ 00656000
+*   /* THIS SUBROUTINE CHECKS FOR NCP ACTIVE THIS ROUTINE IS CALLED  */ 00657000
+*   /* BY STRTREQ.                                                   */ 00658000
+*   /*                                                               */ 00659000
+*   /*****************************************************************/ 00660000
+*                                                                  0622 00661000
+*ACT3705:                                                          0622 00662000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0622 00663000
+ACT3705  DS    0H                                                  0623 00664000
+*   OPCWRKSP(4)=RRETURN;            /* SAVE RETURN REG               */ 00665000
+         ST    RRETURN,OPCWRKSP+12(,ROPCAVT)                       0623 00666000
+*   IF TRMCOHRT=0 THEN                                             0624 00667000
+         LR    @15,RTERM                                           0624 00668000
+         AL    @15,@CF02293                                        0624 00669000
+         ICM   @11,3,TRMCOHRT-4(@15)                               0624 00670000
+         BNZ   @RF00624                                            0624 00671000
+*     DO;                           /* IF NO COHORT PTR              */ 00672000
+*       OPCWRKSP(1)=NCPACT;         /* NCP NOT ACTIVE MSG            */ 00673000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02145                        0626 00674000
+*       OPCWRKSP(2)=PARM4;          /* SET PARM VALUE                */ 00675000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0627 00676000
+*       EXITFLAG=ON;                /* INDICATE EXIT                 */ 00677000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0628 00678000
+*       CALL ERREXIT;               /* ERROR PROCESSING              */ 00679000
+         BAL   @14,ERREXIT                                         0629 00680000
+*     END;                                                         0630 00681000
+*   ELSE                                                           0631 00682000
+*     DO;                           /* HIERARCHY IN PLACE            */ 00683000
+         B     @RC00624                                            0631 00684000
+@RF00624 DS    0H                                                  0632 00685000
+*       RESPECIFY                                                  0632 00686000
+*         RSAVE RSTD;               /* R13=SAVE AREA ADDR            */ 00687000
+*       RSAVE=ADDR(OPCSAVE);        /* SET UP SAVE AREA              */ 00688000
+         LA    RSAVE,OPCSAVE(,ROPCAVT)                             0633 00689000
+*       RPARM=RTERM;                /* PASS TTE                      */ 00690000
+         LR    RPARM,RTERM                                         0634 00691000
+*       CALL COHORTLK;              /* COHORT LOOK UP RTN            */ 00692000
+         L     @15,OPCHORT(,ROPCAVT)                               0635 00693000
+         BALR  @14,@15                                             0635 00694000
+*       RESPECIFY                                                  0636 00695000
+*         RSAVE UNRSTD;                                            0636 00696000
+*       RPARM=RPARM-LENGTH(IEDNTRM);/* BACK UP TO NEGATIVE PREFIX    */ 00697000
+         SH    RPARM,@CH01234                                      0637 00698000
+*       IF RPARM->TRMRSACT=OFF THEN                                0638 00699000
+         TM    TRMRSACT(RPARM),B'10000000'                         0638 00700000
+         BNZ   @RF00638                                            0638 00701000
+*         DO;                       /* ACTIVE FLAG OFF               */ 00702000
+*           OPCWRKSP(1)=NCPACT;     /* NCP NOT ACTIVE MSG            */ 00703000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02145                        0640 00704000
+*           OPCWRKSP(2)=PARM4;      /* PARM VALUE                    */ 00705000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0641 00706000
+*           EXITFLAG=ON;            /* INDICATE EXIT                 */ 00707000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0642 00708000
+*           CALL ERREXIT;           /* ERROR PROCESS                 */ 00709000
+         BAL   @14,ERREXIT                                         0643 00710000
+*         END;                                                     0644 00711000
+*       ELSE                                                       0645 00712000
+*         DO;                       /* ACTIVE FLAG ON                */ 00713000
+         B     @RC00638                                            0645 00714000
+@RF00638 DS    0H                                                  0646 00715000
+*           IF OCACTREQ=OFF&RPARM->TRMINPG=ON THEN                 0646 00716000
+         TM    OCACTREQ(ROPCE),B'00001000'                         0646 00717000
+         BNZ   @RF00646                                            0646 00718000
+         TM    TRMINPG(RPARM),B'00100000'                          0646 00719000
+         BNO   @RF00646                                            0646 00720000
+*             DO;                   /* IF REQUEST IS NOT FROM      0647 00721000
+*                                      ACTIVATE AND ACT-DEACT-     0647 00722000
+*                                      IPL-DUMP IN PROGRESS,ERROR    */ 00723000
+*               RPARM=(RPARM+LENGTH(IEDNTRM))->TRMDESTQ->QCBDCBAD;/*    00724000
+*                                      GET DEB ADDRESS       @YM09041*/ 00725000
+         ICM   @15,7,TRMDESTQ+14(RPARM)                            0648 00726000
+         SLR   @11,@11                                             0648 00727000
+         ICM   @11,7,QCBDCBAD(@15)                                 0648 00728000
+         LR    RPARM,@11                                           0648 00729000
+*               RFY                                                0649 00730000
+*                 IHADCB BASED(RPARM);/*                     @XM05659*/ 00731000
+*               RPARM=DCBDEBAD;     /* GET DEB ADDRESS       @XM05659*/ 00732000
+         L     @15,DCBDEBAD+40(,RPARM)                             0650 00733000
+         LR    RPARM,@15                                           0650 00734000
+*               RFY                                                0651 00735000
+*                 IEDQDEB BASED(RPARM);                            0651 00736000
+*               RPARM=RPARM-(ADDR(DEBNMSUB)-ADDR(IEDQDEB));/* BACKUP */ 00737000
+         SH    RPARM,@CH00776                                      0652 00738000
+*               OCBACKUP=''B;       /* CLEAR TO INSERT THE UCB ADDR  */ 00739000
+         XC    OCBACKUP(8,ROPCE),OCBACKUP(ROPCE)                   0653 00740000
+*               OCBACKUP(1:3)=DEBUCBAD->UCBNAME;/* INSERT THE UCB  0654 00741000
+*                                      ADDR                          */ 00742000
+         ICM   @15,7,DEBUCBAD(RPARM)                               0654 00743000
+         MVC   OCBACKUP(3,ROPCE),UCBNAME(@15)                      0654 00744000
+*               OPCWRKSP(1)=NCPACT2;/* ERROR MSG                     */ 00745000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02147                        0655 00746000
+*               OPCWRKSP(2)=PARM4;  /* SET PARM VALUE                */ 00747000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0656 00748000
+*               EXITFLAG=ON;        /* INDICATE EXIT                 */ 00749000
+         OI    EXITFLAG(ROPCAVT),B'00100000'                       0657 00750000
+*               CALL ERREXIT;       /* ERROR PROCESSING              */ 00751000
+         BAL   @14,ERREXIT                                         0658 00752000
+*             END;                                                 0659 00753000
+*           ELSE                                                   0660 00754000
+*             ;                                                    0660 00755000
+@RF00646 DS    0H                                                  0661 00756000
+*         END;                                                     0661 00757000
+*     END;                                                         0662 00758000
+@RC00638 DS    0H                                                  0663 00759000
+*   RRETURN=OPCWRKSP(4);            /* RESTORE RETURN ADDR           */ 00760000
+@RC00624 L     RRETURN,OPCWRKSP+12(,ROPCAVT)                       0663 00761000
+*   RETURN;                                                        0664 00762000
+@EL00010 DS    0H                                                  0664 00763000
+@EF00010 DS    0H                                                  0664 00764000
+@ER00010 BR    @14                                                 0664 00765000
+*   END;                            /* END OF ACT3705                */ 00766000
+*                                                                  0666 00767000
+*   /*****************************************************************/ 00768000
+*   /*                                                               */ 00769000
+*   /* WAITL CHAIN SEARCH ROUTINE THIS ROUTINE IS CALLED BY          */ 00770000
+*   /* STRTRET,PROCRESP,GETFIRST                                     */ 00771000
+*   /*                                                               */ 00772000
+*   /*****************************************************************/ 00773000
+*                                                                  0666 00774000
+*WAITLSRH:                                                         0666 00775000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0666 00776000
+WAITLSRH DS    0H                                                  0667 00777000
+*   RESPECIFY                                                      0667 00778000
+*    (RWORK6,                                                      0667 00779000
+*     RWORK7) RSTD;                 /* THIS RTN USES RWORK6 TO     0667 00780000
+*                                      CONTAIN THE ADDR OF THE PREVI    00781000
+*                                      OPCE ON THE CHAIN. RWORK7 HAS    00782000
+*                                      THIS ADDRESS OF THE OPCE WE 0667 00783000
+*                                      ARE LOOKING AT                */ 00784000
+*   RWORK6=ADDR(OPCWAITV);          /* ADDR OF WAITL CHAIN           */ 00785000
+         LA    RWORK6,OPCWAITV(,ROPCAVT)                           0668 00786000
+*   RWORK7=OPCWAITV;                /* GET 1ST ELEM ON CHAIN         */ 00787000
+         L     RWORK7,OPCWAITV(,ROPCAVT)                           0669 00788000
+*   RWORK7=RWORK7&MASKBYTE;         /* CLEAR HIGH ORDER BY   @YM06021*/ 00789000
+         N     RWORK7,@CF02136                                     0670 00790000
+*   DO WHILE(RWORK7^=0&RWORK7->OCBACKUP^=RPARM->GRPNAME);/* SEARCH 0671 00791000
+*                                      WAITL CHAIN UNTIL END OF CHAIN   00792000
+*                                      FOUND OR MATCHING GRPNAMES  0671 00793000
+*                                      FOUND                         */ 00794000
+         B     @DE00671                                            0671 00795000
+@DL00671 DS    0H                                                  0672 00796000
+*     RWORK6=RWORK7;                /* SAVE THIS AS PREVIOUS         */ 00797000
+         LR    RWORK6,RWORK7                                       0672 00798000
+*     RWORK7=RWORK7->OCLINK;        /* NEXT OPCE                     */ 00799000
+         L     RWORK7,OCLINK(,RWORK7)                              0673 00800000
+*   END;                                                           0674 00801000
+@DE00671 LTR   RWORK7,RWORK7                                       0674 00802000
+         BZ    @DC00671                                            0674 00803000
+         CLC   OCBACKUP(8,RWORK7),GRPNAME(RPARM)                   0674 00804000
+         BNE   @DL00671                                            0674 00805000
+@DC00671 DS    0H                                                  0675 00806000
+*   IF RWORK7=0 THEN                                               0675 00807000
+         LTR   RWORK7,RWORK7                                       0675 00808000
+         BNZ   @RF00675                                            0675 00809000
+*     RPARM=0;                      /* NO OPCE FOUND                 */ 00810000
+         SLR   RPARM,RPARM                                         0676 00811000
+*   ELSE                                                           0677 00812000
+*     DO;                                                          0677 00813000
+         B     @RC00675                                            0677 00814000
+@RF00675 DS    0H                                                  0678 00815000
+*       RPARM=RWORK7;               /* R1=OPCE                       */ 00816000
+         LR    RPARM,RWORK7                                        0678 00817000
+*       RZERO=RWORK6;               /* R0=PREVIOUS OPCE              */ 00818000
+         LR    RZERO,RWORK6                                        0679 00819000
+*     END;                                                         0680 00820000
+*   RESPECIFY                                                      0681 00821000
+*    (RWORK6,                                                      0681 00822000
+*     RWORK7) UNRSTD;                                              0681 00823000
+*   RETURN;                                                        0682 00824000
+@EL00011 DS    0H                                                  0682 00825000
+@EF00011 DS    0H                                                  0682 00826000
+@ER00011 BR    @14                                                 0682 00827000
+*   END;                            /* END OF WAITLSRH               */ 00828000
+         B     @EL00011                                            0683 00829000
+*                                                                  0684 00830000
+*   /*****************************************************************/ 00831000
+*   /*                                                               */ 00832000
+*   /* THIS SUBR BUILDS THE ACT LINK REQUEST THIS ROUTINE IS CALLED  */ 00833000
+*   /* BY STRTREQ                                                    */ 00834000
+*   /*                                                               */ 00835000
+*   /*****************************************************************/ 00836000
+*                                                                  0684 00837000
+*ACTLINK:                                                          0684 00838000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0684 00839000
+ACTLINK  DS    0H                                                  0685 00840000
+*   OPCWRKSP(4)=RRETURN;            /* SAVE RETURN ADDR              */ 00841000
+         ST    RRETURN,OPCWRKSP+12(,ROPCAVT)                       0685 00842000
+*   RPARM=1;                        /* GET ONE BUFFER                */ 00843000
+         LA    RPARM,1                                             0686 00844000
+*   RESPECIFY                                                      0687 00845000
+*     RSAVE RSTD;                   /* R13=SAVE AREA ADDR            */ 00846000
+*   RSAVE=ADDR(OPCSAVE);            /* ADDR OF SAVE AREA             */ 00847000
+         LA    RSAVE,OPCSAVE(,ROPCAVT)                             0688 00848000
+*   CALL ALLOCBUF;                  /* GET BUFF SUBR IN QCA          */ 00849000
+         L     @15,OPCGETBF(,ROPCAVT)                              0689 00850000
+         BALR  @14,@15                                             0689 00851000
+*   RESPECIFY                                                      0690 00852000
+*     RSAVE UNRSTD;                                                0690 00853000
+*   RPARM->OPREPRI=PRIHIFLG;        /* SET PRIORITY                  */ 00854000
+         MVI   OPREPRI(RPARM),X'E9'                                0691 00855000
+*   RPARM->OPREFLG1=OPRA0;          /* SET FLAG FOR A0               */ 00856000
+         MVI   OPREFLG1(RPARM),X'01'                               0692 00857000
+*   RPARM->OCSWITCH=OCACTLK;        /* SET ACTLINK REQ FLAG          */ 00858000
+         MVI   OCSWITCH(RPARM),X'50'                               0693 00859000
+*   RPARM->OCWTG=VI;                /* INDICATE RETURN HERE          */ 00860000
+         MVC   OCWTG(2,RPARM),@CC02182                             0694 00861000
+*   RPARM->OCACTREQ=ON;             /* INDICATE ACTIVATE IN PROG     */ 00862000
+         OI    OCACTREQ(RPARM),B'00001000'                         0695 00863000
+*   RPARM->OCTRMTBL=OCTRMTBL;       /* GET TTCIN FROM OPCE MOVE TO 0696 00864000
+*                                      DUMMY OPCE                    */ 00865000
+         MVC   OCTRMTBL(2,RPARM),OCTRMTBL(ROPCE)                   0696 00866000
+*   RPARM->OCBACKUP=OCBACKUP;       /* MOVE GRPNAME FROM OPCE TO   0697 00867000
+*                                      DUMMY OPCE                    */ 00868000
+         MVC   OCBACKUP(8,RPARM),OCBACKUP(ROPCE)                   0697 00869000
+*   OPCCOPCE=RPARM;                 /* ATTACH DUMMY OPCE TO OAVT     */ 00870000
+         ST    RPARM,OPCCOPCE(,ROPCAVT)                            0698 00871000
+*   CALL WAITLADD;                  /* PUT ORIGINALOPCE ON WAITL     */ 00872000
+         BAL   @14,WAITLADD                                        0699 00873000
+*   RRETURN=OPCWRKSP(4);            /* RESTORE RETURN ADDR           */ 00874000
+         L     RRETURN,OPCWRKSP+12(,ROPCAVT)                       0700 00875000
+*   RETURN;                                                        0701 00876000
+@EL00012 DS    0H                                                  0701 00877000
+@EF00012 DS    0H                                                  0701 00878000
+@ER00012 BR    @14                                                 0701 00879000
+*   END;                            /* END OF ACTLINK                */ 00880000
+*                                                                  0703 00881000
+*   /*****************************************************************/ 00882000
+*   /*                                                               */ 00883000
+*   /* THIS SUBROUTINE BUILDS THE REQUEST TO IEDNSL TO PRIME THE     */ 00884000
+*   /* TERMINALS ON A SPECIFIC LINE THIS ROUTINE IS CALLED BY        */ 00885000
+*   /* PROCRESP                                                      */ 00886000
+*   /*                                                               */ 00887000
+*   /*****************************************************************/ 00888000
+*                                                                  0703 00889000
+*STRTLINE:                                                         0703 00890000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0703 00891000
+STRTLINE DS    0H                                                  0704 00892000
+*   OPCWRKSP(4)=RRETURN;            /* SAVE RETURN ADDR              */ 00893000
+         ST    RRETURN,OPCWRKSP+12(,ROPCAVT)                       0704 00894000
+*   RESPECIFY                                                      0705 00895000
+*     RWORK8 RSTD;                  /* PROCRESP HAS LOADED RWORK8  0705 00896000
+*                                      WITH THE REAL OPCE ADDR       */ 00897000
+*   NSLPLCB=''B;                    /* CLEAR FIELD                   */ 00898000
+         MVI   NSLPLCB(RNSL),X'00'                                 0706 00899000
+*   NSLSAVE=''B;                    /* CLEAR FIELD           @YM05736*/ 00900000
+         SLR   @15,@15                                             0707 00901000
+         STCM  @15,7,NSLSAVE(RNSL)                                 0707 00902000
+*   NSLGPCUS=''B;                   /* CLEAR FIELD                   */ 00903000
+         MVI   NSLGPCUS(RNSL),X'00'                                0708 00904000
+*   NSLREQTY=NSLSTRTL;              /* INDICATE STARTLINE REQ        */ 00905000
+         MVI   NSLREQTY(RNSL),X'01'                                0709 00906000
+*   NSLPRIBK=PRIMEDFG;              /* SET RETURN PRIORITY           */ 00907000
+         MVI   NSLPRIBK(RNSL),X'DF'                                0710 00908000
+*   NSLFLGBK=OPRVI;                 /* RETURN FLAG TO VI             */ 00909000
+         MVI   NSLFLGBK(RNSL),X'04'                                0711 00910000
+*   RPARM=RWORK8->OCTRMTBL;         /* TTCIN OF LINE                 */ 00911000
+         SLR   RPARM,RPARM                                         0712 00912000
+         ICM   RPARM,3,OCTRMTBL(RWORK8)                            0712 00913000
+*   CALL IEDQTNT;                   /* GET TTE ADDR                  */ 00914000
+         L     @15,AVTRNMPT(,IEDQAPTR)                             0713 00915000
+         BALR  @14,@15                                             0713 00916000
+*   NSLTTEPT=RPARM;                 /* PASS IN PARM LIST             */ 00917000
+         ST    RPARM,NSLTTEPT(,RNSL)                               0714 00918000
+*   NSLGRPNM=RWORK8->OCBACKUP;      /* PASS GROUP NAME               */ 00919000
+         MVC   NSLGRPNM(8,RNSL),OCBACKUP(RWORK8)                   0715 00920000
+*   OPREQCB=SAVTSPLN;               /* QCB FOR NSL                   */ 00921000
+         L     @15,AVTSAVTP(,IEDQAPTR)                             0716 00922000
+         MVC   OPREQCB(3,ROPCE),SAVTSPLN+1(@15)                    0716 00923000
+*   OPREPRI=PRIOPCTL;               /* PRIORITY FOR NSL              */ 00924000
+         MVI   OPREPRI(ROPCE),X'DC'                                0717 00925000
+*   QCTLWRD1=RNSL;                  /* NSL BUFFER ADDR               */ 00926000
+         LA    @15,180                                             0718 00927000
+         ALR   @15,ROPCAVT                                         0718 00928000
+         ST    RNSL,QCTLWRD1(,@15)                                 0718 00929000
+*   QCTLWRD2=RNSL;                  /* NSL BUFFER ADDR               */ 00930000
+         ST    RNSL,QCTLWRD2(,@15)                                 0719 00931000
+*   QCTLREQ=TPOST;                  /* INDICATE POST REQUEST         */ 00932000
+         MVI   QCTLREQ(@15),X'0C'                                  0720 00933000
+*   QCTLEND=ENDLIST;                /* END OF PARM LIST              */ 00934000
+         MVI   QCTLEND(@15),X'80'                                  0721 00935000
+*   RTERM=RPARM;                    /* SET TTE BASE FOR LINE         */ 00936000
+         LR    RTERM,RPARM                                         0722 00937000
+*   RPARM=ADDR(OPCAQCTL);           /* ADDR OF PARM LIST             */ 00938000
+         LA    RPARM,OPCAQCTL(,ROPCAVT)                            0723 00939000
+*   SVC(102);                       /* ISSUE SVC 102                 */ 00940000
+         SVC   102                                                 0724 00941000
+*   ROPCE=RWORK8;                   /* ESTAB ADDR TO OPCE            */ 00942000
+         LR    ROPCE,RWORK8                                        0725 00943000
+*   CALL WAITLADD;                  /* PUT OPCE ON WAITCHAIN         */ 00944000
+         BAL   @14,WAITLADD                                        0726 00945000
+*   OPCMODID=XCTL00;                /* EXIT TO IGC0010D              */ 00946000
+         MVC   OPCMODID(2,ROPCAVT),@CC02184                        0727 00947000
+*   RRETURN=OPCWRKSP(4);            /* RESTORE RETURN ADDR           */ 00948000
+         L     RRETURN,OPCWRKSP+12(,ROPCAVT)                       0728 00949000
+*   RETURN;                                                        0729 00950000
+@EL00013 DS    0H                                                  0729 00951000
+@EF00013 DS    0H                                                  0729 00952000
+@ER00013 BR    @14                                                 0729 00953000
+*   RESPECIFY                                                      0730 00954000
+*     RWORK8 UNRSTD;                                               0730 00955000
+*   END;                            /* END OF STRT TERM              */ 00956000
+*                                                                  0732 00957000
+*   /*****************************************************************/ 00958000
+*   /*                                                               */ 00959000
+*   /* THIS SUBROUTINE PUTS AN ELEMENT ON THE WAITL CHAIN THIS       */ 00960000
+*   /* ROUTINE IS CALLED BY ACTLINK,STRTLINE                         */ 00961000
+*   /*                                                               */ 00962000
+*   /*****************************************************************/ 00963000
+*                                                                  0732 00964000
+*WAITLADD:                                                         0732 00965000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0732 00966000
+WAITLADD DS    0H                                                  0733 00967000
+*   RESPECIFY                                                      0733 00968000
+*     RWORK7 RSTD;                  /* RWORK7 IS USED TO CONTAIN ADDR   00969000
+*                                      OF AN ELEMENT OF WAITL        */ 00970000
+*   RWORK7=OPCWAITV;                /* GET 1ST ELEM ON WAITL         */ 00971000
+         L     RWORK7,OPCWAITV(,ROPCAVT)                           0734 00972000
+*   OCLINK=RWORK7;                  /* SET NEXT ELEM PTR             */ 00973000
+         ST    RWORK7,OCLINK(,ROPCE)                               0735 00974000
+*   ROPCE=ROPCE&MASKBYTE;           /* CLEAR THE HIGH ORDER BYTE   0736 00975000
+*                                                            @YM04620*/ 00976000
+         N     ROPCE,@CF02136                                      0736 00977000
+*   OPCWAITV=ROPCE;                 /* CHAIN ELEM IN                 */ 00978000
+         ST    ROPCE,OPCWAITV(,ROPCAVT)                            0737 00979000
+*   RETURN;                                                        0738 00980000
+@EL00014 DS    0H                                                  0738 00981000
+@EF00014 DS    0H                                                  0738 00982000
+@ER00014 BR    @14                                                 0738 00983000
+*   RESPECIFY                                                      0739 00984000
+*     RWORK7 UNRSTD;                                               0739 00985000
+*   END;                            /* END OF WAITLADD               */ 00986000
+*                                                                  0741 00987000
+*   /*****************************************************************/ 00988000
+*   /*                                                               */ 00989000
+*   /* ERROR RESPONSE PROCESSING THIS ROUTINE IS CALLED BY PROCRESP  */ 00990000
+*   /*                                                               */ 00991000
+*   /*****************************************************************/ 00992000
+*                                                                  0741 00993000
+*ERRRESP:                                                          0741 00994000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0741 00995000
+ERRRESP  DS    0H                                                  0742 00996000
+*   RESPECIFY                                                      0742 00997000
+*     RWORK8 RSTD;                  /* PROCRESP HAS LOADED OPCE ADDR    00998000
+*                                      IN RWORK8                     */ 00999000
+*   OPCWRKSP(4)=RRETURN;            /* SAVE RETURN ADDR              */ 01000000
+         ST    RRETURN,OPCWRKSP+12(,ROPCAVT)                       0743 01001000
+*   IF OCPARM=PARM2 THEN            /* LINE ALREADY STARTED? @YM08579*/ 01002000
+         CLC   OCPARM(2,ROPCE),@CH00066                            0744 01003000
+         BNE   @RF00744                                            0744 01004000
+*     DO;                           /*                       @YM08579*/ 01005000
+*       RESPECIFY                                                  0746 01006000
+*         RSAVE RSTD;                                              0746 01007000
+*       RSAVE=ADDR(OPCSAVE);        /* ADDR OF SAVE AREA             */ 01008000
+         LA    RSAVE,OPCSAVE(,ROPCAVT)                             0747 01009000
+*       CALL FREEBUF;               /* FREE RSP BUFFER       @YM08579*/ 01010000
+         L     @15,OPCFREBF(,ROPCAVT)                              0748 01011000
+         BALR  @14,@15                                             0748 01012000
+*     END;                          /*                       @YM08579*/ 01013000
+*   ELSE                            /*                       @YM08579*/ 01014000
+*     RWORK8->OCUNIT=ROPCE->OCUNIT; /* SAVE BUF FOR MG199    @YM08579*/ 01015000
+         B     @RC00744                                            0750 01016000
+@RF00744 MVC   OCUNIT(4,RWORK8),OCUNIT(ROPCE)                      0750 01017000
+*   RPARM=ROPCE;                    /* FREE OPCE                     */ 01018000
+@RC00744 LR    RPARM,ROPCE                                         0751 01019000
+*   RPARM->OCUNIT=BADTIC;           /* 1 BUFFER TO FREE       @YM3737*/ 01020000
+         MVC   OCUNIT(4,RPARM),@CF02125                            0752 01021000
+*   IF OCPARM=PARM2 THEN            /* LINE ALREADY STARTED? @YM04637*/ 01022000
+         CLC   OCPARM(2,ROPCE),@CH00066                            0753 01023000
+         BNE   @RF00753                                            0753 01024000
+*     OPCWRKSP(1)=MSG19;            /* SETUP ALREADY STARTED MESSAGE    01025000
+*                                                            @YM04637*/ 01026000
+         MVC   OPCWRKSP(4,ROPCAVT),@CF02143                        0754 01027000
+*   ELSE                            /* NCP REJECTION         @YM04637*/ 01028000
+*     OPCWRKSP(1)=MSG199;           /* MSG NUMBER 199                */ 01029000
+         B     @RC00753                                            0755 01030000
+@RF00753 MVC   OPCWRKSP(4,ROPCAVT),@CF02149                        0755 01031000
+*   CALL FREEBUF;                   /* QCA FREE BUFFER RTN           */ 01032000
+@RC00753 L     @15,OPCFREBF(,ROPCAVT)                              0756 01033000
+         BALR  @14,@15                                             0756 01034000
+*   RESPECIFY                                                      0757 01035000
+*     RSAVE UNRSTD;                                                0757 01036000
+*   OPCWRKSP(2)=PARM4;              /* SET UP PARM VALUE             */ 01037000
+         MVC   OPCWRKSP+4(4,ROPCAVT),@CF00256                      0758 01038000
+*   ROPCE=RWORK8;                   /* GET OPCE                      */ 01039000
+         LR    ROPCE,RWORK8                                        0759 01040000
+*   RESPECIFY                                                      0760 01041000
+*     RWORK8 UNRSTD;                                               0760 01042000
+*   OPCCOPCE=ROPCE;                 /* MAKE ORIGINAL OPCE THE CURRENT   01043000
+*                                      ONE                   @OZ27693*/ 01044000
+         ST    ROPCE,OPCCOPCE(,ROPCAVT)                            0761 01045000
+*   RPARM=OCTRMTBL;                 /* TTCIN OF LINE TO PROCESS      */ 01046000
+         SLR   RPARM,RPARM                                         0762 01047000
+         ICM   RPARM,3,OCTRMTBL(ROPCE)                             0762 01048000
+*   CALL IEDQTNT;                   /* CONVERT TO TTE                */ 01049000
+         L     @15,AVTRNMPT(,IEDQAPTR)                             0763 01050000
+         BALR  @14,@15                                             0763 01051000
+*   RTERM=RPARM;                    /* SET TTE BASE                  */ 01052000
+         LR    RTERM,RPARM                                         0764 01053000
+*   CALL ERREXIT;                   /* ERROR PROCESSING              */ 01054000
+         BAL   @14,ERREXIT                                         0765 01055000
+*   RRETURN=OPCWRKSP(4);            /* RESTORE RETURN ADDR           */ 01056000
+         L     RRETURN,OPCWRKSP+12(,ROPCAVT)                       0766 01057000
+*   RETURN;                                                        0767 01058000
+@EL00015 DS    0H                                                  0767 01059000
+@EF00015 DS    0H                                                  0767 01060000
+@ER00015 BR    @14                                                 0767 01061000
+*   END;                            /* END OF ERRRESP                */ 01062000
+*                                                                  0769 01063000
+*   /*****************************************************************/ 01064000
+*   /*                                                               */ 01065000
+*   /* ERROR PROCESSING THIS ROUTINE IS CALLED BY SNASTRT,           */ 01066000
+*   /* LINESTAT,ACT3705,ERRRESP                                      */ 01067000
+*   /*                                                               */ 01068000
+*   /*****************************************************************/ 01069000
+*                                                                  0769 01070000
+*ERREXIT:                                                          0769 01071000
+*   PROC OPTIONS(NOSAVE,NOSAVEAREA);                               0769 01072000
+ERREXIT  DS    0H                                                  0770 01073000
+*   OPCWRKSP(5)=RRETURN;            /* SAVE RETURN ADDR              */ 01074000
+         ST    RRETURN,OPCWRKSP+16(,ROPCAVT)                       0770 01075000
+*   CALL ERRSTAT;                   /* UPDATE ERROR STATUS           */ 01076000
+         BAL   @14,ERRSTAT                                         0771 01077000
+*   IF MORELINE=OFF THEN                                           0772 01078000
+         TM    MORELINE(ROPCAVT),B'01000000'                       0772 01079000
+         BNZ   @RF00772                                            0772 01080000
+*     DO;                           /* IF NO MORE LINES TO PROCESS,     01081000
+*                                      THEN SETUP EXIT               */ 01082000
+*       IF OCWTG=0 THEN                                            0774 01083000
+         ICM   @15,3,OCWTG(ROPCE)                                  0774 01084000
+         BNZ   @RF00774                                            0774 01085000
+*         DO;                       /* NOT INTERNAL CALL             */ 01086000
+*           RZERO=OPCWRKSP(1);      /* SET UPMSG NUMB                */ 01087000
+         L     RZERO,OPCWRKSP(,ROPCAVT)                            0776 01088000
+*           RPARM=OPCWRKSP(2);      /* PARM VALUE                    */ 01089000
+         L     RPARM,OPCWRKSP+4(,ROPCAVT)                          0777 01090000
+*           IF RZERO=MSG511 THEN                                   0778 01091000
+         CH    RZERO,@CH02153                                      0778 01092000
+         BNE   @RF00778                                            0778 01093000
+*             DO;                   /* IF SOME LINES STARTED @OZ28007*/ 01094000
+*               OPCMODID=CHKPT;     /* SET TO XCTL TO IGC0610D     0780 01095000
+*                                                            @OZ28007*/ 01096000
+         MVC   OPCMODID(2,ROPCAVT),@CC02172                        0780 01097000

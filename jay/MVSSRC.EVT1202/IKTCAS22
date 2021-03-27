@@ -1,0 +1,499 @@
+         TITLE '*** IKTCAS22 - TERMINAL HANDLING ***'                   00001000
+IKTCAS22 CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'IKTCAS22  78.336'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  STM   @14,@12,12(@13)                                     0001 00009000
+         BALR  @12,0                                               0001 00010000
+@PSTART  DS    0H                                                  0001 00011000
+         USING @PSTART,@12                                         0001 00012000
+         ST    @13,@SA00001+4                                      0001 00013000
+         LA    @14,@SA00001                                        0001 00014000
+         ST    @14,8(,@13)                                         0001 00015000
+         LR    @13,@14                                             0001 00016000
+*   R1=WEVRPL;                      /* GET ADDRESS OF RPL FOR CLSDST    00017000
+*                                                            @ZA32361*/ 00018000
+         L     @14,WEVRPL(,R10)                                    0033 00019000
+         LR    R1,@14                                              0033 00020000
+*   LOGWEPTR=R1-LENGTH(WESTD);      /* COMPUTE ADDRESS OF LOGON WORK    00021000
+*                                      ELEMENT FROM A(RPL)   @ZA32361*/ 00022000
+         LR    LOGWEPTR,R1                                         0034 00023000
+         SL    LOGWEPTR,@CF00518                                   0034 00024000
+*   LOGWEPTR->WEUASCB=WEUASCB;      /* COPY ASCB ADDRESS TO LOGON  0035 00025000
+*                                      WORK ELEMENT          @ZA32361*/ 00026000
+         L     @04,WEUASCB(,R10)                                   0035 00027000
+         ST    @04,WEUASCB(,LOGWEPTR)                              0035 00028000
+*   LOGWEPTR->WEUECB=WEUECB;        /* COPY ECB ADDRESS TO LOGON WORK   00029000
+*                                      ELEMENT               @ZA32361*/ 00030000
+         L     @04,WEUECB(,R10)                                    0036 00031000
+         ST    @04,WEUECB(,LOGWEPTR)                               0036 00032000
+*   LBUFPTR=ADDR(LOGWEPTR->WELBUF->LBUFFER);/* GET ADDRESS OF LOGON     00033000
+*                                      BUFFER IN LOGON WORK ELEMENT     00034000
+*                                                            @ZA32361*/ 00035000
+         L     LBUFPTR,WELBUF(,LOGWEPTR)                           0037 00036000
+         LA    LBUFPTR,LBUFFER(,LBUFPTR)                           0037 00037000
+*   R15=ADDR(IKTCASCX);             /* GET CLSDST EXIT ADDRESS     0038 00038000
+*                                                            @ZA32361*/ 00039000
+         L     R15,@CV00508                                        0038 00040000
+*   IF WECODE1F=FCVITT THEN         /* IS THIS TERM TRANSFER REQ     */ 00041000
+         CLI   WECODE1F(R10),X'21'                                 0039 00042000
+         BNE   @RF00039                                            0039 00043000
+*     DO;                           /* YES ISSUE CLSDST PASS         */ 00044000
+*       R0=LBUFPTR;                 /* GET LOGON BUFFER ADDRESS    0041 00045000
+*                                                            @ZA32361*/ 00046000
+         LR    R0,LBUFPTR                                          0041 00047000
+*       WSCLSPAS='1'B;              /* SET PASS INDICATOR            */ 00048000
+*       WSCLSREL='0'B;              /* SET RELEASE BIT OFF           */ 00049000
+         AL    @14,@CF00519                                        0043 00050000
+         OI    WSCLSPAS(@14),B'00010000'                           0043 00051000
+         NI    WSCLSREL(@14),B'11011111'                           0043 00052000
+*       GEN REFS(R0,R1,R15);                                       0044 00053000
+*                                  /* ISSUE CLSDST PASS     @ZA32361*/  00054000
+         CLSDST RPL=(1),AAREA=(0),EXIT=(15),OPTCD=(ASY,PASS)  @ZA32361  00055000
+*     END;                                                         0045 00056000
+*   ELSE                                                           0046 00057000
+*     DO;                           /* NOT TERM PASS THEN RELEASE    */ 00058000
+         B     @RC00039                                            0046 00059000
+@RF00039 DS    0H                                                  0047 00060000
+*       WSCLSREL='1'B;              /* SET RELEASE BIT ON            */ 00061000
+*       WSCLSPAS='0'B;              /* SET PASS BIT OFF              */ 00062000
+         LA    @14,112                                             0048 00063000
+         AL    @14,WEVRPL(,R10)                                    0048 00064000
+         OI    WSCLSREL(@14),B'00100000'                           0048 00065000
+         NI    WSCLSPAS(@14),B'11101111'                           0048 00066000
+*       GEN;                                                       0049 00067000
+         CLSDST RPL=(1),EXIT=(15),OPTCD=(ASY,RELEASE)         @ZA32361  00068000
+*     END;                                                         0050 00069000
+*   IF R5=0 THEN                    /* IS REG 5 0? IF SO,    @ZA19531*/ 00070000
+@RC00039 LTR   R5,R5                                               0051 00071000
+         BNZ   @RF00051                                            0051 00072000
+*     DO;                           /* FREE THE LOGON WORK ELEMENT 0052 00073000
+*                                                            @ZA19531*/ 00074000
+*       R0=WELEN;                   /* GET WORK ELEMENT LENGTH     0053 00075000
+*                                                            @ZA32361*/ 00076000
+         LH    R0,WELEN(,R10)                                      0053 00077000
+*       WA1=R10;                    /* GET WORK ELEMENT ADDRESS    0054 00078000
+*                                                            @ZM42700*/ 00079000
+         ST    R10,WA1                                             0054 00080000
+*       GEN REFS(R0,WA1) SETS(R1);                                 0055 00081000
+*                                     /* FREE WORK ELEMENT  @ZM42700*/  00082000
+         FREEMAIN E,LV=(0),A=WA1,SP=231  FREEMAIN FOR LOGON W.E.        00083000
+*     END;                          /*                       @ZA19531*/ 00084000
+*   ELSE                                                           0057 00085000
+*     ;                             /* DO NOT FREE W.E.      @ZA19531*/ 00086000
+@RF00051 DS    0H                                                  0058 00087000
+*   END IKTCAS22                                                   0058 00088000
+*                                                                  0058 00089000
+*/* THE FOLLOWING INCLUDE STATEMENTS WERE FOUND IN THIS PROGRAM.     */ 00090000
+*/*%INCLUDE SYSLIB  (IFGRPL  )                                       */ 00091000
+*/*%INCLUDE SYSLIB  (IFGRPLVT)                                       */ 00092000
+*/*%INCLUDE SYSLIB  (ISTRPLFB)                                       */ 00093000
+*/*%INCLUDE SYSLIB  (IKTWESTD)                                       */ 00094000
+*                                                                  0058 00095000
+*       ;                                                          0058 00096000
+@EL00001 L     @13,4(,@13)                                         0058 00097000
+@EF00001 DS    0H                                                  0058 00098000
+@ER00001 LM    @14,@12,12(@13)                                     0058 00099000
+         BR    @14                                                 0058 00100000
+@DATA    DS    0H                                                       00101000
+         DS    0F                                                       00102000
+@SA00001 DS    18F                                                      00103000
+         DS    0F                                                       00104000
+@CF00518 DC    F'76'                                                    00105000
+@CF00519 DC    F'112'                                                   00106000
+@CV00508 DC    V(IKTCASCX)                                              00107000
+         DS    0D                                                       00108000
+WA1      DS    F                                                        00109000
+PATCH    DC    13F'0'                                                   00110000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00111000
+@01      EQU   01                                                       00112000
+@02      EQU   02                                                       00113000
+@03      EQU   03                                                       00114000
+@04      EQU   04                                                       00115000
+@05      EQU   05                                                       00116000
+@06      EQU   06                                                       00117000
+@07      EQU   07                                                       00118000
+@08      EQU   08                                                       00119000
+@09      EQU   09                                                       00120000
+@10      EQU   10                                                       00121000
+@11      EQU   11                                                       00122000
+@12      EQU   12                                                       00123000
+@13      EQU   13                                                       00124000
+@14      EQU   14                                                       00125000
+@15      EQU   15                                                       00126000
+LBUFPTR  EQU   @07                                                      00127000
+LOGWEPTR EQU   @06                                                      00128000
+R0       EQU   @00                                                      00129000
+R1       EQU   @01                                                      00130000
+R5       EQU   @05                                                      00131000
+R10      EQU   @10                                                      00132000
+TWAPTR   EQU   @11                                                      00133000
+R15      EQU   @15                                                      00134000
+R12      EQU   @12                                                      00135000
+R13      EQU   @13                                                      00136000
+R14      EQU   @14                                                      00137000
+IFGRPL   EQU   0                                                        00138000
+RPLCOMN  EQU   IFGRPL                                                   00139000
+RPLIDWD  EQU   RPLCOMN                                                  00140000
+RPLLEN   EQU   RPLIDWD+3                                                00141000
+RPLECB   EQU   RPLCOMN+8                                                00142000
+RPLEXITP EQU   RPLECB                                                   00143000
+RPLFDBWD EQU   RPLCOMN+12                                               00144000
+RPLFDBK  EQU   RPLFDBWD+1                                               00145000
+RPLRTNCD EQU   RPLFDBK                                                  00146000
+RPLCNDCD EQU   RPLFDBK+1                                                00147000
+RPLCMPON EQU   RPLCNDCD                                                 00148000
+RPLFDB2  EQU   RPLCMPON                                                 00149000
+RPLERRCD EQU   RPLCNDCD+1                                               00150000
+RPLFDB3  EQU   RPLERRCD                                                 00151000
+RPLKEYLE EQU   RPLCOMN+16                                               00152000
+RPLARG   EQU   RPLCOMN+36                                               00153000
+RPLOPTCD EQU   RPLCOMN+40                                               00154000
+RPLOPT1  EQU   RPLOPTCD                                                 00155000
+RPLECBSW EQU   RPLOPT1                                                  00156000
+RPLOPT2  EQU   RPLOPTCD+1                                               00157000
+RPLADR   EQU   RPLOPT2                                                  00158000
+RPLOPT3  EQU   RPLOPTCD+2                                               00159000
+RPLOPT4  EQU   RPLOPTCD+3                                               00160000
+RPLNXTRP EQU   RPLCOMN+44                                               00161000
+RPLOPTC2 EQU   RPLCOMN+56                                               00162000
+RPLOPT5  EQU   RPLOPTC2                                                 00163000
+RPLWRTYP EQU   RPLOPT5                                                  00164000
+RPLOPT6  EQU   RPLOPTC2+1                                               00165000
+RPLUNTYP EQU   RPLOPT6                                                  00166000
+RPLOPT7  EQU   RPLOPTC2+2                                               00167000
+RPLCNOPT EQU   RPLOPT7                                                  00168000
+RPLOPT8  EQU   RPLOPTC2+3                                               00169000
+RPLRBAR  EQU   RPLCOMN+60                                               00170000
+RPLAIXID EQU   RPLRBAR+2                                                00171000
+RPLEXTDS EQU   RPLCOMN+68                                               00172000
+RPLEXTD1 EQU   RPLEXTDS                                                 00173000
+RPLVTEXT EQU   IFGRPL+76                                                00174000
+RPLFDBK2 EQU   RPLVTEXT+12                                              00175000
+RPLSSNSI EQU   RPLFDBK2                                                 00176000
+RPLDSB   EQU   RPLSSNSI                                                 00177000
+RPLDSB1  EQU   RPLDSB                                                   00178000
+RPLSSEI  EQU   RPLDSB1                                                  00179000
+RPLDSB2  EQU   RPLDSB+1                                                 00180000
+RPLUSNSI EQU   RPLFDBK2+2                                               00181000
+RPLOPTC3 EQU   RPLVTEXT+20                                              00182000
+RPLOPT9  EQU   RPLOPTC3                                                 00183000
+RPLOPT10 EQU   RPLOPTC3+1                                               00184000
+RPLOPT11 EQU   RPLOPTC3+2                                               00185000
+RPLOPT12 EQU   RPLOPTC3+3                                               00186000
+RPLOSENS EQU   RPLVTEXT+24                                              00187000
+RPLSSNSO EQU   RPLOSENS                                                 00188000
+RPLSSEO  EQU   RPLSSNSO                                                 00189000
+RPLOF16  EQU   0                                                        00190000
+RPLRH3   EQU   RPLOF16                                                  00191000
+RPLSRTYP EQU   RPLOF16+1                                                00192000
+RPLSTYPE EQU   RPLSRTYP                                                 00193000
+RPLRTYPE EQU   RPLSRTYP                                                 00194000
+RPLCHN   EQU   RPLOF16+2                                                00195000
+RPLVTFL1 EQU   RPLOF16+3                                                00196000
+RPLVTFL2 EQU   RPLOF16+4                                                00197000
+RPLPOSTV EQU   RPLVTFL2                                                 00198000
+RPLRESP  EQU   RPLVTFL2                                                 00199000
+RPLCNTRL EQU   RPLOF16+5                                                00200000
+RPLCNTDF EQU   RPLCNTRL                                                 00201000
+RPLCNTDC EQU   RPLCNTRL+1                                               00202000
+RPLCNTSC EQU   RPLCNTRL+2                                               00203000
+RPLOF60  EQU   0                                                        00204000
+RPLOBSQ  EQU   RPLOF60+4                                                00205000
+RPLIBSQ  EQU   RPLOF60+5                                                00206000
+WESTD    EQU   0                                                        00207000
+WECODE1  EQU   WESTD                                                    00208000
+WECODE1F EQU   WECODE1+1                                                00209000
+WECODE2  EQU   WESTD+2                                                  00210000
+WECODE2F EQU   WECODE2+1                                                00211000
+WERC     EQU   WESTD+8                                                  00212000
+WELEN    EQU   WESTD+10                                                 00213000
+WEUASCB  EQU   WESTD+12                                                 00214000
+WEVNIB   EQU   WESTD+16                                                 00215000
+WEUECB   EQU   WEVNIB                                                   00216000
+WEVRPL   EQU   WESTD+20                                                 00217000
+WELBUF   EQU   WESTD+24                                                 00218000
+WETERM   EQU   WESTD+28                                                 00219000
+WETMFLG  EQU   WESTD+32                                                 00220000
+WORKSPAC EQU   0                                                        00221000
+WSFLG1   EQU   WORKSPAC                                                 00222000
+WSCLSREL EQU   WSFLG1                                                   00223000
+WSCLSPAS EQU   WSFLG1                                                   00224000
+LOGBUFF  EQU   0                                                        00225000
+LBUFFER  EQU   LOGBUFF+4                                                00226000
+ISTRPL   EQU   0                                                        00227000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00228000
+LOGLEN   EQU   LOGBUFF                                                  00229000
+@NM00029 EQU   WORKSPAC+8                                               00230000
+@NM00028 EQU   WORKSPAC+4                                               00231000
+@NM00027 EQU   WORKSPAC+1                                               00232000
+@NM00026 EQU   WSFLG1                                                   00233000
+WSSYNCH  EQU   WSFLG1                                                   00234000
+WSRETRYB EQU   WSFLG1                                                   00235000
+WSOPNDST EQU   WSFLG1                                                   00236000
+WSALLOCD EQU   WSFLG1                                                   00237000
+WEALTC   EQU   WESTD+75                                                 00238000
+WEALTR   EQU   WESTD+74                                                 00239000
+WEPRMC   EQU   WESTD+73                                                 00240000
+WEPRMR   EQU   WESTD+72                                                 00241000
+WEBIND   EQU   WESTD+36                                                 00242000
+@NM00025 EQU   WESTD+35                                                 00243000
+WERUSZO  EQU   WESTD+34                                                 00244000
+WERUSZI  EQU   WESTD+33                                                 00245000
+@NM00024 EQU   WETMFLG                                                  00246000
+WENOSW   EQU   WETMFLG                                                  00247000
+WEFLG1   EQU   WETMFLG                                                  00248000
+WETMBF   EQU   WETERM+2                                                 00249000
+WESUBT   EQU   WETERM+1                                                 00250000
+WETMTP   EQU   WETERM                                                   00251000
+WERC2    EQU   WERC+1                                                   00252000
+WERC1    EQU   WERC                                                     00253000
+WENEXT   EQU   WESTD+4                                                  00254000
+WECD2MIF EQU   WECODE2F                                                 00255000
+WECD2MAF EQU   WECODE2F                                                 00256000
+WECODE2T EQU   WECODE2                                                  00257000
+WECDMIF  EQU   WECODE1F                                                 00258000
+WECDMAF  EQU   WECODE1F                                                 00259000
+WECODE1T EQU   WECODE1                                                  00260000
+RPLSEQNO EQU   RPLOF60+6                                                00261000
+@NM00023 EQU   RPLIBSQ                                                  00262000
+RPLIINV  EQU   RPLIBSQ                                                  00263000
+RPLINEG  EQU   RPLIBSQ                                                  00264000
+RPLIPOS  EQU   RPLIBSQ                                                  00265000
+RPLIIGN  EQU   RPLIBSQ                                                  00266000
+RPLIRSET EQU   RPLIBSQ                                                  00267000
+RPLITST  EQU   RPLIBSQ                                                  00268000
+RPLISET  EQU   RPLIBSQ                                                  00269000
+@NM00022 EQU   RPLOBSQ                                                  00270000
+RPLOINV  EQU   RPLOBSQ                                                  00271000
+RPLONEG  EQU   RPLOBSQ                                                  00272000
+RPLOPOS  EQU   RPLOBSQ                                                  00273000
+RPLOIGN  EQU   RPLOBSQ                                                  00274000
+RPLORSET EQU   RPLOBSQ                                                  00275000
+RPLOTST  EQU   RPLOBSQ                                                  00276000
+RPLOSET  EQU   RPLOBSQ                                                  00277000
+RPLIBSQV EQU   RPLOF60+2                                                00278000
+RPLOBSQV EQU   RPLOF60                                                  00279000
+@NM00021 EQU   RPLCNTSC                                                 00280000
+RPLRSHUT EQU   RPLCNTSC                                                 00281000
+RPLRQR   EQU   RPLCNTSC                                                 00282000
+RPLSHUTC EQU   RPLCNTSC                                                 00283000
+RPLSHUTD EQU   RPLCNTSC                                                 00284000
+RPLSTSN  EQU   RPLCNTSC                                                 00285000
+RPLCLEAR EQU   RPLCNTSC                                                 00286000
+RPLSDT   EQU   RPLCNTSC                                                 00287000
+RPLBIS   EQU   RPLCNTDC                                                 00288000
+RPLSBI   EQU   RPLCNTDC                                                 00289000
+RPLTUNBD EQU   RPLCNTDC                                                 00290000
+RPLTBIND EQU   RPLCNTDC                                                 00291000
+RPLSIGNL EQU   RPLCNTDC                                                 00292000
+RPLLUS   EQU   RPLCNTDC                                                 00293000
+RPLRTR   EQU   RPLCNTDC                                                 00294000
+RPLBID   EQU   RPLCNTDC                                                 00295000
+@NM00020 EQU   RPLCNTDF                                                 00296000
+RPLQI    EQU   RPLCNTDF                                                 00297000
+RPLRELQ  EQU   RPLCNTDF                                                 00298000
+RPLCHASE EQU   RPLCNTDF                                                 00299000
+RPLQEC   EQU   RPLCNTDF                                                 00300000
+RPLQC    EQU   RPLCNTDF                                                 00301000
+RPLCNCEL EQU   RPLCNTDF                                                 00302000
+RPLDATA  EQU   RPLCNTDF                                                 00303000
+RPLRRN   EQU   RPLRESP                                                  00304000
+RPLNFME  EQU   RPLRESP                                                  00305000
+RPLEX    EQU   RPLRESP                                                  00306000
+RPLQRI   EQU   RPLRESP                                                  00307000
+@NM00019 EQU   RPLPOSTV                                                 00308000
+RPLSCHED EQU   RPLPOSTV                                                 00309000
+@NM00018 EQU   RPLVTFL1                                                 00310000
+RPLTLGAC EQU   RPLVTFL1                                                 00311000
+RPLTNDSP EQU   RPLVTFL1                                                 00312000
+RPLAUTUS EQU   RPLVTFL1                                                 00313000
+RPLVTUSE EQU   RPLVTFL1                                                 00314000
+@NM00017 EQU   RPLVTFL1                                                 00315000
+@NM00016 EQU   RPLCHN                                                   00316000
+RPLONLY  EQU   RPLCHN                                                   00317000
+RPLLAST  EQU   RPLCHN                                                   00318000
+RPLMIDLE EQU   RPLCHN                                                   00319000
+RPLFIRST EQU   RPLCHN                                                   00320000
+@NM00015 EQU   RPLRTYPE                                                 00321000
+RPLDFASY EQU   RPLRTYPE                                                 00322000
+RPLNFSYN EQU   RPLRTYPE                                                 00323000
+RPLRRESP EQU   RPLRTYPE                                                 00324000
+@NM00014 EQU   RPLSTYPE                                                 00325000
+RPLSRESP EQU   RPLSTYPE                                                 00326000
+@NM00013 EQU   RPLRH3                                                   00327000
+RPLCSI   EQU   RPLRH3                                                   00328000
+RPLCHREQ EQU   RPLRH3                                                   00329000
+RPLCMD   EQU   RPLRH3                                                   00330000
+RPLEB    EQU   RPLRH3                                                   00331000
+RPLBB    EQU   RPLRH3                                                   00332000
+RPLSIGDA EQU   RPLVTEXT+32                                              00333000
+RPLSAV13 EQU   RPLVTEXT+28                                              00334000
+RPLUSNSO EQU   RPLOSENS+2                                               00335000
+RPLSSMO  EQU   RPLSSNSO+1                                               00336000
+@NM00012 EQU   RPLSSEO                                                  00337000
+RPLRRO   EQU   RPLSSEO                                                  00338000
+RPLFIO   EQU   RPLSSEO                                                  00339000
+RPLSTATO EQU   RPLSSEO                                                  00340000
+RPLCPMO  EQU   RPLSSEO                                                  00341000
+@NM00011 EQU   RPLSSEO                                                  00342000
+RPLFMHDR EQU   RPLOPT12                                                 00343000
+@NM00010 EQU   RPLOPT12                                                 00344000
+@NM00009 EQU   RPLOPT12                                                 00345000
+@NM00008 EQU   RPLOPT12                                                 00346000
+RPLNIBTK EQU   RPLOPT12                                                 00347000
+RPLTRUNC EQU   RPLOPT12                                                 00348000
+RPLKEEP  EQU   RPLOPT12                                                 00349000
+@NM00007 EQU   RPLOPT12                                                 00350000
+RPLRSVE8 EQU   RPLOPT11                                                 00351000
+RPLRSVE7 EQU   RPLOPT11                                                 00352000
+RPLRSVE6 EQU   RPLOPT11                                                 00353000
+RPLRSVE5 EQU   RPLOPT11                                                 00354000
+RPLRSVE4 EQU   RPLOPT11                                                 00355000
+RPLSTOP  EQU   RPLOPT11                                                 00356000
+RPLSTART EQU   RPLOPT11                                                 00357000
+RPLQUIES EQU   RPLOPT11                                                 00358000
+RPLRSVI6 EQU   RPLOPT10                                                 00359000
+RPLRSVI5 EQU   RPLOPT10                                                 00360000
+RPLRSVI4 EQU   RPLOPT10                                                 00361000
+RPLRSVI3 EQU   RPLOPT10                                                 00362000
+RPLTSKY  EQU   RPLOPT10                                                 00363000
+RPLSPARM EQU   RPLOPT10                                                 00364000
+RPLDSPLY EQU   RPLOPT10                                                 00365000
+RPLBSCID EQU   RPLOPT10                                                 00366000
+RPLTOPL  EQU   RPLOPT9                                                  00367000
+RPLCIDE  EQU   RPLOPT9                                                  00368000
+RPLRNNM  EQU   RPLOPT9                                                  00369000
+RPLAPPST EQU   RPLOPT9                                                  00370000
+RPLCOUNT EQU   RPLOPT9                                                  00371000
+RPLTERMS EQU   RPLOPT9                                                  00372000
+RPLDEVCH EQU   RPLOPT9                                                  00373000
+RPLLOGON EQU   RPLOPT9                                                  00374000
+RPLUSFLD EQU   RPLVTEXT+16                                              00375000
+RPLESR2  EQU   RPLUSNSI+1                                               00376000
+RPLESR1  EQU   RPLUSNSI                                                 00377000
+RPLSSMI  EQU   RPLDSB2                                                  00378000
+@NM00006 EQU   RPLSSEI                                                  00379000
+RPLRRI   EQU   RPLSSEI                                                  00380000
+RPLFII   EQU   RPLSSEI                                                  00381000
+RPLSTATI EQU   RPLSSEI                                                  00382000
+RPLCPMI  EQU   RPLSSEI                                                  00383000
+RPLPATHI EQU   RPLSSEI                                                  00384000
+RPLARCLN EQU   RPLVTEXT+8                                               00385000
+RPLAARLN EQU   RPLVTEXT+4                                               00386000
+RPLAAREA EQU   RPLVTEXT                                                 00387000
+RPLERMSA EQU   RPLCOMN+72                                               00388000
+RPLEMLEN EQU   RPLCOMN+70                                               00389000
+RPLACTIV EQU   RPLCOMN+69                                               00390000
+RPLBRANC EQU   RPLEXTD1                                                 00391000
+RPLNIB   EQU   RPLEXTD1                                                 00392000
+RPLTCRYP EQU   RPLEXTD1                                                 00393000
+@NM00005 EQU   RPLEXTD1                                                 00394000
+RPLEXIT  EQU   RPLEXTD1                                                 00395000
+RPLNEXIT EQU   RPLEXTD1                                                 00396000
+RPLEXSCH EQU   RPLEXTD1                                                 00397000
+RPLDDDD  EQU   RPLRBAR+4                                                00398000
+@NM00004 EQU   RPLRBAR+3                                                00399000
+@NM00003 EQU   RPLAIXID                                                 00400000
+RPLAXPKP EQU   RPLAIXID                                                 00401000
+RPLAIXPC EQU   RPLRBAR                                                  00402000
+RPLRSV88 EQU   RPLOPT8                                                  00403000
+RPLUNCON EQU   RPLOPT8                                                  00404000
+RPLACTV  EQU   RPLOPT8                                                  00405000
+RPLSESS  EQU   RPLOPT8                                                  00406000
+RPLPEND  EQU   RPLOPT8                                                  00407000
+RPLODPRM EQU   RPLOPT8                                                  00408000
+RPLODACP EQU   RPLOPT8                                                  00409000
+RPLODACQ EQU   RPLOPT8                                                  00410000
+RPLRSV78 EQU   RPLOPT7                                                  00411000
+RPLTCRNO EQU   RPLOPT7                                                  00412000
+RPLRLSOP EQU   RPLOPT7                                                  00413000
+RPLTPOST EQU   RPLOPT7                                                  00414000
+RPLQOPT  EQU   RPLOPT7                                                  00415000
+RPLCNIMM EQU   RPLCNOPT                                                 00416000
+RPLCNANY EQU   RPLCNOPT                                                 00417000
+RPLCNALL EQU   RPLCNOPT                                                 00418000
+RPLRSV68 EQU   RPLOPT6                                                  00419000
+RPLRSV67 EQU   RPLOPT6                                                  00420000
+RPLLOCK  EQU   RPLOPT6                                                  00421000
+RPLNCOND EQU   RPLOPT6                                                  00422000
+RPLCOND  EQU   RPLOPT6                                                  00423000
+RPLEOT   EQU   RPLUNTYP                                                 00424000
+RPLEOM   EQU   RPLUNTYP                                                 00425000
+RPLEOB   EQU   RPLUNTYP                                                 00426000
+RPLWROPT EQU   RPLOPT5                                                  00427000
+RPLNODE  EQU   RPLOPT5                                                  00428000
+RPLERACE EQU   RPLWRTYP                                                 00429000
+RPLEAU   EQU   RPLWRTYP                                                 00430000
+RPLNERAS EQU   RPLWRTYP                                                 00431000
+RPLPSOPT EQU   RPLOPT5                                                  00432000
+@NM00002 EQU   RPLOPT5                                                  00433000
+RPLDLGIN EQU   RPLOPT5                                                  00434000
+RPLBUFL  EQU   RPLCOMN+52                                               00435000
+RPLRLEN  EQU   RPLCOMN+48                                               00436000
+RPLCHAIN EQU   RPLNXTRP                                                 00437000
+@NM00001 EQU   RPLOPT4                                                  00438000
+RPLMKFRM EQU   RPLOPT4                                                  00439000
+RPLENDTR EQU   RPLOPT4                                                  00440000
+RPLALIGN EQU   RPLOPT3                                                  00441000
+RPLFMT   EQU   RPLOPT3                                                  00442000
+RPLFLD   EQU   RPLOPT3                                                  00443000
+RPLVFY   EQU   RPLOPT3                                                  00444000
+RPLBLK   EQU   RPLOPT3                                                  00445000
+RPLSFORM EQU   RPLOPT3                                                  00446000
+RPLEODS  EQU   RPLOPT3                                                  00447000
+RPLNSP   EQU   RPLOPT2                                                  00448000
+RPLUPD   EQU   RPLOPT2                                                  00449000
+RPLWAITX EQU   RPLOPT2                                                  00450000
+RPLLRD   EQU   RPLOPT2                                                  00451000
+RPLBWD   EQU   RPLOPT2                                                  00452000
+RPLCNV   EQU   RPLOPT2                                                  00453000
+RPLADD   EQU   RPLADR                                                   00454000
+RPLKEY   EQU   RPLOPT2                                                  00455000
+RPLECBIN EQU   RPLECBSW                                                 00456000
+RPLGEN   EQU   RPLOPT1                                                  00457000
+RPLKGE   EQU   RPLOPT1                                                  00458000
+RPLASY   EQU   RPLOPT1                                                  00459000
+RPLSKP   EQU   RPLOPT1                                                  00460000
+RPLSEQ   EQU   RPLOPT1                                                  00461000
+RPLDIR   EQU   RPLOPT1                                                  00462000
+RPLLOC   EQU   RPLOPT1                                                  00463000
+RPLDAF   EQU   RPLARG+2                                                 00464000
+RPLSAF   EQU   RPLARG                                                   00465000
+RPLAREA  EQU   RPLCOMN+32                                               00466000
+RPLTCBPT EQU   RPLCOMN+28                                               00467000
+RPLDACB  EQU   RPLCOMN+24                                               00468000
+RPLCCHAR EQU   RPLCOMN+20                                               00469000
+RPLSTRID EQU   RPLCOMN+18                                               00470000
+RPLKEYL  EQU   RPLKEYLE                                                 00471000
+RPLRDSOH EQU   RPLFDB3                                                  00472000
+RPLRLG   EQU   RPLFDB3                                                  00473000
+RPLLGFRC EQU   RPLFDB3                                                  00474000
+RPLREOT  EQU   RPLFDB3                                                  00475000
+RPLREOM  EQU   RPLFDB3                                                  00476000
+RPLREOB  EQU   RPLFDB3                                                  00477000
+RPLSV32  EQU   RPLFDB3                                                  00478000
+RPLUINPT EQU   RPLFDB3                                                  00479000
+RPLSTSAV EQU   RPLFDB2                                                  00480000
+RPLCUERR EQU   RPLFDB2                                                  00481000
+RPLDLGFL EQU   RPLFDB2                                                  00482000
+RPLIOERR EQU   RPLFDB2                                                  00483000
+RPLDVUNS EQU   RPLFDB2                                                  00484000
+RPLATND  EQU   RPLFDB2                                                  00485000
+RPLRVID  EQU   RPLFDB2                                                  00486000
+RPLERLK  EQU   RPLFDB2                                                  00487000
+RPLERREG EQU   RPLRTNCD                                                 00488000
+RPLSTAT  EQU   RPLFDBWD                                                 00489000
+RPLPOST  EQU   RPLEXITP                                                 00490000
+RPLWAIT  EQU   RPLEXITP                                                 00491000
+RPLPLHPT EQU   RPLCOMN+4                                                00492000
+RPLLEN2  EQU   RPLLEN                                                   00493000
+RPLREQ   EQU   RPLIDWD+2                                                00494000
+RPLSTYP  EQU   RPLIDWD+1                                                00495000
+RPLID    EQU   RPLIDWD                                                  00496000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00497000
+@ENDDATA EQU   *                                                        00498000
+         END   IKTCAS22,(C'PLS0958',0702,78336)                         00499000

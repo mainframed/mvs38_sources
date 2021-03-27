@@ -1,0 +1,227 @@
+         TITLE 'IEDQB4  -  SLOWPOLL ROUTINE'                            00400010
+IEDQB4   CSECT                                                          00800010
+*C660000                                                       @G36XRAW 00900010
+*********************************************************************** 01200010
+*                                                                     * 01600010
+* STATUS - CHANGE LEVEL 0                                             * 02000010
+*                                                                     * 02400010
+* FUNCTION -                                                          * 02800010
+*    TO INTERRUPT THE POLLING CYCLE IN PROGRESS ON A LINE. AFTER      * 03200010
+*    A SPECIFIED LENGTH OF TIME, THE POLLING RESUMES IN REGULAR       * 03600010
+*    ORDER. THIS FUNCTION IS HELPFUL WHEN A LINE PROBLEM IS DETECTED  * 04000010
+*    BECAUSE IT AVOIDS MUCH USELESS POLLING AND SUBSEQUENT ISSUING    * 04400010
+*    OF OPERATOR MESSAGES. THIS FUNCTION ALSO REDUCES OPERATOR        * 04800010
+*    INTERVENTION - WHEN THE LINE IS ULTIMATELY IN WORKING ORDER      * 05200010
+*    AGAIN, IT IS POLLED AUTOMATICALLY WITHOUT ANY ACTION BY THE      * 05600010
+*    OPERATOR.                                                        * 06000010
+*                                                                     * 06400010
+*    THE INTERRUPTION OF THE POLLING CYCLE IS ACCOMPLISHED BY         * 06800010
+*    PLACING THE LCB INTO THE TIME DELAY QUEUE FOR A SPECIFIED        * 07200010
+*    LENGTH OF TIME.                                                  * 07600010
+*                                                                     * 08000010
+* ENTRY POINTS -                                                      * 08400010
+*         FIRST EXECUTABLE INSTRUCTION - CALLED BY THE BUFFER         * 08800010
+*         DISPOSITION SUBTASK (IEDQBD) IN AN INMESSAGE SUBGROUP       * 09200010
+*         OF AN MH.                                                   * 09600010
+*                                                                     * 10000010
+* INPUT -                                                             * 10400010
+*    R1 - LIST OF ELEMENTS TO BE POSTED                               * 10800010
+*    R4 - LCB ADDRESS                                                 * 11200010
+*    R8 - ADDRESS OF MACRO GENERATED PARAMETER LIST                   * 11600010
+*                                                                     * 12000010
+*    THE PARAMETER LIST HAS THE FOLLOWING FORMAT -                    * 12400010
+*                                                                     * 12800010
+*    *********************************                                * 13200010
+*    *+0 B4  * LIST  *       *       *                                * 13600010
+*    * INDEX * LNGTH *       *       *                                * 14000010
+*    * + BIT * + LOG *       *       *                                * 14400010
+*    *************************       *                                * 14800010
+*    *+4                             *                                * 15200010
+*    *                MASK           *                                * 15600010
+*    *                               *                                * 16000010
+*    *********************************                                * 16400010
+*    *+4 OR +8       *               *                                * 16800010
+*    *  TIME DELAY   *               *                                * 17200010
+*    *  IN SECONDS   *               *                                * 17600010
+*    *********************************                                * 18000010
+*                                                                     * 18400010
+*    BIT - MEANS THAT IF BIT 7 IS ON, THE ROUTINE IS TO BE CALLED     * 18800010
+*    UNCONDITIONALLY. IN THIS CASE, THE MASK ENTRY IS OMITTED AND     * 19200010
+*    THE PARAMETER LIST IS ONLY 8 BYTES LONG.                         * 19600010
+*                                                                     * 20000010
+*    LOG - MEANS THAT IF BIT 7 IS ON, THE ROUTINE IS TO BE CALLED     * 20400010
+*    ONLY WHEN ALL OF THE BITS SPECIFIED IN THE MASK-FIELD ARE ON.    * 20800010
+*    BIT 7 IS OFF IF THE ROUTINE IS TO BE CALLED WHEN ANY OF THE      * 21200010
+*    BITS SPECIFIED IN THE MASK-FIELD ARE ON.                         * 21600010
+*                                                                     * 22000010
+*    R11 - ADDRESS OF THE DISPATCHER                                  * 22400010
+*                                                                     * 22800010
+*    R13 - ADDRESS OF AVTSAVE2                                        * 23200010
+*                                                                     * 23600010
+* OUTPUT -                                                            * 24000010
+*                                                                     * 24400010
+*    TO THE TIME DELAY SUBTASK -                                      * 24800010
+*    R1 - ADDRESS OF THE LCB                                          * 25200010
+*                                                                     * 25600010
+*    TO THE DISPATCHER -                                              * 26000010
+*    R1 - ADDRESS OF LCB ERB                                          * 26400010
+*                                                                     * 26800010
+* EXTERNAL REFERENCES -                                               * 27200010
+*         AVTHG01 - ADDRESS OF THE TIME DELAY ROUTINE                 * 27600010
+*                                                                     * 28000010
+*         DSPCHAIN - FOR RETURN                                       * 28400010
+*                                                                     * 28800010
+* EXITS,  NORMAL -                                                    * 29200010
+*         DSPCHAIN                                                    * 29600010
+*                                                                     * 30000010
+* EXITS,  ERROR -                                                     * 30400010
+*         NONE                                                        * 30800010
+*                                                                     * 31200010
+* TABLES/WORK AREAS -                                                 * 31600010
+*                                                                     * 32000010
+*    AVT                                                              * 32400010
+*    DISPATCHER                                                       * 32800010
+*    LCB                                                              * 33200010
+*                                                                     * 33600010
+* ATTRIBUTES -                                                        * 34000010
+*    REENTRANT, REFRESHABLE, ENABLED, RESIDENT, PROBLEN PROGRAM       * 34400010
+*    MODE.                                                            * 34800010
+*                                                                     * 35200010
+* CHARACTER CODE DEPENDENCY -                                         * 35600010
+*    THE OPERATION OF THIS MODULE DOES NOT DEPEND UPON AN INTERNAL    * 36000010
+*    REPRESENTATION OF THE EXTERNAL CHARACTER SET.                    * 36400010
+*                                                                     * 36800010
+* CHANGE ACTIVITY AS FOLLOWS:                                           37200010
+*A404000,448000,836000                                         @SA72789 37200110
+*                                                                     * 37600010
+*********************************************************************** 38000010
+         EJECT                                                          38400010
+         USING IEDQSTCB,RA              STCB ADDR                       38800010
+         USING IEDQLCB,RLCB             LCB ADDR                        39200010
+         USING IEDQDISP,R11             DISPATCHER ADDR                 39600010
+         USING IEDQB4,RBASE             ROUTINE BASE ADDR               40000010
+         USING AVTSAVE2,R13             AVT 2ND SAVE AREA ADDR          40400010
+         USING IEDQSCB,R3               SCB ADDRESSABILITY     @SA72789 40600010
+         SPACE 1                                                        40800010
+IEDQB4   IEDHJN IEDQB401                                                41200010
+         SPACE 1                                                        41600010
+* FIND RECEIVE SCHEDULER STCB AND REMOVE IT FROM STCB CHAIN             42000010
+* *********************************************************             42400010
+         SPACE 1                                                        42800010
+         LA    R6,0(,R1)                                                43200010
+         L     RA,LCBSTCBA-1            GET 1ST STCB ADDR               43600010
+         LA    RA,0(,RA)                CLEAR TOP 8 BITS                44000010
+         CLI   LCBFLAG1,AVTEZERO        CHECK FOR 3705 PLCB      S22024 44100010
+         BE    B4700                    IF YES - NO SLOWPOLL     S22024 44200010
+         CLI   STCBPRI,DSPCWAIT         TEST IF ANY 1ST STCB            44400010
+         BE    B4700                    IF NO - NO SLOWPOLL             44800010
+         L     R3,LCBSCBA-1             SCB ADDRESS            @SA72789 44880010
+         TM    SCBSTATE,SCBLCK1N+SCBMSGLN  LOCK MODE           @SA72789 44960010
+         BNZ   B4700                    BRANCH IF YES,         @SA72789 45040010
+*                                        NO SLOWPOLL           @SA72789 45120010
+         CLI   STCBVTO,DSPRCVSC         TEST IF RECV SCHED              45200010
+         BNE   B4240                    IF NO                           45600010
+         MVC   LCBSTCBA(THREE),STCBLINK REMOVE STCB FR STCB CHAIN       46000010
+         B     B4270                    GO PREPARE LCB                  46400010
+         SPACE 5                                                        46800010
+B4240    LR    RB,RA                    SAVE STCB ADDR                  47200010
+         L     RA,STCBLINK-1            GET NEXT STCB ADDR              47600010
+         LA    RA,0(,RA)                CLEAR TOP 8 BITS                48000010
+         CLI   STCBPRI,DSPCWAIT         TEST IF ANY NEXT STCB           48400010
+         BE    B4700                    IF NO - NO SLOWPOLL             48800010
+         CLI   STCBVTO,DSPRCVSC         TEST IF RECV SCHED              49200010
+         BNE   B4240                    IF NO                           49600010
+         MVC   STCBLINK-IEDQSTCB(THREE,RB),STCBLINK  REMOVE STCB        50000010
+*                                       .. FROM STCB CHAIN              50400010
+         SPACE 1                                                        50800010
+* PREPARE LCB TO BE USED AS TIME DELAY REQUEST ELEMENT                  51200010
+* ****************************************************                  51600010
+         SPACE 1                                                        52000010
+B4270    IC    RTIME,PARMLH(,RPARM)     GET PARAM LIST LH               52400010
+         N     RTIME,LHMASK             CLEAR BITS 0-23 AND 31          52800010
+         AR    RTIME,RPARM              GET NEXT PARAM LIST ADDR        53200010
+         SH    RTIME,FOUR               GET THIS PARAM LIST LAST WORD   53600010
+*                                       .. ADDR                         54000010
+         MVC   LCBEOLTD(TWO),0(RTIME)   INS TIME DELAY INTO LCB         54400010
+         MVI   LCBTDL,LCBINSRC-1-IEDQLCB INS LCB-TYPE TIME-DELAY Q      54800010
+*                                       .. OFFS                         55200010
+         SPACE 1                                                        55600010
+* INSERT LCB INTO TIME DELAY QUEUE                                      56000010
+* ********************************                                      56400010
+         SPACE 1                                                        56800010
+         MVC   LCBQCBA(THREE),AVTDELYB+1  INS TIME DELAY QCB ADDR       57200010
+*                                       .. INTO LCB                     57600010
+         LR    R1,RLCB                  SET LCB ADDR AS ELEM-PTR        58000010
+         IC    R7,LCBRSKEY              SAVE RECEIVE SCHEDULER KEY      58400010
+         MVI   LCBRSKEY,DSPBUFSC        MAKE LCB LOOK AS IF FOR         58800010
+*                                       .. BUFFERED LINE IN ORDER TO    59200010
+*                                       .. SKIP POSTING OF BUFFER LCB   59600010
+*                                       .. IN THE TIME DELAY SUBTASK    60000010
+         L     R15,AVTHG01              GET TIME DELAY SUBTASK ADDR     60400010
+         BALR  RETURN,R15               INS LCB INTO TIME DELAY Q       60800010
+         STC   R7,LCBRSKEY              RESTORE RECEIVE SCHEDULER KEY   61200010
+         SPACE 1                                                        61600010
+* EXIT FROM THIS ROUTINE                                                62000010
+* **********************                                                62400010
+         SPACE 1                                                        62800010
+B4700    L     R8,AVTMSGS-1             GET OPTIONAL-VCON-LIST ADDR     63200010
+         L     R8,0(,R8)                GET BUFF-DISP-SUBTASK ADDR      63600010
+         ST    R8,LCBERBQB-1            INS IT AS ERB QCB INTO LCB      64000010
+         ST    R6,LCBERBLK-1                                            64400010
+         MVI   LCBERBPY,PRIRCQCB        SET PRIORITY                    64800010
+         NI    LCBSTAT1,XFF-LCBRCLLN    TURN OFF RECALL BIT             65200010
+         LA    R1,LCBERB                SET LCB ERB ADDR                65600010
+         BAL   RETURN,DSPCHAIN          RETURN TO DISPATCHER   @G36XRAW 66000010
+         SPACE 5                                                        66400010
+* REFERENCE SECTION                                                     66800010
+* *****************                                                     67200010
+         SPACE 1                                                        67600010
+* REGISTERS                                                             68000010
+* .........                                                             68400010
+         SPACE 1                                                        68800010
+R1       EQU   1                        ELEMENT REG                     69200010
+RA       EQU   1                        STCB REG                        69600010
+RTIME    EQU   2                        TIME DELAY                      70000010
+RB       EQU   2                        WORK REG                        70400010
+R3       EQU   3                                               @SA72789 70600010
+RLCB     EQU   4                        ADDRESS OF LCB                  70800010
+R6       EQU   6                        SAVE REG FOR LIST FROM BD       71200010
+R7       EQU   7                        SAVE REG FOR RCV SCH KEY        71600010
+R8       EQU   8                        WORK REG                        72000010
+RPARM    EQU   8                        ADDR OF SLOWPOLL PARM LIST      72400010
+R11      EQU   11                       ADDR OF DISPATCHER              72800010
+RBASE    EQU   12                       ROUTINE BASE REG                73200010
+R13      EQU   13                       ADDR OF AVTSAVE2                73600010
+RETURN   EQU   14                       LINK REG                        74000010
+R15      EQU   15                       FOR BRANCH TO TIME DELAY        74400010
+         SPACE 1                                                        74800010
+* PARAMETER LIST OFFSETS                                                75200010
+* ......................                                                75600010
+         SPACE 1                                                        76000010
+PARMLH   EQU   1                        OFFSET TO PARM LIST LNGTH       76400010
+         SPACE 1                                                        76800010
+* MISCELLANEOUS                                                         77200010
+* .............                                                         77600010
+         SPACE 1                                                        78000010
+         DS    0F                                                       78400010
+LHMASK   DC    X'000000FE'              TO CLEAR PARM LNGTH REG         78800010
+FOUR     DC    H'4'                     TO COMPUTE ADDR OF TIME PARM    79200010
+XFF      EQU   X'FF'                    USED IN TURNING OFF BITS        79600010
+TWO      EQU   2                        LENGTH OF 2 BYTES               79700010
+THREE    EQU   3                        LENGTH OF 3 BYTES               79800010
+         SPACE 5                                                        80000010
+         TAVTD                                                          80400010
+         SPACE 5                                                        80800010
+         TDISPD                                                         81200010
+         SPACE 5                                                        81600010
+         TLCBD                                                          82000010
+         SPACE 5                                                        82400010
+         TPRIOR                                                         82800010
+         SPACE 5                                                        83200010
+         TSTCBD                                                         83600010
+         EJECT                                                          83700010
+         TSCBD                                                 @SA72789 83800010
+         SPACE 5                                                        84000010
+         DROP  RA,RLCB,R11,RBASE,R13                                    84400010
+         SPACE 1                                                        84800010
+         END                                                            85200010

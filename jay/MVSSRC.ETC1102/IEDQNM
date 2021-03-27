@@ -1,0 +1,341 @@
+QNM      TITLE 'IEDQNM-ROUTINE TO BUILD CKREQ RECORD'                   00100005
+IEDQNM   CSECT                                                          00200005
+         SPACE 3                                                        00300005
+*  CHANGE ACTIVITY AS FOLLOWS                                           00400005
+******************** MICROFICHE FLAGS *********************** SUPT CODE 00500005
+*A538000-539000                                                 SA51078 00600222
+*D762000                                                        SA51078 00600322
+*A505001-505002,510301                                          SA59179 00600405
+*A516000,759000,778000                                          SA61045 00600505
+*A133000-134000,283000-284000,286000,387300-389700,483400-485400,Y01004 00600605
+*A759500-760500                                                  Y01004 00600705
+*C186000,282000,285000,309000,450000-456000                      Y01004 00600805
+*D312000                                                         Y01004 00600905
+*A327000                                                       @SA74882 00601010
+*D330000-333000                                                @SA74882 00601110
+*C506200                                                       @OX11946 00601210
+*D510200-511300,535000                                         @OX11946 00601310
+         SPACE 3                                                        00900020
+*********************************************************************** 01200020
+*                                                                     * 01240022
+*TITLE:'IEDQNM'-CKREQ FROM APPLICATION PROGRAM                        * 01250005
+*                                                                     * 01260005
+*MODULE-NAME=IEDQNM                                                   * 01280022
+*                                                                     * 01320022
+*DESCRIPTIVE-NAME=ROUTINE TO BUILD CHECKREQ RECORDS                   * 01360022
+*                                                                     * 01400022
+*COPYRIGHT='NONE'                                                     * 01440022
+*                                                                     * 01500020
+*  STATUS:  CHANGE LEVEL 5                                            * 01800005
+*                                                                     * 02700020
+*FUNCTION:THIS MODULE BUILDS CKREQ DISK RECORD(S) FOR ALL DESTINA-    * 03000020
+*   TION QUEUES ASSOCIATED WITH THE APPLICATION PROGRAM WHICH         * 03300020
+*   ISSUED THE CKREQ MACRO.                                           * 03600020
+*                                                                     * 03900020
+*ENTRY POINT:                                                         * 04200020
+*                                                                     * 04500020
+*        IEDQNM                                                       * 04800020
+*                                                                     * 05100020
+*INPUT:REGISTERS 2,3,9,12,14,15 CONTAIN THE FOLLOWING VALUES          * 05400020
+*                                                                     * 05700020
+*   2-ADDRESS OF CHECKPOINT WORK AREA                                 * 06000020
+*   3-ADDRESS OF THE REQUEST ELEMENT THIS MODULE IS TO PROCESS        * 06300020
+*   4-ADDRESS OF DISK RECORD IF CONTINUED FROM PREVIOUS EXECUTION       06600020
+*   9-ADDRESS OF AVT                                                  * 06900020
+*   12-BASE FOR IEDQNF-CHECKPOINT EXECUTOR                            * 07200020
+*   14-RETURN ADDRESS-IN IEDQNF                                       * 07500020
+*   15-ENTRY POINT FOR THIS MODULE                                    * 07800020
+*                                                                     * 08100020
+*   THE FOLLOWING REQUEST ELEMENT POINTED TO BY R3                   * 08400020
+*                                                                     * 08700020
+*   OFFSET 0-KEY:X'60'                                                * 09000020
+*        1-ADDRESS OF CHECKPOINT QCB                                  * 09300020
+*        4-LINK FIELD                                                 * 09600020
+*        8-ADDRESS OF ECB                                             * 09900020
+*        12- ADDRESS OF DEB CHAIN IN APPLICATION PROGRAM              * 10200020
+*                                                                     * 10500020
+*OUTPUT:ACKREQ DISK RECORD IS BUILT.ITS ADDRESS IS IN CKPLDRB IF      * 10800020
+*   THIS IS THE FIRST RECORD BUILT FOR THIS REQUEST;IT IS IN          * 11100020
+*   CKPEXCP IF NOT THE FIRST RECORD. ONE REQUEST MAY RESULT IN MORE   * 11400020
+*   THAN ONE RECORD,BUT EACH ENTRY INTO THIS MODULE RESULTS IN ONLY   * 11700020
+*   ONE RECORD.                                                       * 12000020
+*                                                                     * 12300020
+*EXTERNAL ROUTINES:                                                   * 12600020
+*                                                                     * 12900020
+*        IEDQTRM-DETERMINES TERMINAL ADDRESS                          * 13200020
+*        IEDQEB-AQCTL (SVC 102) - PUTS IEDQNM INTO KEY ZERO      Y01004 13300005
+*        MODESET-SVC 107 - GETS IEDQNM OUT OF KEY ZERO           Y01004 13400005
+*                                                                     * 13500020
+*EXITS-NORMAL:THIS MODULE RETURNS TO THE ADDRESS IN R14. R15          * 13800020
+*   CONTAINS THE OFFSET FOR THE I/O QUEUE MANAGER.                    * 14100020
+*                                                                     * 14400020
+*EXITS-ERROR:THIS MODULE RETURNS TO THE ADDRESS IN R14. R15           * 14700020
+*   CONTAINS THE OFFSET FOR THE NO CORE ROUTINE.                      * 15000020
+*                                                                     * 15300020
+*TABLES/WORK AREAS:                                                   * 15600020
+*                                                                     * 15900020
+*   AVT(AVTRNMPT,AVTOPTPT,AVTCLRHI)                                   * 16200020
+*   CHECKPOINT WORK AREA                                              * 16500020
+*   DEB                                                               * 16800020
+*   TERMNAME TABLE                                                    * 17100020
+*   TERMINAL TABLE                                                    * 17400020
+*   QCB                                                               * 17700020
+*   OPTION TABLE                                                      * 18000020
+*                                                                     * 18300020
+*ATTRIBUTES:REENTERABLE, RESIDENT                                Y01004 18600005
+*                                                                     * 18900020
+*NOTES:THE OPERATION OF THIS MODULE DEPENDS UPON AN INTERNAL REPRE-   * 19200020
+*   SENTATION OF THE EXTERNAL CHARACTER SET WHICH IS EQUIVALENT TO    * 19500020
+*   THE ONE USED AT ASSEMBLY TIME. THE CODING HAS BEEN ARRANGED SO    * 19800020
+*   THAT REDEFINITION OF 'CHARACTER' CONSTANTS,BY REASSEMBLY, WILL    * 20100020
+*   RESULT IN A CORRECT MODULE FOR THE NEW DEFINITIONS.               * 20400020
+*                                                                     * 20700020
+*********************************************************************** 21000020
+         EJECT                                                          21100005
+         SPACE 3                                                        21300020
+*REGISTER ASSIGNMENTS                                                   21600020
+         SPACE                                                          21900020
+R0       EQU   0                                                        22200020
+R1       EQU   1                        ADDRESS OF TERMINAL ENTRY       22500020
+R2       EQU   2                        ADDRESS OF CKPT WORK AREA       22800020
+R3       EQU   3                        ADDR OF OPTION FIELD            23100020
+R4       EQU   4                        ADDRESS OF DISK RECORD          23400020
+R5       EQU   5                        ADDRESS OF REQUEST ELEMENT      23700020
+R6       EQU   6                        LENGTH OF OPTION FIELD          24000020
+R7       EQU   7                        ADDRESS OF QCB;OPT LNGTH TB     24300020
+R8       EQU   8                        OFFSET TO OPTION FIELD          24600020
+RAVT     EQU   9                        ADDR OF AVT                     24900020
+R10      EQU   10                       INDEX-OPTION FIELDS LOOP        25200020
+R11      EQU   11                       COMPARAND-NO.OPTION FIELDS      25500020
+R12      EQU   12                       BASE FOR CKPT EXECUTOR          25800020
+R13      EQU   13                       ADDR OPT FIELDS-THIS ENTRY      26100020
+R14      EQU   14                       RETURN REG                      26400020
+R15      EQU   15                       BASE FOR THIS MODULE,RETURN    X26700020
+                                        CODE OFFSET                     27000020
+         SPACE 3                                                        27300020
+         USING *,R15                    BASE                            27600020
+         B     QNM00                    BYPASS ID                       27660005
+QNMCODE  EQU   *                        AQCTL PARAMETER LIST.    Y01004 27720005
+         DC    X'12'                    KEY ZERO REQUEST CODE.   Y01004 27780005
+         DC    X'08'                    IEDQNM'S ACTION CODE.    Y01004 27840005
+         SPACE 1                                                        27900005
+         DC    AL2(QNMKEY0-IEDQNM)      OFFSET TO KEY ZERO CODE. Y01004 28500005
+IEDQNM   IEDHJN                                                         28700005
+QNM00    DS    0H                                                       28900005
+         SPACE                                                          29100020
+         USING IEDQAVTD,RAVT                                            29400020
+         USING IEDQCKPD,R2                                              29700020
+         USING IEDQCRED,R3              BASE FOR REQUEST ELEMENT        30000020
+         USING IEDQCDRD,R4                                              30300020
+         SPACE                                                          30600020
+         ICM   R4,ALL,CKPEXCP           GET CURRENT EXCP RECORD. Y01004 30900005
+         BZ    QNM05                    BRANCH IF NONE BEING WRITTN     31500020
+         TM    CDRCKFLG,CDRCKRNC        CHECK FOR INCOMPLETE CREQ       31800020
+         BZ    QNM05                    BRANCH IF NOT INCOMPLETE        32100020
+         CLI   CDRKEY,CDRCKREQ          CHECK FOR CKREQ RECORD          32400020
+         BNE   QNM05                    BRANCH IF NOT CKREQ             32700020
+         L     R5,AVTCKPTB              CKPT QCB ELEMENT       @SA74882 32750010
+         CR    R3,R5                    IS CURRENT ELEMENT     @SA74882 32800010
+*                                       EQUAL TO FIRST ELEMENT @SA74882 32850010
+*                                       ON QUEUE               @SA74882 32900010
+         BE    QNM07                    YES                    @SA74882 32950010
+         SPACE 3                                                        33600020
+*ISSUE GETMAIN IN ORDER TO BUILD DISK RECORD                            33900020
+         SPACE                                                          34200020
+QNM05    EQU   *                                                        34500020
+         LH    R10,CKPCKRLN             LENGTH OF RECORD                34800020
+         LA    R11,CKPLDRB              ADDRESS TO PUT GETMAIN          35100020
+         LR    R8,R15                   SAVE BASE                       35400020
+         GETMAIN EC,LV=(R10),A=(R11),MF=(E,CKPGETML)                    35700020
+         SPACE 3                                                        36000020
+         LTR   R15,R15                  CHECK FOR INSUFFICIENT CORE     36300020
+         LR    R15,R8                   RESTORE BASE                    36600020
+         BNZ   QNM65                    BRANCH IF NO CORE               36900020
+         L     R4,CKPLDRB                                               37200020
+         SPACE                                                          37500020
+QNM07    EQU   *                                                        37800020
+         OI    CDRCKFLG,CDRCKRNC        TURN ON INCOMPLETE FLAG         38100020
+         L     R5,CREDEB                GET DEB CHAIN FROM REQ.ELMT     38400020
+         USING IEDQDEB,R5               BASE FOR DEB                    38700020
+         TM    AVTPKF,AVTFTCHF          IS FETCH/PROTECT ACTIVE  Y01004 38730005
+         BZ    QNM10                    BRANCH IF NO.            Y01004 38760005
+         LR    R8,R15                   SAVE BASE.               Y01004 38790005
+         LA    R1,QNMCODE               AQCTL PARAMETER LIST.    Y01004 38820005
+         AQCTL                          GET INTO KEY ZERO.       Y01004 38850005
+         SPACE 2                                                        38880005
+QNMKEY0  DS    0H                       KEY ZERO ENTRY POINT.    Y01004 38910005
+         LR    R15,R8                   RESTORE BASE.            Y01004 38940005
+         SPACE 3                                                        39000020
+*BEGINNING OF LOOP THROUGH DEB CHAIN LOOKING FOR DESTINATION Q DEBS     39300020
+         SPACE                                                          39600020
+QNM10    EQU   *                                                        39900020
+         CLI   DEBTAMID,X'C0'           CHECK FOR TCAM INPUT DEB   0827 40200020
+         BE    QNM20                    BRANCH IF TCAM INPUT       0827 40500020
+         L     R5,DEBDEBAD-1            GET NEXT DEB IN CHAIN           40800020
+         B     QNM10                    BRANCH TO BEGINNING OF LOOP     41100020
+         SPACE 3                                                        41400020
+*BUILD DISK RECORD                                                      41700020
+         SPACE                                                          42000020
+QNM20    EQU   *                                                        42300020
+         MVI   CDRKEY,CDRCKREQ          PUT IN CKREQ KEY                42600020
+         LH    R1,DEBTAMOS              GET TERMNAME OFFSET             42900020
+         N     R1,AVTCLRHI              CLEAR HIGH ORDER HALF WORD      43200020
+         STH   R1,CDRCKOFF                                              43500020
+         L     R6,DEBQCBAD-1            ADDR OF READ AHEAD QCB          43600020
+         SPACE 3                                                        43800020
+*DETERMINE IF THIS IS THE LAST TCAM DEB IN THE CHAIN.                   44100020
+         SPACE                                                          44400020
+QNM21    EQU   *                                                        44700020
+         ICM   R5,ADDR,DEBDEBAD         ADDRESS OF NEXT DEB IN   Y01004 45000005
+*                                       CHAIN.                   Y01004 45300005
+         BZ    QNM22                    BRANCH IF END OF CHAIN.  Y01004 45600005
+         CLI   DEBTAMID,X'C0'           CHECK FOR TCAM INPUT DEB   0827 45900020
+         BE    QNM25                    BRANCH IF TCAM DEB              46200020
+         B     QNM21                    BRANCH TO BEGINNING OF LOOP     46500020
+QNM22    EQU   *                                                        46800020
+         NI    CDRCKFLG,X'FF'-CDRCKRNC  TURN OFF INCOMPLETE FLAG        47100020
+QNM25    EQU   *                                                        47400020
+         ST    R5,CREDEB                UPDATE REQUEST ELEMENT TO      X47700020
+                                        POINT TO NEXT DEB IN CHAIN      48000020
+         STM   R14,R15,CKPSAVE2         SAVE REGS                       48300020
+         TM    AVTPKF,AVTFTCHF          IS FETCH/PROTECT ACTIVE  Y01004 48340005
+         BZ    QNMFETCH                 BRANCH IF NO.            Y01004 48380005
+         LR    R7,R1                    SAVE TERMNAME OFFSET.    Y01004 48420005
+         MODESET KEY=NZERO,MODE=PROB    GET OUT OF KEY ZERO.     Y01004 48460005
+         LR    R1,R7                    RESTORE TERMNAME OFFSET. Y01004 48500005
+QNMFETCH EQU   *                                                 Y01004 48540005
+         L     R15,AVTRNMPT             ADDRESS OF TERMNAME TABLE       48600020
+         BALR  R14,R15                  GET ADDR OF TERMINAL ENTRY      48900020
+         LM    R14,R15,CKPSAVE2         RESTORE REGS                    49200020
+         SPACE                                                          49500020
+         USING IEDQTRM,R1               BASE FOR TERMINAL ENTRY         49800020
+         TM    TRMSTATE,TRMHELDN        CHECK FOR SYNC             0917 49860020
+         BO    QNM26                    BRANCH IF SYNC=YES         0917 49920020
+         XC    CDRCKOFF,CDRCKOFF        SET OFFSET TO 0 -NOT USED  0917 49980020
+QNM26    EQU   *                                                   0917 50040020
+         L     R7,TRMDESTQ-1            ADDR OF QCB                     50100020
+         USING IEDQQCB,R7               BASE                            50400020
+         LR    R11,R4                   SAVE BEGINNING OF DISK RCD 0827 50500020
+         TM    TRMSTATE,TRMLOG          PROCESS ENTRY           SA59179 50560005
+         BM    QNM27               YES,SAVE FIELDS             @OX11946 50620010
+         TM    QCBDSFLG,QCBDISK         CHECK FOR DISK QUEUES           50700020
+         BZ    QNM29                    BRANCH IF CORE ONLY        0910 51000020
+         SPACE 3                                                        51010020
+         SPACE 3                                                        51140020
+*CHECKPOINT MASTER QCB FIELDS                                           51150020
+         SPACE                                                          51160020
+QNM27    EQU   *                                                   1217 51230020
+         MVC   CDRCKMSG(CKPMCTLN),QCBMSGCT MOVE MSG CT TO RECORD        51300020
+         MVC   CDRCKIN(CKPSEQLN),TRMINSEQ MOVE SEQ NO.5 TO RECORD       51600020
+         ICM   R8,ADDR,TRMSTAT+ONE      GET PEWA ADDRESS        SA61045 51610005
+         BZ    QNM2703                  BR NOT OPEN             SA61045 51620005
+         USING  IEDQPEWA,R8                                     SA61045 51630005
+         NC    EOMSAVE+ONE(2),EOMSAVE+ONE  IS THERE AN EOM BUF  SA61045 51640005
+         BZ    QNM2701                  BRANCH IF NO            SA61045 51650005
+         L     R8,EOMSAVE               ADDRESS OF EOM BUFFER   SA61045 51660005
+         B     QNM2702                  SET SEQ OUT             SA61045 51670005
+QNM2701  EQU   *                                                SA61045 51680005
+         CLC   PERAQCB+1(3),AVTDELAD+1   READ AHEAD Q EMTY      SA61045 51690005
+         BE    QNM2703                  BR IF EMPTY             SA61045 51700005
+         L     R8,PERAQCB               BFR ON READ AHAD Q      SA61045 51710005
+QNM2702  EQU   *                                                SA61045 51720005
+         DROP  R8                                               SA61045 51730005
+         MVC   CDRCKIN+2(2),PRFTQBCK-1-IEDQPRF(R8) SET NEW SEQ NSA61045 51740005
+QNM2703  EQU   *                                                SA61045 51750005
+         MVC   CDRCKQBC(CKPQBKLN),QCBQBACK  MOVE QBACK POINTERS         51900020
+         SPACE 3                                                        52500020
+*BEGINNING OF LOOP THROUGH PRIORITY LEVEL QCBS                          52800020
+         SPACE                                                          53100020
+QNM28    EQU   *                                                        53400020
+         MVC   CDRCKQCB(CKPQCBLN),QCBDNHDR  MOVE PRIOR QCB PTRS         53700020
+         MVC   CDRCKPQB(CKPQBKLN),QCBPQBCK                      SA51078 53800022
+*                                       PRILEVEL QBACK PTR      SA51078 53900022
+         CLI   QCBPRIPQ,0               CHECK FOR LAST PRIOR QCB        54000020
+         BE    QNM29                    BRANCH IF LAST                  54300020
+         LA    R7,QCBPSIZE(,R7)         ADD LENGTH OF PRIOR QCB         54600020
+         LA    R4,CKPQCBLN(,R4)         ADD LEN TO RECORD POSITION      54900020
+         B     QNM28                    LOOP                            55200020
+         SPACE                                                          55500020
+*END OF LOOP THROUGH PRIORITY LEVEL QCBS                                55800020
+         SPACE 3                                                        56100020
+QNM29    EQU   *                                                        56400020
+         LR    R0,R11                   SAVE RECORD ADDRESS             56700020
+         TM    TRMSTATE,TRMOPTFN        CHECK FOR OPTION FIELDS         57300020
+         BZ    QNM50                    BRANCH IF OPTION NOT USED       57600020
+         SPACE 3                                                        57900020
+*MOVE OPTION FIELDS TO DISK RECORD(USES REGISTERS 1.3.4.5.6.7.8.10.     58200020
+*11,13)                                                                 58500020
+         SPACE 3                                                        58800020
+*SET UP FOR LOOP                                                        59100020
+         SPACE                                                          59400020
+         SR    R11,R11                  CLEAR                           59700020
+         IC    R11,TRMOPNO              COMPARAND-NO.OF OPTN FIELDS     60000020
+         L     R13,AVTOPTPT             ADDRESS OF OPTION TABLE         60300020
+         L     R7,4(0,R13)              ADDR OF OPT LENGTH TABLE        60600020
+         LH    R8,TRMOPTBL              OFFST TO OPT FOR THIS ENTRY     60900020
+         N     R8,AVTCLRHI              CLEAR HIGH ORDER HALF WORD      61200020
+         AR    R13,R8                   GET ADDR OF OPT-THIS ENTRY      61500020
+         SR    R8,R8                    CLEAR-OFFSET TO EACH OPTFLD     61800020
+         SR    R6,R6                    CLEAR-LENGTH FOR MOVE           62100020
+         LA    R10,TRMOPT               BEGINNING OF OPTION OFFSETS     62400020
+         SPACE 3                                                        62700020
+*BEGINNING OF LOOP THROUGH OPTION TABLE OFFSETS FOR THIS TERM ENTRY     63000020
+         SPACE                                                          63300020
+QNM40    EQU   *                                                        63600020
+         LR    R5,R13                   INITIALIZE-OPTNS-THIS ENTRY     63900020
+         IC    R8,0(R10)                OPTION OFFSET                   64200020
+         CLI   0(R10),X'FF'             CHECK FOR UNUSED FIELD          64500020
+         BE    QNM48                    BRANCH IF NOT USED              64800020
+         SPACE                                                          65100020
+         AR    R5,R8                    ADDRESS OF OPTION FIELD         65700020
+         IC    R6,0(R7)                 LENGTH OF OPTION FIELD          66000020
+         CLI   1(R7),X'D0'              CHECK OPTION TYPE        11111  66050020
+         BH    QNM45                    BRANCH IF NOT ADDRESS TYPE 1111 66100020
+         CLI   1(R7),X'80'              CHECK OPTION TYPE        E 111  66150020
+         BH    QNM48                    BRANCH IF ADDRESS TYPE   E 1111 66200020
+QNM45    EQU   *                                                 E 111  66250020
+         EX    R6,QNMMOVE               MOVE OPTION FIELD TO RECORD     66300020
+         LA    R4,1(R4,R6)              ADD LENGTH MOVED TO BASE OF    X66600020
+                                        DISK RECORD                     66900020
+QNM48    EQU   *                                                        67200020
+         LA    R7,10(0,R7)              MOVE TO NEXT EXTRY IN OPTN     X67500020
+                                        LENGTH TABLE                    67800020
+         LA    R10,1(0,R10)             BUMP INDEX                      68100020
+         BCT   R11,QNM40                SUBTRACT FROM NO.OPTN FLDS      68400020
+         SPACE                                                          68700020
+*END OF LOOP OPTION FIELDS                                              69000020
+         SPACE 3                                                        69300020
+QNM50    EQU   *                                                        69600020
+         LR    R4,R0                    RESTORE RECORD BEGINNING AD     69900020
+         LA    R11,CKPIOQM              OFFSET FOR QUEUE MANAGER        70200020
+         C     R0,CKPEXCP               COMPARE FOR CONTINUED CKREQ     70500020
+         BNE   QNM60                    BRANCH IF THIS IS 1ST RCD       70800020
+         LA    R11,CKPDIOR              OFFSET FOR DISK I/O RTN         71100020
+         SPACE 3                                                        71400020
+*RETURN TO CHECKPOINT EXECUTOR-OFFSET FOR NEXT MODULE TO BE LOADED      71700020
+*IS IN REGISTER 15                                                      72000020
+         SPACE                                                          72300020
+QNM60    EQU   *                                                        72600020
+         LR    R15,R11                  RETURN CODE                     72900020
+         BR    R14                      RETURN                          73200020
+         SPACE 3                                                        73500020
+*SET OFFSET FOR NO CORE MODULE AND RETURN TO CHECKPOINT EXECUTOR        73800020
+         SPACE                                                          74100020
+QNM65    EQU   *                                                        74400020
+         LA    R15,CKPNOCOR                                             74700020
+         BR    R14                                                      75000020
+         SPACE 3                                                        75300020
+QNMMOVE MVC    CDRCKOPT(0),0(R5)        MOVE OPTION FIELD TO RECORD     75600020
+         SPACE                                                          75900020
+ADDR     EQU   7                        MASK TO ICM 3-BYTE ADDRS Y01004 76000005
+ALL      EQU   15                       MASK TO ICM ALL 4 BYTES. Y01004 76100005
+ONE      EQU   1                        OFFSET OF ONE           SA61045 76200005
+         SPACE 2                                                        76300005
+         TAVTD                                                          76500020
+         TCKPD 3330                                                     76800000
+         TTRMD                                                          77100020
+         TQCBD                                                          77400020
+         TDEBAPD                                                        77700020
+         TPRFD                                                          77800020
+         TPEWAD                                                 SA61045 77900005
+         END                                                            78000020

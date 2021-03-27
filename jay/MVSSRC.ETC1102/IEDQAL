@@ -1,0 +1,156 @@
+IEDQAL   TITLE 'IEDQAL - COMPARE AT OFFSET ROUTINE'                     00600010
+IEDQAL   CSECT                                                          01200010
+*********************************************************************** 01800010
+*                                                                     * 02400010
+*TITLE 'IEDQAL' - COMPARE AT OFFSET ROUTINE                           * 03000010
+*                                                                     * 03600010
+*STATUS -- CHANGE LEVEL                                               * 04200010
+*                                                                     * 04800010
+*FUNCTION -- FINDS AND COMPARES THE NEXT CHARACTERS FROM AN           * 05400010
+*   OFFSET INTO THE BUFFER, TO THE CHARACTERS WHOSE ADDRESS           * 06000010
+*   IS PASSED TO THE ROUTINE.                                         * 06600010
+*                                                                     * 07200010
+*ENTRY POINT -- 'IEDQAL'                                              * 07800010
+*   CALLING SEQUENCE-                                                 * 08400010
+*        L     R15,AVTAL                                              * 09000010
+*        BALR  R14,R15                                                * 09600010
+*                                                                     * 10200010
+*   REGISTERS 2-12 ARE SAVED AND RESTORED IN PASSED R13               * 10800010
+*                                                                     * 11400010
+*INPUT --                                                             * 12000010
+*   EXPECTED REGISTER CONTENTS                                        * 12600010
+*        USING R6,BUFFER DSECT                                        * 13200010
+*        USING R9,AVT BASE                                            * 13800010
+*        USING R13,SAVE AREA                                          * 14400010
+*        USING R15,BASE REGISTER                                      * 15000010
+*                                                                     * 15600010
+*   PARAMETERS PASSED -                                               * 16200010
+*                                                                     * 16800010
+*      REGISTER 0 - ADDRESS OF CHARACTER STRING FOR COMPARE WITH      * 17400010
+*                   LENGTH OF STRING IN HI-ORDER BYTE.  (OR ZERO      * 18000010
+*                   IF LENGTH IS THE FIRST BYTE OF STRING.            * 18600010
+*      REGISTER 1 - OFFSET OF FIELD IN BUFFER                         * 19200010
+*      REGISTER 2 - BLANK CHARACTER IF BLANKS ARE TO BE IGNORED       * 19800010
+*                 - NEGATIVE IF BLANKS ARE CHARACTERS                 * 20400010
+*                                                                     * 21000010
+*OUTPUT --                                                            * 21600010
+*   PARAMETERS RETURNED -                                             * 22200010
+*      REGISTER 0 - UPDATED OFFSET                                    * 22800010
+*      REGISTER 1 - ADDRESS OF LAST CHARACTER FOUND                   * 23400010
+*      REGISTER 15- COUNT OF CHARACTERS COMPARED EQUAL                * 24000010
+*      AVTDOUBL  -- CHARACTERS FOUND                                  * 24600010
+*EXTERNAL REFERENCES --                                               * 25200010
+*                                                                     * 25800010
+*   TAVTD -- AVTDOUBL AS WORK AREA                                    * 26400010
+*   BUFFER CURRENTLY BEING PROCESSED                                  * 27000010
+*                                                                     * 27600010
+*EXITS, NORMAL -- RETURN TO CALLER VIA A BRANCH REGISTER 14           * 28200010
+*   PARAMETER LIST (IN RECB) AND REGISTER 15 RETURN CODE              * 28800010
+*                                                                     * 29400010
+*********************************************************************** 30000010
+         EJECT                                                          30600010
+********* REGISTER EQUATES *********                                    31200010
+         SPACE                                                          31800010
+R0       EQU   0                                                        32400010
+RPARM    EQU   1                                                        33000010
+RBLANK   EQU   2                                                        33600010
+RUNIT    EQU   3                                                        34200010
+RCNTS    EQU   4                                                        34800010
+RDATA    EQU   5         DATA ADDR WITHIN UNIT                          35400010
+RPREFIX  EQU   6         BUFFER (PARAMETER REGISTER)                    36000010
+ROFF     EQU   7         OFFSET OF DATA                                 36600010
+RCHAR    EQU   8         ADDR OF DATA TO COMPARE                        37200010
+RAVT     EQU   9         AVT BASE                                       37800010
+RWORK    EQU   10        WORK REGISTER                                  38400010
+RCNT     EQU   11        COUNT OF CHARACTERS COMPARED                   39000010
+R12      EQU   12                                                       39600010
+RSAVE    EQU   13        SAVE AREA ADDRESS                              40200010
+R14      EQU   14        RETURN REGISTER                                40800010
+RBASE    EQU   15        MODULE BASE REGISTER                           41400010
+         SPACE 2                                                        42000010
+********* OTHER EQUATES *********                                       42600010
+         SPACE 1                                                        43200010
+TFOUR    EQU   24                                                       43800010
+EQ       EQU   8         CONDITION CODE EQUAL                           44400010
+SAVREG   EQU   12        OFFSET IN SAVE AREA FOR STORE MULTI            45000010
+MAXCNT   EQU   8         MAX CHARACTER COUNT                            45600010
+ONE      EQU   1         INCREMENT AMOUNT                               46200010
+         EJECT                                                          46800010
+         USING IEDQAL01,R12                                             47400010
+         USING IEDQAVTD,RAVT                                            48000010
+         USING IEDQPRF,RPREFIX                                          48600010
+         SPACE 2                                                        49200010
+IEDQAL01 EQU   *                                                        49800010
+         STM   R14,R12,SAVREG(RSAVE)   SAVE REGISTERS                   50400010
+         LR    R12,RBASE                                                51000010
+IEDQAL   IEDHJN ENTER                                                   52000010
+         SR    RBASE,RBASE              INSURE POSITIVE RETURN          54600010
+         LR    RCHAR,R0                 GET ADDR OF CHARS               55200010
+         LR    RCNT,RPARM               SAVE COUNT                      55800010
+         SRL   RCNT,TFOUR               SHIFT TO LOW BYTE               56400010
+         LTR   RCNT,RCNT                COUNT IN REG                    57000010
+         BNZ   COUNT                    YES                             57600010
+         IC    RCNT,0(,RCHAR)           NO, MUST BE IN DATA FIELD       58200010
+         LA    RCHAR,ONE(,RCHAR)        BUMP PAST LENGTH                58800010
+COUNT    EQU   *                                                        59400010
+         SR    RCNTS,RCNTS              CLEAR                           59800010
+         LA    R0,MAXCNT                GET MAXIMUM COUNT               60200010
+         CR    RCNT,R0                  GREATER THAN MAXIMUM            60600010
+         BNH   CNTOK                    NO                              61200010
+         LA    RCNT,MAXCNT              SET MAXIMUM                     61800010
+CNTOK    EQU   *                                                        62400010
+         LR    R0,RCNT                  SET COUNT                       63000010
+         N     RPARM,AVTCLRHI           CLEAR                           63600010
+         LA    RWORK,AVTDOUBL           GET WORKAREA PTR                64200010
+         LR    ROFF,RPARM               SET OFFSET                      64800010
+         LR    RUNIT,RPREFIX            POINT TO UNIT                   65400010
+         B     LOOP                       AND LOOK AGAIN                69000010
+NXTUNIT  EQU   *                                                        69060010
+         L     RUNIT,PRFTIC-IEDQPRF(,RUNIT) GET NEXT UNIT               69120010
+         SH    ROFF,AVTKEYLE            SUBTRACT UNIT SIZE              69180010
+LOOP     EQU   *                                                        69240010
+         CH    RPARM,PRFSIZE            OUT OF BUFFER                   69300010
+         BNL   DONE                     YES ,GET OUT                    69360010
+         CH    ROFF,AVTKEYLE            DATA IN THIS UNIT               69420010
+         BNL   NXTUNIT                  NO, GET NEXT UNIT               69480010
+MOVDATA  EQU   *                                                        69600010
+         LA    RDATA,AVTUMALN(RUNIT,ROFF)  DEVELOP ADDR OF BYTE         70200010
+         LA    RCNTS,ONE(,RCNTS)        NUMBER SCANNED                  70500010
+         LA    ROFF,ONE(,ROFF)          OFFSET IN UNIT                  70800010
+         LA    RPARM,ONE(,RPARM)        OFFSET IN BUFFER                71100010
+         LTR   RBLANK,RBLANK            BLANK SPECIFIED                 71400010
+         BM    NOBLK                    NO                              72000010
+         EX    RBLANK,COMPBLK           CHECK FOR BLANK                 72600010
+         BE    LOOP                     SKIP BLANK                      73200010
+NOBLK    EQU   *                                                        73800010
+         MVC   0(1,RWORK),0(RDATA)         MOVE TO WORK AREA            74400010
+         LA    RWORK,ONE(RWORK)         INCR WORK AREA ADDRESS          75000010
+         BCT   RCNT,LOOP                OUT OF COUNT                    75600010
+NOTOUT   EQU   *                                                        76600010
+         LNR   RCNT,RCNT                NO CHARS LEFT OVER              77600010
+         AR    RCNT,R0                  NUMBER CHARS FOUND              78600010
+         LR    RBASE,RCNT               NUMBER OF CHARS FOUND           82200010
+         LR    R0,RPARM                 OFFSET OF NEXT BYTE             82800010
+         LR    RPARM,RDATA              ADDR OF LAST IN STRING          83400010
+         BCTR  RCNT,0                   DECR FOR COMPARE                84000010
+         EX    RCNT,COMP                IS STRING IN BUFFER             84600010
+         BE    SETOFF                  YES, SET DATOFF TO RETURN        85200010
+         SR    RBASE,RBASE              NO, SET RETURN CODE             85800010
+         SR    R0,RCNTS                 RESET TO ORIGINAL OFFSET        86700010
+SETOFF   EQU   *                                                        87600010
+         LM    RBLANK,R12,28(RSAVE)     RESTORE REGS                    88200010
+         BR    R14                        AND RETURN                    88800010
+DONE     EQU   *                                                        88900010
+         LA    RPARM,ONE(,RPARM)        BUMP PAST END OF BUFFER         89000010
+         LA    RCNTS,ONE(,RCNTS)        BUMP FOR LATER                  89100010
+         B     NOTOUT                   RETURN                          89200010
+         SPACE 1                                                        89400010
+COMPBLK  CLI   0(RDATA),0                                               90000010
+         SPACE 2                                                        90600010
+COMP     CLC   0(0,RCHAR),AVTDOUBL      COMPARE CHAR TO AVTDOUBL        91200010
+         EJECT                                                          91800010
+         TAVTD                                                          92400010
+         TPRFD                                                          93000010
+PRFDATAD EQU   PRFKEY                                                   93600010
+PRFDATOF EQU   PRFCOUNT                                                 94200010
+         END                                                            94800010

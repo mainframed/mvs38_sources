@@ -1,0 +1,184 @@
+         TITLE 'ISTRACCR - CONTROL BLOCK QUEUE REMOVE PROCEDURE'        00001000
+* 5735-RC2 COPYRIGHT IBM CORP 1977                                      00002000
+* LICENSED MATERIAL - PROGRAM PROPERTY OF IBM                           00003000
+* REFER TO COPYRIGHT INSTRUCTIONS FORM NUMBER G120-2083                 00004000
+ISTRACCR CSECT ,                                                   0002 00005000
+@MAINENT DS    0H                                                  0002 00006000
+         USING *,@15                                               0002 00007000
+         B     @PROLOG                                             0002 00008000
+         DC    AL1(16)                                             0002 00009000
+         DC    C'ISTRACCR  80.232'                                 0002 00010000
+         DROP  @15                                                      00011000
+@PROLOG  STM   @14,@00,12(@13)                                     0002 00012000
+         STM   @02,@12,28(@13)                                     0002 00013000
+         BALR  @12,0                                               0002 00014000
+@PSTART  DS    0H                                                  0002 00015000
+         USING @PSTART,@12                                         0002 00016000
+         PRINT OFF                                                      00017000
+         PRINT ON                                                       00018000
+*   ISTQAPTR=PLISTQAB;              /* SET UP QAB                    */ 00019000
+         L     ISTQAPTR,PLISTQAB(,PLISTPTR)                        0016 00020000
+*   IF QABCT=0 THEN                                                0017 00021000
+         LH    @14,QABCT(,ISTQAPTR)                                0017 00022000
+         LTR   @14,@14                                             0017 00023000
+         BNZ   @RF00017                                            0017 00024000
+*     RCREG=16;                     /* IF NO Q ELEMENTS BAD RETURN 0018 00025000
+*                                      CODE                          */ 00026000
+         LA    RCREG,16                                            0018 00027000
+*   ELSE                                                           0019 00028000
+*     DO;                                                          0019 00029000
+         B     @RC00017                                            0019 00030000
+@RF00017 DS    0H                                                  0020 00031000
+*       IF PLISTCBA=0 THEN                                         0020 00032000
+         L     @14,PLISTCBA(,PLISTPTR)                             0020 00033000
+         LTR   @14,@14                                             0020 00034000
+         BNZ   @RF00020                                            0020 00035000
+*         PFXPTR=QABFIRST;          /* INIT C.B. ADDRESS             */ 00036000
+         L     PFXPTR,QABFIRST(,ISTQAPTR)                          0021 00037000
+*       ELSE                                                       0022 00038000
+*         PFXPTR=PLISTCBA;          /* INIT C.B. ADDRESS             */ 00039000
+         B     @RC00020                                            0022 00040000
+@RF00020 L     PFXPTR,PLISTCBA(,PLISTPTR)                          0022 00041000
+*       NWPFXREG=PFXPTR+QABFWDDS;   /* GET ADDRESS OF FORWARD PTR    */ 00042000
+@RC00020 LR    NWPFXREG,PFXPTR                                     0023 00043000
+         AH    NWPFXREG,QABFWDDS(,ISTQAPTR)                        0023 00044000
+*       NWPFXREG=NWPFXREG->QABID;   /* GET ADDRESS OF NEXT C.B.      */ 00045000
+         L     NWPFXREG,QABID(,NWPFXREG)                           0024 00046000
+*       BKPFXREG=PFXPTR+QABBCKDS;   /* GET ADDRESS OF BACKWARD PTR   */ 00047000
+         LR    BKPFXREG,PFXPTR                                     0025 00048000
+         AH    BKPFXREG,QABBCKDS(,ISTQAPTR)                        0025 00049000
+*       BKPFXREG=BKPFXREG->QABID;   /* GET ADDRESS OF PREVIOUS C.B.  */ 00050000
+         L     BKPFXREG,QABID(,BKPFXREG)                           0026 00051000
+*/* IF DEQUING 1ST C.B. POINT QAB FWDPTR TO NEXT.                    */ 00052000
+*                                                                  0027 00053000
+*       IF BKPFXREG=ISTQAPTR THEN                                  0027 00054000
+         CR    BKPFXREG,ISTQAPTR                                   0027 00055000
+         BNE   @RF00027                                            0027 00056000
+*         QABFIRST=NWPFXREG;                                       0028 00057000
+*                                                                  0028 00058000
+         ST    NWPFXREG,QABFIRST(,ISTQAPTR)                        0028 00059000
+*/* IF NOT, UPDATE FWD POINTER IN PREVIOUS C.B. ON Q.                */ 00060000
+*                                                                  0029 00061000
+*       ELSE                                                       0029 00062000
+*         DO;                                                      0029 00063000
+         B     @RC00027                                            0029 00064000
+@RF00027 DS    0H                                                  0030 00065000
+*           BKPFXREG=BKPFXREG+QABFWDDS;/* NEXT@                      */ 00066000
+         LH    @14,QABFWDDS(,ISTQAPTR)                             0030 00067000
+         ALR   BKPFXREG,@14                                        0030 00068000
+*           BKPFXREG->QABID=NWPFXREG;/* UPDATE PTR                   */ 00069000
+         ST    NWPFXREG,QABID(,BKPFXREG)                           0031 00070000
+*           BKPFXREG=BKPFXREG-QABFWDDS;/* GET BACK BEGINNING OF CB   */ 00071000
+         SLR   BKPFXREG,@14                                        0032 00072000
+*         END;                                                     0033 00073000
+*                                                                  0033 00074000
+*/* IF DEQUEING LAST POINT QAB LAST TO PREVIOUS.                     */ 00075000
+*                                                                  0034 00076000
+*       IF NWPFXREG=ISTQAPTR THEN                                  0034 00077000
+@RC00027 CR    NWPFXREG,ISTQAPTR                                   0034 00078000
+         BNE   @RF00034                                            0034 00079000
+*         QABLAST=BKPFXREG;                                        0035 00080000
+*                                                                  0035 00081000
+         ST    BKPFXREG,QABLAST(,ISTQAPTR)                         0035 00082000
+*/* IF NOT UPDATE BACK POINTER OF NEXT C.B. ON Q.                    */ 00083000
+*                                                                  0036 00084000
+*       ELSE                                                       0036 00085000
+*         DO;                                                      0036 00086000
+         B     @RC00034                                            0036 00087000
+@RF00034 DS    0H                                                  0037 00088000
+*           NWPFXREG=NWPFXREG+QABBCKDS;/* GET POINTER TO PREVIOUS CB */ 00089000
+         AH    NWPFXREG,QABBCKDS(,ISTQAPTR)                        0037 00090000
+*           NWPFXREG->QABID=BKPFXREG;/* UPDATE PTR                   */ 00091000
+         ST    BKPFXREG,QABID(,NWPFXREG)                           0038 00092000
+*         END;                                                     0039 00093000
+*                                                                  0039 00094000
+*/* IF ONLY ONE ELEMENT ON Q ZERO OUT FIRST AND LAST PTRS.           */ 00095000
+*                                                                  0040 00096000
+*       IF QABFIRST=ADDR(ISTQAB) THEN                              0040 00097000
+@RC00034 C     ISTQAPTR,QABFIRST(,ISTQAPTR)                        0040 00098000
+         BNE   @RF00040                                            0040 00099000
+*         DO;                                                      0041 00100000
+*           QABFIRST=0;                                            0042 00101000
+         SLR   @14,@14                                             0042 00102000
+         ST    @14,QABFIRST(,ISTQAPTR)                             0042 00103000
+*           QABLAST=0;                                             0043 00104000
+         ST    @14,QABLAST(,ISTQAPTR)                              0043 00105000
+*         END;                                                     0044 00106000
+*       ELSE                                                       0045 00107000
+*         ;                                                        0045 00108000
+@RF00040 DS    0H                                                  0046 00109000
+*       PLISTPTR=PFXPTR;            /* PUT C.B. POINTER IN REG1      */ 00110000
+         LR    PLISTPTR,PFXPTR                                     0046 00111000
+*       RCREG=0;                    /* SET UP SUCCESSFUL R.C.        */ 00112000
+         SLR   RCREG,RCREG                                         0047 00113000
+*       QABCT=QABCT-1;              /* DECREMENT QAB COUNT           */ 00114000
+         LH    @14,QABCT(,ISTQAPTR)                                0048 00115000
+         BCTR  @14,0                                               0048 00116000
+         STH   @14,QABCT(,ISTQAPTR)                                0048 00117000
+*     END;                                                         0049 00118000
+*   RETURN CODE(RCREG);             /* RETURN TO CALLER              */ 00119000
+@RC00017 L     @14,12(,@13)                                        0050 00120000
+         L     @00,20(,@13)                                        0050 00121000
+         LM    @02,@12,28(@13)                                     0050 00122000
+         BR    @14                                                 0050 00123000
+*   END ISTRACCR;                                                  0051 00124000
+@DATA    DS    0H                                                       00125000
+         DS    0F                                                       00126000
+         DS    0F                                                       00127000
+         DS    0D                                                       00128000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00129000
+@01      EQU   01                                                       00130000
+@02      EQU   02                                                       00131000
+@03      EQU   03                                                       00132000
+@04      EQU   04                                                       00133000
+@05      EQU   05                                                       00134000
+@06      EQU   06                                                       00135000
+@07      EQU   07                                                       00136000
+@08      EQU   08                                                       00137000
+@09      EQU   09                                                       00138000
+@10      EQU   10                                                       00139000
+@11      EQU   11                                                       00140000
+@12      EQU   12                                                       00141000
+@13      EQU   13                                                       00142000
+@14      EQU   14                                                       00143000
+@15      EQU   15                                                       00144000
+PLISTPTR EQU   @01                                                      00145000
+ISTQAPTR EQU   @02                                                      00146000
+PFXPTR   EQU   @03                                                      00147000
+NWPFXREG EQU   @04                                                      00148000
+BKPFXREG EQU   @05                                                      00149000
+RCREG    EQU   @15                                                      00150000
+PLIST    EQU   0                                                        00151000
+PLISTQAB EQU   PLIST                                                    00152000
+PLISTCBA EQU   PLIST+4                                                  00153000
+ISTPFX   EQU   0                                                        00154000
+PFXID    EQU   ISTPFX                                                   00155000
+ISTQAB   EQU   0                                                        00156000
+QABID    EQU   ISTQAB                                                   00157000
+QABCT    EQU   ISTQAB+4                                                 00158000
+QABFIRST EQU   ISTQAB+8                                                 00159000
+QABLAST  EQU   ISTQAB+12                                                00160000
+QABATTR  EQU   ISTQAB+16                                                00161000
+QABATTR2 EQU   QABATTR+1                                                00162000
+QABFWDDS EQU   ISTQAB+20                                                00163000
+QABBCKDS EQU   ISTQAB+22                                                00164000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00165000
+QABPTYDS EQU   ISTQAB+18                                                00166000
+@NM00006 EQU   QABATTR2                                                 00167000
+@NM00005 EQU   QABATTR2                                                 00168000
+@NM00004 EQU   QABATTR2                                                 00169000
+@NM00003 EQU   QABATTR2                                                 00170000
+QABFIFO  EQU   QABATTR2                                                 00171000
+QABLIFO  EQU   QABATTR2                                                 00172000
+QABPRTY  EQU   QABATTR2                                                 00173000
+@NM00002 EQU   QABATTR2                                                 00174000
+QABATTR1 EQU   QABATTR                                                  00175000
+@NM00001 EQU   ISTQAB+6                                                 00176000
+PFXBCK   EQU   ISTPFX+12                                                00177000
+PFXFWD   EQU   ISTPFX+8                                                 00178000
+PFXLNG   EQU   ISTPFX+5                                                 00179000
+PFXPRTY  EQU   ISTPFX+4                                                 00180000
+PFXCBID  EQU   PFXID                                                    00181000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00182000
+@ENDDATA EQU   *                                                        00183000
+         END   ISTRACCR,(C'PLS2124',0702,80232)                         00184000

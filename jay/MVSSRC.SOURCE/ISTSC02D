@@ -1,0 +1,649 @@
+         TITLE 'ISTSC02D,PLINK FUNCTION FOR THE OLT SECTION'            00001000
+ISTSC02D CSECT ,                                                   0001 00002000
+@MAINENT DS    0H                                                  0001 00003000
+         USING *,@15                                               0001 00004000
+         B     @PROLOG                                             0001 00005000
+         DC    AL1(16)                                             0001 00006000
+         DC    C'ISTSC02D  80.232'                                 0001 00007000
+         DROP  @15                                                      00008000
+@PROLOG  ST    @14,12(,@13)                                        0001 00009000
+         STM   @00,@12,20(@13)                                     0001 00010000
+         BALR  @12,0                                               0001 00011000
+@PSTART  DS    0H                                                  0001 00012000
+         USING @PSTART,@12                                         0001 00013000
+*                                                                  0041 00014000
+*   /*****************************************************************/ 00015000
+*   /*                                                               */ 00016000
+*   /* BEGINNING OF EXECUTABLE CODE                                  */ 00017000
+*   /*                                                               */ 00018000
+*   /*****************************************************************/ 00019000
+*                                                                  0042 00020000
+*   SVESC02D(2)=R13;                /* SET UP BACK POINTER           */ 00021000
+         ST    R13,SVESC02D+4(,WAPTR)                              0042 00022000
+*   BACKSAVE(3)=ADDR(SVESC02D);     /* PUT FORWARD CHAIN IN LAST     */ 00023000
+         LA    @14,SVESC02D(,WAPTR)                                0043 00024000
+         ST    @14,BACKSAVE+8(,R13)                                0043 00025000
+*   R13=ADDR(SVESC02D);             /* POINT TO SAVE AREA FOR MOD    */ 00026000
+         LR    R13,@14                                             0044 00027000
+*   PLIMAP=R1;                      /* SETUP BASE TO PARM LIST       */ 00028000
+         LR    PLIMAP,R1                                           0045 00029000
+*   RC=0;                           /* SET GOOD RETURN CODE          */ 00030000
+         SLR   RC,RC                                               0046 00031000
+*   IF $PLNKDL='1'B THEN            /* IF DELETE REQUEST, RETURN     */ 00032000
+         TM    $PLNKDL(PLIMAP),B'00001000'                         0047 00033000
+         BO    @RT00047                                            0047 00034000
+*     GO TO S2DC0090;               /* GO TO COMMON MODULE RETURN    */ 00035000
+*   RC=8;                           /* SET ERROR RETURN CODE         */ 00036000
+         LA    RC,8                                                0049 00037000
+*   IF $PLNKLD='0'B|$PLNKLOD=0 THEN /* IF THERE IS PARM LIST ERR     */ 00038000
+         TM    $PLNKLD(PLIMAP),B'10000000'                         0050 00039000
+         BZ    @RT00050                                            0050 00040000
+         CLI   $PLNKLOD(PLIMAP),0                                  0050 00041000
+         BE    @RT00050                                            0050 00042000
+*     GO TO S2DC0090;               /* GO TO COMMON MODULE RETURN    */ 00043000
+*   RC=0;                           /* SET GOOD RETURN CODE          */ 00044000
+*                                                                  0052 00045000
+         SLR   RC,RC                                               0052 00046000
+*   /*****************************************************************/ 00047000
+*   /*                                                               */ 00048000
+*   /* THE FOLLOWING LOOP IS EXECUTED ONCE FOR EVERY MODULE THAT     */ 00049000
+*   /* APPEARS IN THE PLINK PARAMETER LIST. IF APPROPRIATE, IT LOOKS */ 00050000
+*   /* IN THE MORECORE CHAIN, AND IF IT FINDS IT THERE, IT PASSES    */ 00051000
+*   /* BACK THAT ADDRESS FOR AN ENTRYPOINT. OTHERWISE, THE MODULE IS */ 00052000
+*   /* LOADED INTO THE MORECORE AREA IF AVAILABLE OR INTO THE OLTAREA*/ 00053000
+*   /* IF THERE IS NO MORECORE AREA.                                 */ 00054000
+*   /*                                                               */ 00055000
+*   /*****************************************************************/ 00056000
+*                                                                  0053 00057000
+*   DO INDEX=1 TO $PLNKLOD;         /* LOAD ALL PLINK MODULES        */ 00058000
+         LA    INDEX,1                                             0053 00059000
+         B     @DE00053                                            0053 00060000
+@DL00053 DS    0H                                                  0054 00061000
+*     LDRNAME=$PLNMOD(INDEX);       /* PUT IN THIS MOD NAME          */ 00062000
+         LR    @14,INDEX                                           0054 00063000
+         SLA   @14,3                                               0054 00064000
+         ALR   @14,PLIMAP                                          0054 00065000
+         MVC   LDRNAME(8),$PLNMOD-8(@14)                           0054 00066000
+*     RESPECIFY                                                    0055 00067000
+*       COREMANG BASED(MS);         /* SETUP PROPER POINTER TO CHAIN */ 00068000
+*                                                                  0055 00069000
+*     /***************************************************************/ 00070000
+*     /*                                                             */ 00071000
+*     /* IF THERE HAS BEEN A MORECORE ISSUED, AND THE BIT INDICATES  */ 00072000
+*     /* THERE MIGHT BE A MORECORE PLINK MODULE, CHECK THE CHAIN FOR */ 00073000
+*     /* THE MODULE IN QUESTION. STOP WHEN THE CHAIN POINTER IS A    */ 00074000
+*     /* ZERO.                                                       */ 00075000
+*     /*                                                             */ 00076000
+*     /***************************************************************/ 00077000
+*                                                                  0056 00078000
+*     IF $FSTMCIS='1'B&#PLKMCOR='1'B&$PLNKPM='0'B THEN/* CHECK TO SEE   00079000
+*                                      IF THE MORECORE CHAIN SHOULD     00080000
+*                                      BE CHECKED                    */ 00081000
+         TM    $FSTMCIS(WAPTR),B'00000100'                         0056 00082000
+         BNO   @RF00056                                            0056 00083000
+         L     @14,$LOWADDR(,WAPTR)                                0056 00084000
+         LH    @09,RTNDISP(,@14)                                   0056 00085000
+         ALR   @09,@14                                             0056 00086000
+         TM    #PLKMCOR(@09),B'00100000'                           0056 00087000
+         BNO   @RF00056                                            0056 00088000
+         TM    $PLNKPM(PLIMAP),B'00100000'                         0056 00089000
+         BNZ   @RF00056                                            0056 00090000
+*       DO MS=$FRELPTR BY 0 WHILE(MS^=0);/* SCAN THE CHAIN FOR THE 0057 00091000
+*                                      MODULE                        */ 00092000
+         L     MS,$FRELPTR(,WAPTR)                                 0057 00093000
+         B     @DE00057                                            0057 00094000
+@DL00057 DS    0H                                                  0058 00095000
+*         IF PLMC='1'B&BUFFER(1:8)=LDRNAME THEN/* IF FILL MATCH,   0058 00096000
+*                                      ALTER POINTERS                */ 00097000
+         TM    PLMC(MS),B'00000010'                                0058 00098000
+         BNO   @RF00058                                            0058 00099000
+         CLC   BUFFER(8,MS),LDRNAME                                0058 00100000
+         BNE   @RF00058                                            0058 00101000
+*           DO;                     /* SET POINTER TO MORECORE AREA  */ 00102000
+*             MS=ADDR(BUFFER);      /* FIRST BYTE OF AREA IS FIRST 0060 00103000
+*                                      BYTE OF MODULE                */ 00104000
+         LA    @14,BUFFER(,MS)                                     0060 00105000
+         LR    MS,@14                                              0060 00106000
+*             GO TO S2DC0030;       /* DONE FOR THIS PLINK MODULE    */ 00107000
+         B     S2DC0030                                            0061 00108000
+*           END;                    /* END OF MATCH CODE             */ 00109000
+*         MS=COREFWDN;              /* SET POINTER TO NEXT AREA IN 0063 00110000
+*                                      CHAIN                         */ 00111000
+@RF00058 L     MS,COREFWDN(,MS)                                    0063 00112000
+*       END;                        /* END OF MORECORE CHAIN SCAN    */ 00113000
+*                                                                  0064 00114000
+@DE00057 LTR   MS,MS                                               0064 00115000
+         BNZ   @DL00057                                            0064 00116000
+*     /***************************************************************/ 00117000
+*     /*                                                             */ 00118000
+*     /* IF IT IS NOT IN MORECORE CHAIN, GET ALL PERTINENT INFO ABOUT*/ 00119000
+*     /* MODULE SO IT CAN BE DETERMINED IF IT WILL FIT AND IF THERE  */ 00120000
+*     /* IS MORECORE SPACE FOR IT                                    */ 00121000
+*     /*                                                             */ 00122000
+*     /***************************************************************/ 00123000
+*                                                                  0065 00124000
+*     LDRADR=$LOWADDR;              /* PUT IN LOAD ADDRESS           */ 00125000
+@RF00056 L     @14,$LOWADDR(,WAPTR)                                0065 00126000
+         ST    @14,LDRADR                                          0065 00127000
+*     LDRCOMP='1'B;                 /* COMPUTE SIZE OF MODULE        */ 00128000
+         OI    LDRCOMP,B'01000000'                                 0066 00129000
+*     R1=ADDR(LDRPARM);             /* POINT TO PARMLIST             */ 00130000
+         LA    R1,LDRPARM                                          0067 00131000
+*     CALL ISTCC013;                /* CALL LOADER FOR SIZE          */ 00132000
+         L     @15,@CV00353                                        0068 00133000
+         BALR  @14,@15                                             0068 00134000
+*     IF R15=12 THEN                /* SET RET CODE IF NOT FOUND     */ 00135000
+         C     R15,@CF00161                                        0069 00136000
+         BE    @RT00069                                            0069 00137000
+*       GO TO S2DC0050;             /* RETURN CODE OF 12             */ 00138000
+*     IF R15^=0 THEN                /* SET I/O ERROR RETURN CODE     */ 00139000
+         LTR   R15,R15                                             0071 00140000
+         BNZ   @RT00071                                            0071 00141000
+*       GO TO S2DC0040;             /* RETURN CODE OF 8              */ 00142000
+*                                                                  0072 00143000
+*     /***************************************************************/ 00144000
+*     /*                                                             */ 00145000
+*     /* IF THE PLINK MODULE CAN BE PUT INTO MORECORE, AND IF THE    */ 00146000
+*     /* ROOT WANTS IT TO BE PUT INTO MORECORE, THEN TRY TO GET SPACE*/ 00147000
+*     /* FOR THE MODULE FROM THE MORECORE MODULE. IF THE SPACE CAN BE*/ 00148000
+*     /* GOTTEN, CREATE A LOAD ADDRESS SUCH THAT THE PLINK MODULE    */ 00149000
+*     /* WILL END UP AT THE FIRST BYTE OF THE MORECORE AREA          */ 00150000
+*     /*                                                             */ 00151000
+*     /***************************************************************/ 00152000
+*                                                                  0073 00153000
+*     IF $PLNKPM='0'B&#PLKMCOR='1'B THEN                           0073 00154000
+         TM    $PLNKPM(PLIMAP),B'00100000'                         0073 00155000
+         BNZ   @RF00073                                            0073 00156000
+         L     @14,$LOWADDR(,WAPTR)                                0073 00157000
+         LH    @09,RTNDISP(,@14)                                   0073 00158000
+         ALR   @09,@14                                             0073 00159000
+         TM    #PLKMCOR(@09),B'00100000'                           0073 00160000
+         BNO   @RF00073                                            0073 00161000
+*       DO;                         /* ANY PLINK IN MORECORE AREA?   */ 00162000
+*         MCORMAX=R0;               /* SET MAX TO SIZE OF OLT        */ 00163000
+         ST    R0,MCORMAX                                          0075 00164000
+*         MCORMIN=R0;               /* SET MIN TO SIZE OF OLT        */ 00165000
+         ST    R0,MCORMIN                                          0076 00166000
+*         R0SAVE=R0;                /* SAVE R0 ACROSS MORECORE CALL  */ 00167000
+         LR    R0SAVE,R0                                           0077 00168000
+*         R1SAVE=R1;                /* SAVE R1 ACROSS MORECORE CALL  */ 00169000
+         LR    R1SAVE,R1                                           0078 00170000
+*         R1=ADDR(MCORELST);        /* POINT TO PARAMETER LIST       */ 00171000
+         LA    R1,MCORELST                                         0079 00172000
+*         CALL ISTSC02C;            /* TRY TO GET THE CORE REQUIRED  */ 00173000
+         L     @15,@CV00356                                        0080 00174000
+         BALR  @14,@15                                             0080 00175000
+*         MCRPTR=R1;                /* SAVE TENATIVE CORE POINTER    */ 00176000
+         LR    MCRPTR,R1                                           0081 00177000
+*         R0=R0SAVE;                /* RESTORE R0 FROM BEFORE CALL   */ 00178000
+         LR    R0,R0SAVE                                           0082 00179000
+*         R1=R1SAVE;                /* RESTORE R1 FROM BEFORE CALL   */ 00180000
+         LR    R1,R1SAVE                                           0083 00181000
+*         IF R15=0 THEN                                            0084 00182000
+         LTR   R15,R15                                             0084 00183000
+         BNZ   @RF00084                                            0084 00184000
+*           DO;                     /* IF WE GOT CORE, ALTER POINTERS*/ 00185000
+*             RESPECIFY                                            0086 00186000
+*               COREMANG BASED(MCRPTR-8);/* SET PROPER POINTER TO  0086 00187000
+*                                      CORE                          */ 00188000
+*             LDRADR=ADDR(BUFFER)-(R1-$LOWADDR);/* BACK UP BY      0087 00189000
+*                                      RELATIVE DISPLACEMENT         */ 00190000
+         LR    @14,MCRPTR                                          0087 00191000
+         SL    @14,@CF00040                                        0087 00192000
+         LA    @09,BUFFER(,@14)                                    0087 00193000
+         LR    @04,R1                                              0087 00194000
+         SL    @04,$LOWADDR(,WAPTR)                                0087 00195000
+         LCR   @04,@04                                             0087 00196000
+         ALR   @04,@09                                             0087 00197000
+         ST    @04,LDRADR                                          0087 00198000
+*             R1=ADDR(BUFFER);      /* SET MODULE TO START AT      0088 00199000
+*                                      MORECORE AREA                 */ 00200000
+         LR    R1,@09                                              0088 00201000
+*             PLMC='1'B;            /* SHOW MORECORE AREA HAS PLINK     00202000
+*                                      IN                            */ 00203000
+         OI    PLMC(@14),B'00000010'                               0089 00204000
+*           END;                    /* END OF CORE GOTTEN SECTION    */ 00205000
+*       END;                        /* END OF TRYING TO PUT PLINK IN    00206000
+*                                      MORECORE AREA                 */ 00207000
+*                                                                  0091 00208000
+@RF00084 DS    0H                                                  0092 00209000
+*     /***************************************************************/ 00210000
+*     /*                                                             */ 00211000
+*     /* MAKE SURE THE MODULE WILL FIT IN THE AREA ALLOWED TO THE    */ 00212000
+*     /* OLT. IF IT WILL, GO TO THE LOADER TO BRING IT IN. STORE THE */ 00213000
+*     /* RETURN CODE IN A TEMPORARY AREA AND GIVE THE OLT THE LAST   */ 00214000
+*     /* NON-ZERO RETURN CODE GENERATED. STORE THE ENTRY ADDRESS IN  */ 00215000
+*     /* THE ENTRYPOINT TABLE PASSED IN THE PARAMETER LIST.          */ 00216000
+*     /*                                                             */ 00217000
+*     /***************************************************************/ 00218000
+*                                                                  0092 00219000
+*     IF R1+R0>$HIGHADR THEN        /* IF MODULE WONT FIT, ERROR     */ 00220000
+@RF00073 LR    @14,R1                                              0092 00221000
+         ALR   @14,R0                                              0092 00222000
+         C     @14,$HIGHADR(,WAPTR)                                0092 00223000
+         BH    @RT00092                                            0092 00224000
+*       GO TO S2DC0045;             /* SET RETURN CODE OF 16         */ 00225000
+*     MS=R1;                        /* GET BEGINNING OF PLINK MOD    */ 00226000
+         LR    MS,R1                                               0094 00227000
+*     LDRCOMP='0'B;                 /* ALL OK, LOAD                  */ 00228000
+         NI    LDRCOMP,B'10111111'                                 0095 00229000
+*     R1=ADDR(LDRPARM);             /* POINT TO PARMLIST             */ 00230000
+         LA    R1,LDRPARM                                          0096 00231000
+*     CALL ISTCC013;                /* LOAD PLINK MODULE             */ 00232000
+         L     @15,@CV00353                                        0097 00233000
+         BALR  @14,@15                                             0097 00234000
+*     IF R15^=0 THEN                /* SET I/O ERROR RETURN CODE     */ 00235000
+         LTR   R15,R15                                             0098 00236000
+         BNZ   @RT00098                                            0098 00237000
+*       GO TO S2DC0040;             /* SET RETRUN CODE TO 8          */ 00238000
+*S2DC0030:                                                         0100 00239000
+*     $PLNKEPL(INDEX)=MS->INST;     /* PUT ENTRYPOINT IN LIST        */ 00240000
+S2DC0030 LR    @14,INDEX                                           0100 00241000
+         SLA   @14,2                                               0100 00242000
+         L     @09,$PLNKENP(,PLIMAP)                               0100 00243000
+         L     @04,INST(,MS)                                       0100 00244000
+         AL    @09,@CF00379                                        0100 00245000
+         ST    @04,$PLNKEPL(@14,@09)                               0100 00246000
+*     GO TO S2DC0060;               /* DO NEXT PLINK MODULE          */ 00247000
+         B     S2DC0060                                            0101 00248000
+*S2DC0040:                                                         0102 00249000
+*     RC=8;                         /* I/O ERROR LOADING,TRY NEXT    */ 00250000
+S2DC0040 LA    RC,8                                                0102 00251000
+*     GO TO S2DC0060;               /* DO NEXT PLINK MODULE          */ 00252000
+         B     S2DC0060                                            0103 00253000
+*S2DC0045:                                                         0104 00254000
+*     RC=16;                        /* NO SPACE FOR MODULE           */ 00255000
+S2DC0045 LA    RC,16                                               0104 00256000
+*     GO TO S2DC0060;               /* DO NEXT PLINK MODULE          */ 00257000
+*                                                                  0105 00258000
+         B     S2DC0060                                            0105 00259000
+*     /***************************************************************/ 00260000
+*     /*                                                             */ 00261000
+*     /* IF THE MODULE COULD NOT BE FOUND, GIVE A BAD RETURN CODE AND*/ 00262000
+*     /* ISSUE THE MSG 253I TO INFORM THE OPERATOR WHAT MODULE WAS   */ 00263000
+*     /* NOT FOUND.                                                  */ 00264000
+*     /*                                                             */ 00265000
+*     /***************************************************************/ 00266000
+*                                                                  0106 00267000
+*S2DC0050:                                                         0106 00268000
+*     RC=12;                        /* MODULE NOT FOUND              */ 00269000
+S2DC0050 LA    RC,12                                               0106 00270000
+*     $INBUFR(1:8)=$PLNMOD(INDEX);  /* MODULE NAME FOR MESSAGE       */ 00271000
+*                                                                  0107 00272000
+         LR    @14,INDEX                                           0107 00273000
+         SLA   @14,3                                               0107 00274000
+         ALR   @14,PLIMAP                                          0107 00275000
+         MVC   $INBUFR(8,WAPTR),$PLNMOD-8(@14)                     0107 00276000
+*     /***************************************************************/ 00277000
+*     /*                                                             */ 00278000
+*     /* TCEC MSGN(253)SUB(YES) INVOKED                              */ 00279000
+*     /*                                                             */ 00280000
+*     /***************************************************************/ 00281000
+*                                                                  0108 00282000
+*     $TCECM='1'B;                  /* SET TCEC SW IN RCA            */ 00283000
+         OI    $TCECM(WAPTR),B'00000001'                           0108 00284000
+*     R1=ADDR($TCA05);              /* SET UP PARM LIST $TR          */ 00285000
+         LA    R1,$TCA05                                           0109 00286000
+*     CALL #EXIT;                   /* CALL CECOM                    */ 00287000
+         L     @15,#EXITA(,WAPTR)                                  0110 00288000
+         BALR  @14,@15                                             0110 00289000
+*     DCL                                                          0111 00290000
+*       1 $TCA05,                   /* TCEC PARM LIST                */ 00291000
+*        2 $TCB05 FIXED(32) INIT(253),/* MSG NUMBER                  */ 00292000
+*        2 $TCC05 FIXED(32) INIT(0),/* INCT LEN                      */ 00293000
+*        2 $TCD05 BIT(8) INIT('10000000'B),/* FLAG                   */ 00294000
+*        2 $TCE05 CHAR(4) INIT('FFFFFFFF'X);/* MSSAGE MASK           */ 00295000
+*S2DC0060:                                                         0112 00296000
+*   END;                            /* END OF PLINK LOOP             */ 00297000
+S2DC0060 AL    INDEX,@CF00070                                      0112 00298000
+@DE00053 SLR   @14,@14                                             0112 00299000
+         IC    @14,$PLNKLOD(,PLIMAP)                               0112 00300000
+         CR    INDEX,@14                                           0112 00301000
+         BNH   @DL00053                                            0112 00302000
+*S2DC0090:                                                         0113 00303000
+*   R15=RC;                         /* SET ACTUAL RETURN CODE        */ 00304000
+S2DC0090 LR    R15,RC                                              0113 00305000
+*   R13=SVESC02D(2);                /* PICK UP PREVIOUS SAVEAREA     */ 00306000
+         L     R13,SVESC02D+4(,WAPTR)                              0114 00307000
+*   DO;                             /* ATDSPLY                       */ 00308000
+*   END;                            /* ATDSPLY                       */ 00309000
+*   END ISTSC02D;                   /* END OF PLINK FUNCTION         */ 00310000
+@EL00001 DS    0H                                                  0117 00311000
+@EF00001 DS    0H                                                  0117 00312000
+@ER00001 L     @14,12(,@13)                                        0117 00313000
+         LM    @00,@12,20(@13)                                     0117 00314000
+         BR    @14                                                 0117 00315000
+@DATA    DS    0H                                                       00316000
+         DS    0F                                                       00317000
+         DS    0F                                                       00318000
+@CF00070 DC    F'1'                                                     00319000
+@CF00040 DC    F'8'                                                     00320000
+@CF00161 DC    F'12'                                                    00321000
+@CF00379 DC    F'-4'                                                    00322000
+@CV00353 DC    V(ISTCC013)                                              00323000
+@CV00356 DC    V(ISTSC02C)                                              00324000
+         DS    0D                                                       00325000
+MCORELST DS    CL12                                                     00326000
+         ORG   MCORELST                                                 00327000
+@NM00031 DC    X'0102F4F2'                                              00328000
+MCORMAX  DS    FL4                                                      00329000
+MCORMIN  DS    FL4                                                      00330000
+         ORG   MCORELST+12                                              00331000
+LDRPARM  DS    CL8                                                      00332000
+         ORG   LDRPARM                                                  00333000
+@NM00035 DS    CL4                                                      00334000
+@NM00036 DC    AL4(LDRPARME)                                            00335000
+         ORG   LDRPARM+8                                                00336000
+LDRPARME DS    CL16                                                     00337000
+         ORG   LDRPARME                                                 00338000
+LDRNAME  DS    CL8                                                      00339000
+LDRADR   DS    AL4                                                      00340000
+@NM00037 DC    X'80'                                                    00341000
+         ORG   @NM00037                                                 00342000
+LDRPLINK DS    BL1                                                      00343000
+LDRCOMP  EQU   @NM00037+0                                               00344000
+@NM00038 EQU   @NM00037+0                                               00345000
+         ORG   LDRPARME+13                                              00346000
+@NM00039 DS    CL1                                                      00347000
+@NM00040 DC    H'0'                                                     00348000
+         ORG   LDRPARME+16                                              00349000
+$TCA05   DS    CL13                                                     00350000
+         ORG   $TCA05                                                   00351000
+$TCB05   DC    A(253)                                                   00352000
+$TCC05   DC    A(0)                                                     00353000
+$TCD05   DC    B'10000000'                                              00354000
+$TCE05   DC    X'FFFFFFFF'                                              00355000
+         ORG   $TCA05+13                                                00356000
+         DS    CL3                                                      00357000
+PATCH    DC    40F'0'                                                   00358000
+@00      EQU   00                      EQUATES FOR REGISTERS 0-15       00359000
+@01      EQU   01                                                       00360000
+@02      EQU   02                                                       00361000
+@03      EQU   03                                                       00362000
+@04      EQU   04                                                       00363000
+@05      EQU   05                                                       00364000
+@06      EQU   06                                                       00365000
+@07      EQU   07                                                       00366000
+@08      EQU   08                                                       00367000
+@09      EQU   09                                                       00368000
+@10      EQU   10                                                       00369000
+@11      EQU   11                                                       00370000
+@12      EQU   12                                                       00371000
+@13      EQU   13                                                       00372000
+@14      EQU   14                                                       00373000
+@15      EQU   15                                                       00374000
+INDEX    EQU   @08                                                      00375000
+R0SAVE   EQU   @10                                                      00376000
+RC       EQU   @07                                                      00377000
+MCRPTR   EQU   @05                                                      00378000
+R1SAVE   EQU   @09                                                      00379000
+MS       EQU   @05                                                      00380000
+PLIMAP   EQU   @06                                                      00381000
+WAPTR    EQU   @02                                                      00382000
+R0       EQU   @00                                                      00383000
+R1       EQU   @01                                                      00384000
+R13      EQU   @13                                                      00385000
+R15      EQU   @15                                                      00386000
+TOLTEPWA EQU   0                                                        00387000
+$CDA     EQU   TOLTEPWA+100                                             00388000
+$RCA     EQU   $CDA+44                                                  00389000
+$OLTPTR  EQU   $CDA+52                                                  00390000
+$LOWADDR EQU   $OLTPTR                                                  00391000
+$HIMOREC EQU   $CDA+60                                                  00392000
+$HIGHADR EQU   $HIMOREC                                                 00393000
+$FRELPTR EQU   $CDA+64                                                  00394000
+$COMMFLG EQU   TOLTEPWA+224                                             00395000
+$FLAG6   EQU   $COMMFLG+5                                               00396000
+$FSTMCIS EQU   $FLAG6                                                   00397000
+$ABNDBIT EQU   $FLAG6                                                   00398000
+$FLAG8   EQU   $COMMFLG+7                                               00399000
+$TCECM   EQU   $FLAG8                                                   00400000
+$INBUFR  EQU   TOLTEPWA+2104                                            00401000
+#EXITA   EQU   TOLTEPWA+2632                                            00402000
+$CCOMDAT EQU   TOLTEPWA+2644                                            00403000
+$CFLGS   EQU   $CCOMDAT+16                                              00404000
+$24FEMSG EQU   TOLTEPWA+2681                                            00405000
+$24CATMG EQU   $24FEMSG+11                                              00406000
+@NM00021 EQU   TOLTEPWA+2776                                            00407000
+$OUNTPTR EQU   @NM00021+4                                               00408000
+$NSPTR   EQU   $OUNTPTR                                                 00409000
+$NSCNT   EQU   @NM00021+10                                              00410000
+$ENXX    EQU   @NM00021+15                                              00411000
+$IMITX   EQU   $ENXX                                                    00412000
+SVESC033 EQU   TOLTEPWA+3160                                            00413000
+SVECC013 EQU   TOLTEPWA+3232                                            00414000
+SVEIC003 EQU   TOLTEPWA+3592                                            00415000
+SVESC022 EQU   TOLTEPWA+3736                                            00416000
+SVECC011 EQU   TOLTEPWA+4024                                            00417000
+#EXIT    EQU   0                                                        00418000
+PLINKMAP EQU   0                                                        00419000
+$PLNKENP EQU   PLINKMAP+4                                               00420000
+@NM00024 EQU   PLINKMAP+8                                               00421000
+$PLNKLD  EQU   @NM00024                                                 00422000
+$PLNKPM  EQU   @NM00024                                                 00423000
+$PLNKDL  EQU   @NM00024                                                 00424000
+$PLNKLOD EQU   PLINKMAP+10                                              00425000
+$PLNMOD  EQU   PLINKMAP+12                                              00426000
+$PLNKEPL EQU   0                                                        00427000
+@NM00027 EQU   0                                                        00428000
+RTNDISP  EQU   @NM00027+10                                              00429000
+INST     EQU   @NM00027+12                                              00430000
+$NEWSPRF EQU   0                                                        00431000
+#FLAGS   EQU   $NEWSPRF+16                                              00432000
+#PLKMCOR EQU   #FLAGS                                                   00433000
+BACKSAVE EQU   0                                                        00434000
+COREMANG EQU   0                                                        00435000
+CORESZEN EQU   COREMANG                                                 00436000
+PLMC     EQU   CORESZEN+3                                               00437000
+COREFWDN EQU   COREMANG+4                                               00438000
+BUFFER   EQU   COREMANG+8                                               00439000
+OLTENTRY EQU   0                                                        00440000
+SVESC02D EQU   SVESC022                                                 00441000
+SVECC012 EQU   SVESC022                                                 00442000
+SVEIC00A EQU   SVEIC003                                                 00443000
+SVEIC004 EQU   SVEIC003                                                 00444000
+SVEIC005 EQU   SVEIC003                                                 00445000
+SVESC02A EQU   SVESC022                                                 00446000
+SVESC02B EQU   SVESC022                                                 00447000
+SVESC02E EQU   SVESC022                                                 00448000
+SVESC02F EQU   SVECC013                                                 00449000
+SVESC024 EQU   SVESC022                                                 00450000
+SVESC027 EQU   SVESC022                                                 00451000
+SVESC029 EQU   SVESC033                                                 00452000
+SVESC031 EQU   SVECC013                                                 00453000
+SVESC032 EQU   SVECC011                                                 00454000
+SVETC037 EQU   SVEIC003                                                 00455000
+         AGO   .@UNREFD                START UNREFERENCED COMPONENTS    00456000
+FREEN    EQU   CORESZEN+3                                               00457000
+@NM00034 EQU   CORESZEN+3                                               00458000
+@NM00033 EQU   CORESZEN+3                                               00459000
+@NM00032 EQU   CORESZEN                                                 00460000
+$RME     EQU   $NEWSPRF+36                                              00461000
+@NM00030 EQU   $NEWSPRF+35                                              00462000
+$ECA     EQU   $NEWSPRF+32                                              00463000
+$DCHB    EQU   $NEWSPRF+28                                              00464000
+$MOSIZE  EQU   $NEWSPRF+24                                              00465000
+$RTSIZE  EQU   $NEWSPRF+20                                              00466000
+$COUNT   EQU   $NEWSPRF+18                                              00467000
+$REFNUM  EQU   $NEWSPRF+17                                              00468000
+@NM00029 EQU   #FLAGS                                                   00469000
+#MSGIDRQ EQU   #FLAGS                                                   00470000
+@NM00028 EQU   #FLAGS                                                   00471000
+$VIRTUAL EQU   #FLAGS                                                   00472000
+$PLINK$  EQU   $NEWSPRF+12                                              00473000
+$SCTREQ  EQU   $NEWSPRF+11                                              00474000
+$RM      EQU   $NEWSPRF+9                                               00475000
+$CTYPE   EQU   $NEWSPRF+8                                               00476000
+$CCLASS  EQU   $NEWSPRF+7                                               00477000
+$CFEAT   EQU   $NEWSPRF+6                                               00478000
+$CMODEL  EQU   $NEWSPRF+5                                               00479000
+$TYPE    EQU   $NEWSPRF+4                                               00480000
+$CLASS   EQU   $NEWSPRF+3                                               00481000
+$FEAT    EQU   $NEWSPRF+2                                               00482000
+$MODEL   EQU   $NEWSPRF+1                                               00483000
+$RTN#    EQU   $NEWSPRF                                                 00484000
+#MSGID   EQU   @NM00027+16                                              00485000
+LEVEL    EQU   @NM00027+8                                               00486000
+SECTID   EQU   @NM00027                                                 00487000
+$PLNKDEL EQU   PLINKMAP+11                                              00488000
+$PLNKCOR EQU   PLINKMAP+9                                               00489000
+$PLNKSC  EQU   @NM00024                                                 00490000
+@NM00026 EQU   @NM00024                                                 00491000
+$PLNKRT  EQU   @NM00024                                                 00492000
+@NM00025 EQU   @NM00024                                                 00493000
+$PLNKCL  EQU   @NM00024                                                 00494000
+$PLNIDNT EQU   PLINKMAP+2                                               00495000
+$PLNLEVL EQU   PLINKMAP+1                                               00496000
+$PLNTRMG EQU   PLINKMAP                                                 00497000
+SVECC010 EQU   TOLTEPWA+3952                                            00498000
+SVETC035 EQU   TOLTEPWA+3880                                            00499000
+SVESC030 EQU   TOLTEPWA+3808                                            00500000
+SVESC020 EQU   TOLTEPWA+3664                                            00501000
+SVEIC002 EQU   TOLTEPWA+3520                                            00502000
+SVECC014 EQU   TOLTEPWA+3376                                            00503000
+SVESC120 EQU   TOLTEPWA+3304                                            00504000
+SVESC025 EQU   TOLTEPWA+3088                                            00505000
+@NM00023 EQU   TOLTEPWA+2980                                            00506000
+$RPLERR  EQU   TOLTEPWA+2977                                            00507000
+@NM00022 EQU   TOLTEPWA+2976                                            00508000
+$R13PR3  EQU   TOLTEPWA+2972                                            00509000
+$CEINT2  EQU   TOLTEPWA+2968                                            00510000
+$CEINT1  EQU   TOLTEPWA+2964                                            00511000
+$MSGGET  EQU   TOLTEPWA+2960                                            00512000
+$ACQLIST EQU   TOLTEPWA+2956                                            00513000
+$R4SAVE1 EQU   TOLTEPWA+2952                                            00514000
+$CLSISS  EQU   TOLTEPWA+2950                                            00515000
+$CLSCNT  EQU   TOLTEPWA+2948                                            00516000
+$CUTABLE EQU   TOLTEPWA+2868                                            00517000
+$BUFSZ2  EQU   TOLTEPWA+2864                                            00518000
+$RESID2  EQU   TOLTEPWA+2860                                            00519000
+$OLTCCW2 EQU   TOLTEPWA+2856                                            00520000
+$ENDBFR2 EQU   TOLTEPWA+2852                                            00521000
+$1STBFR2 EQU   TOLTEPWA+2848                                            00522000
+$TECB2   EQU   TOLTEPWA+2844                                            00523000
+$BUFSZ1  EQU   TOLTEPWA+2840                                            00524000
+$RESID1  EQU   TOLTEPWA+2836                                            00525000
+$OLTCCW1 EQU   TOLTEPWA+2832                                            00526000
+$ENDBFR1 EQU   TOLTEPWA+2828                                            00527000
+$1STBFR1 EQU   TOLTEPWA+2824                                            00528000
+$TECB1   EQU   TOLTEPWA+2820                                            00529000
+$WAITIME EQU   TOLTEPWA+2816                                            00530000
+$TRTN#   EQU   TOLTEPWA+2815                                            00531000
+$WIODEV  EQU   TOLTEPWA+2814                                            00532000
+$RQSTSZE EQU   TOLTEPWA+2812                                            00533000
+$RQSTPTR EQU   TOLTEPWA+2808                                            00534000
+$R4SAVE  EQU   TOLTEPWA+2804                                            00535000
+$PARTADR EQU   TOLTEPWA+2800                                            00536000
+$TBSDATA EQU   TOLTEPWA+2796                                            00537000
+$CTWIDTH EQU   TOLTEPWA+2795                                            00538000
+$CTLINE  EQU   TOLTEPWA+2794                                            00539000
+$APWIDTH EQU   TOLTEPWA+2793                                            00540000
+$APLINE  EQU   TOLTEPWA+2792                                            00541000
+$INDEX   EQU   $IMITX                                                   00542000
+$UMXX    EQU   @NM00021+14                                              00543000
+$NSXX    EQU   @NM00021+12                                              00544000
+$ATACNT  EQU   $NSCNT                                                   00545000
+$CTR     EQU   @NM00021+8                                               00546000
+$ATAPTR  EQU   $NSPTR                                                   00547000
+$DDRPTR  EQU   @NM00021                                                 00548000
+$DTORESP EQU   TOLTEPWA+2712                                            00549000
+$APNAME  EQU   TOLTEPWA+2704                                            00550000
+$24SYMNE EQU   $24CATMG+4                                               00551000
+$24DEVAD EQU   $24CATMG                                                 00552000
+$24RTN#  EQU   $24FEMSG+8                                               00553000
+$ESECTID EQU   $24FEMSG                                                 00554000
+$24FLGS  EQU   TOLTEPWA+2680                                            00555000
+$24SAVE2 EQU   TOLTEPWA+2676                                            00556000
+$24SAVE1 EQU   TOLTEPWA+2672                                            00557000
+$24UNADR EQU   TOLTEPWA+2668                                            00558000
+$24SAV13 EQU   TOLTEPWA+2664                                            00559000
+$24RETCD EQU   TOLTEPWA+2663                                            00560000
+$MACID   EQU   TOLTEPWA+2661                                            00561000
+$CSPARE  EQU   $CFLGS                                                   00562000
+$C2WAY   EQU   $CFLGS                                                   00563000
+$CINCT   EQU   $CCOMDAT+12                                              00564000
+$CINADR  EQU   $CCOMDAT+8                                               00565000
+$COUTCT  EQU   $CCOMDAT+4                                               00566000
+$COUTAD  EQU   $CCOMDAT                                                 00567000
+ROOTLOC  EQU   TOLTEPWA+2640                                            00568000
+$RETREG  EQU   TOLTEPWA+2636                                            00569000
+$WORK    EQU   TOLTEPWA+2376                                            00570000
+$EXTA    EQU   TOLTEPWA+2320                                            00571000
+$PASSONA EQU   TOLTEPWA+2264                                            00572000
+$TRMINPT EQU   TOLTEPWA+2184                                            00573000
+$BUFFER  EQU   TOLTEPWA+1976                                            00574000
+$TLTRPL3 EQU   TOLTEPWA+1856                                            00575000
+$TLTRPL2 EQU   TOLTEPWA+1736                                            00576000
+$TLTRPL1 EQU   TOLTEPWA+1616                                            00577000
+$SLTBL   EQU   TOLTEPWA+1468                                            00578000
+@NM00020 EQU   TOLTEPWA+1464                                            00579000
+$DEVTBLE EQU   TOLTEPWA+240                                             00580000
+@NM00019 EQU   $COMMFLG+15                                              00581000
+@NM00018 EQU   $COMMFLG+14                                              00582000
+@NM00017 EQU   $COMMFLG+13                                              00583000
+@NM00016 EQU   $COMMFLG+12                                              00584000
+@NM00015 EQU   $COMMFLG+11                                              00585000
+@NM00014 EQU   $COMMFLG+10                                              00586000
+@NM00013 EQU   $COMMFLG+9                                               00587000
+@NM00012 EQU   $COMMFLG+8                                               00588000
+$VS2     EQU   $FLAG8                                                   00589000
+$VS1     EQU   $FLAG8                                                   00590000
+$EDOS    EQU   $FLAG8                                                   00591000
+@NM00011 EQU   $FLAG8                                                   00592000
+$TWOWAY  EQU   $FLAG8                                                   00593000
+@NM00010 EQU   $FLAG8                                                   00594000
+@NM00009 EQU   $COMMFLG+6                                               00595000
+$CIREQ   EQU   $FLAG6                                                   00596000
+$ABTERM  EQU   $ABNDBIT                                                 00597000
+$DISCREQ EQU   $FLAG6                                                   00598000
+$DISCISS EQU   $FLAG6                                                   00599000
+$CHANGE  EQU   $FLAG6                                                   00600000
+$CTERROR EQU   $FLAG6                                                   00601000
+$RECAL11 EQU   $FLAG6                                                   00602000
+@NM00008 EQU   $COMMFLG+4                                               00603000
+@NM00007 EQU   $COMMFLG+3                                               00604000
+@NM00006 EQU   $COMMFLG+2                                               00605000
+@NM00005 EQU   $COMMFLG+1                                               00606000
+@NM00004 EQU   $COMMFLG                                                 00607000
+@NM00003 EQU   $CDA+120                                                 00608000
+$CUCNT   EQU   $CDA+118                                                 00609000
+@NM00002 EQU   $CDA+117                                                 00610000
+$PRTFORM EQU   $CDA+116                                                 00611000
+$OPISCNT EQU   $CDA+114                                                 00612000
+$OPNDCNT EQU   $CDA+112                                                 00613000
+$GETMSZE EQU   $CDA+110                                                 00614000
+$GRCNTS  EQU   $CDA+108                                                 00615000
+$CTLCNT  EQU   $CDA+106                                                 00616000
+$ACTLVL  EQU   $CDA+105                                                 00617000
+$PRNTLVL EQU   $CDA+104                                                 00618000
+$ERRCNTA EQU   $CDA+102                                                 00619000
+$TLCNT   EQU   $CDA+100                                                 00620000
+$TIMEALW EQU   $CDA+96                                                  00621000
+$PTRAREA EQU   $CDA+92                                                  00622000
+$GETMPTR EQU   $CDA+88                                                  00623000
+$R13PTRT EQU   $CDA+84                                                  00624000
+$R13PTR  EQU   $CDA+80                                                  00625000
+$TEPEND  EQU   $CDA+76                                                  00626000
+$PLINKDL EQU   $CDA+72                                                  00627000
+$TEPBEGN EQU   $CDA+68                                                  00628000
+$LOMOREC EQU   $CDA+56                                                  00629000
+$ENDCOMM EQU   $CDA+48                                                  00630000
+$COMMON  EQU   $RCA                                                     00631000
+$SLASHAD EQU   $CDA+32                                                  00632000
+$PASSON  EQU   $CDA+28                                                  00633000
+$TOLBRTB EQU   $CDA+24                                                  00634000
+$SCTPTR8 EQU   $CDA+20                                                  00635000
+$SCTPTR  EQU   $CDA+16                                                  00636000
+$TBWDPTR EQU   $CDA+12                                                  00637000
+$TFWDPTR EQU   $CDA+8                                                   00638000
+@NM00001 EQU   $CDA                                                     00639000
+$SCTTBLE EQU   TOLTEPWA                                                 00640000
+.@UNREFD ANOP                          END UNREFERENCED COMPONENTS      00641000
+@RT00047 EQU   S2DC0090                                                 00642000
+@RT00050 EQU   S2DC0090                                                 00643000
+@RT00069 EQU   S2DC0050                                                 00644000
+@RT00071 EQU   S2DC0040                                                 00645000
+@RT00092 EQU   S2DC0045                                                 00646000
+@RT00098 EQU   S2DC0040                                                 00647000
+@ENDDATA EQU   *                                                        00648000
+         END   ISTSC02D,(C'PLS2129',0702,80232)                         00649000

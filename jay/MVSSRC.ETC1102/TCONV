@@ -1,0 +1,128 @@
+         MACRO                                                          00700010
+&NAME  TCONV   &MF=,&TYPE=EH,&FROM=,&TO=,&COUNT=,&MAP=NO,&LSTNAME=,    X01400010
+               &RET=                                                    02100010
+.*                                                                      02800010
+         GBLB  &EXECUTV,&E536454                                        03500010
+         GBLB  &RCC .        SET TO 1 IF INTLZE WILL SUPPORT RCC        04200010
+         LCLA  &FLAG,&ERROR,&KOUNT                                      04900010
+         LCLB  &RCC1                                                    05600010
+         LCLC  &F,&SIZE,&CHAR,&Z                                        06300010
+.*                                                                      07000010
+         AIF   ('&MAP' EQ 'YES').MAP1                                   07700010
+         AIF   (T'&MF EQ 'O').STD                                       08400010
+         AIF   ('&MF' EQ 'L' OR '&MF' EQ 'S').STD                       09100010
+         AIF   ('&MF'(1,3) NE '(E,').MFERROR                            09800010
+&CHAR    SETC  '&NAME'                                                  10500010
+         AIF   ('&MF'(4,3) EQ '(1)').RG1                                11200010
+         AIF   ('&MF'(4,1) EQ '(').RG2                                  11900010
+&CHAR    LA    R1,&MF(2) .         ADDRESS OF PARAMETER LIST            12600010
+&CHAR    SETC  ' '                                                      13300010
+         AGO   .RG1                                                     14000010
+.RG2     ANOP                                                           14700010
+&KOUNT   SETA  K'&MF(2)-2                                               15400010
+&F       SETC  '&MF(2)'(2,&KOUNT)                                       16100010
+         AIF   ('&F'(1,1) EQ 'R').C724                                  16800010
+&CHAR    LR    R1,R&F .            ADDRESS OF PARAMETER LIST            17500010
+&CHAR    SETC  ' '                                                      18200010
+         AGO   .RG1                                                     18900010
+.C724    ANOP                                                           19600010
+&CHAR    LR    R1,&F .             ADDRESS OF PARAMETER LIST            20300010
+&CHAR    SETC  ' '                                                      21000010
+.RG1     ANOP                                                           21700010
+.RCC2    ANOP                                                           22400010
+         AIF   ('&RCC' EQ '0').RCCA                                     23100010
+         AIF   (T'&RET EQ 'O').RCCD                                     23800010
+         AIF   ('&RET'(1,1) EQ '#').RCCB                                24500010
+         AIF   ('&RET'(1,1) EQ '(').RCCC                                25200010
+         MVC   $RETMASK,&RET .     SET RETURN CODE MASK                 25900010
+         AGO   .RCCD                                                    26600010
+.RCCE    ANOP                                                           27300010
+         MVI   $RETMASK,#ALL-#RC0 . SET RETURN CODE MASK                28000010
+         AGO   .RCCD                                                    28700010
+.RCCB    ANOP                                                           29400010
+         MVI   $RETMASK,#ALL-&RET . SET RETURN CODE MASK                30100010
+         AGO   .RCCD                                                    30800010
+.RCCC    ANOP                                                           31500010
+         MVI   $RETMASK,#ALL-&RET(1) . SET RETURN CODE MASK             32200010
+         AGO   .RCCD                                                    32900010
+.RCCA    ANOP                                                           33600010
+         AIF   (T'&RET EQ 'O').RCCD                                     34300010
+         MNOTE 5,'RETURN CODE NOT SUPPORTED BY -INTLZE-'                35000010
+.RCCD    ANOP                                                           35700010
+         AIF   (&RCC1).RCC3                                             36400010
+&CHAR    BAL   R14,#EXIT .         BRANCH TO LINKAGE SUBROUTINE         37100010
+         MEXIT                                                          37800010
+.MFERROR MNOTE 8,'MF VALUE (&MF) INCORRECT, NO STATEMENTS GENERATED.'   38500010
+         MEXIT                                                          39200010
+.STD     ANOP                                                           39900010
+         AIF   (T'&FROM NE 'O').TEST3                                   40600010
+&ERROR   SETA  1                                                        41300010
+         MNOTE 8,'FROM ADDRESS MISSING.'                                42000010
+.TEST3   AIF   (T'&TO NE 'O').TEST4                                     42700010
+&ERROR   SETA  1                                                        43400010
+         MNOTE 8,'TO ADDRESS MISSING.'                                  44100010
+.TEST4   AIF   (T'&COUNT NE 'O').BEGIN                                  44800010
+&ERROR   SETA  1                                                        45500010
+         MNOTE 8,'COUNT MISSING.'                                       46200010
+.BEGIN   ANOP                                                           46900010
+         AIF   (&ERROR EQ 1).EXIT                                       47600010
+         AIF   ('&TYPE' NE 'HE').CNVRT2                                 48300010
+&FLAG    SETA  X'8000'                                                  49000010
+.CNVRT2  ANOP                                                           49700010
+         AIF   ('&MF' EQ 'L').LIST                                      50400010
+&NAME    LA    R14,&FROM(1) . GET ADDR OF DATA                          51100010
+         AIF   (N'&FROM EQ 1).CNVRT4                                    51800010
+.TEST5   AIF   (&FROM(2) GE 2 OR &FROM(2) LE 14).CNVRT3                 52500010
+&ERROR   SETA  1                                                        53200010
+         MNOTE 8,'INVALID REG SPEC FOR FROM.'                           53900010
+.CNVRT3  ANOP                                                           54600010
+         AIF   (&ERROR EQ 1).EXIT                                       55300010
+         AR    R14,&FROM(2) . INCREMENT ADDRESS                         56000010
+.CNVRT4  ANOP                                                           56700010
+         ST    R14,QWIE&SYSNDX . PLACE ADDR IN PARAMETER LIST           57400010
+         LA    R14,&TO . GET OUTPUT DATA ADDR                           58100010
+         ST    R14,QWIU&SYSNDX . OUTPUT DATA STORE                      58800010
+         LA    R14,R&SYSNDX .     RETURN ADDRESS                        59500010
+&RCC1    SETB  1                                                        60200010
+         AGO   .RCC2                                                    60900010
+.RCC3    ANOP                                                           61600010
+         CNOP  0,4                                                      62300010
+         BAL   R1,#EXIT .          BRANCH TO LINKAGE SUBROUTINE         63000010
+&CHAR    SETC  '&LSTNAME'                                               63700010
+         AGO   .STD1                                                    64400010
+.LIST    ANOP                                                           65100010
+&CHAR    SETC  '&NAME'                                                  65800010
+         CNOP  0,4                                                      66500010
+.STD1    ANOP                                                           67200010
+         AIF   (&EXECUTV).OLTSEP                                        67900010
+&CHAR    DC    B'00000000' .       CONTROL PROGRAM FLAGS                68600010
+         AGO   .OLTSEP1                                                 69300010
+.OLTSEP  ANOP                                                           70000010
+&CHAR    DC    B'00000001' .       CONTROL PROGRAM FLAGS                70700010
+.OLTSEP1 ANOP                                                           71400010
+         DC    AL1(2) .            MACRO LEVEL                          72100010
+         DC    CL2'41' .           MACRO ID                             72800010
+QWIE&SYSNDX  DC  XL4'00000000' . ADDRESS OF DATA                        73500010
+QWIU&SYSNDX  DC  XL4'00000000' .  OUTPUT DATA                           74200010
+C&SYSNDX DC    AL2(&COUNT+&FLAG) . COUNT AND TYPE INFORMATION           74900010
+**                                BIT 0 SET TO 1 INDICATES 'HE' TYPE.   75600010
+         AIF   ('&MF' EQ 'L').EXIT                                      76300010
+R&SYSNDX DS    0H .               RETURN ON HALFWORD BOUNDARY           77000010
+         MEXIT                                                          77700010
+.MAP1    ANOP                                                           78400010
+CONVMAP  DSECT                                                          79100010
+&Z       SETC  '$'                                                      79800010
+         AIF   (&E536454).ZIPPER                                        80500010
+           DC  XL1'0' .            CONTROL PROGRAM FLAGS                81200010
+           DC  XL1'0' .            MACRO LEVEL                          81900010
+           DC  XL2'0' .            MACRO ID                             82600010
+         AGO   .ZIPPED                                                  83300010
+.ZIPPER  ANOP                                                           84000010
+&Z.CNVTRMG DC  XL1'0' .            CONTROL PROGRAM FLAGS                84700010
+&Z.CNVLEVL DC  XL1'0' .            MACRO LEVEL                          85400010
+&Z.CNVIDNT DC  XL2'0' .            MACRO ID                             86100010
+.ZIPPED  ANOP                                                           86800010
+&Z.CNVFROM DC  A(0) .              FROM ADDRESS                         87500010
+&Z.CNVTO   DC  A(0) .              TO   ADDRESS                         88200010
+&Z.CNVCT   DC  XL2'0' .            TYPE & COUNT                         88900010
+.EXIT    MEND                                                           89600010

@@ -1,0 +1,504 @@
+QNQ      TITLE 'IEDQNQ-CHECKPOINT NOTIFICATION AND DISPOSITION MOD'     00200010
+IEDQNQ   CSECT                                                          00400010
+         SPACE 3                                                        00405010
+*C240300,247000,481100,483100,508000,720000,722000,724000        Y02027 00405210
+*C726000,738000,768000,770000,772000,774000,776000.778000        Y02027 00405410
+*C780000,782000,784000,786000,788000-790000,795000               Y02027 00405610
+*D199000,238400,238800,239200,239600,240600-241500,481200-482300 Y02027 00405810
+*D524000,728000,730000,732000,734000,736000,740000,742000,774400 Y02027 00406010
+*D774800,775200,775600,778300,778600,778900,779200,779500        Y02027 00406210
+*D792000-794100                                                  Y02027 00406410
+*A301000,303000                                                  Y02027 00406610
+*A508200-509200,587500,720900-721800,723600,724500-725400,727200 Y02027 00406810
+*A728100-729900,730800-731700,732600-733500,734400-735300        Y02027 00407010
+*A736200-737100,738900-739800,740700-741600,769000,771000,773000 Y02027 00407210
+*A775000,777000,779000,781000,783000,785000,787000,796420-794680 Y02027 00407410
+*A822600-823200                                                  Y02027 00407610
+*A198000,238000,774000,794000                                    A42413 00410010
+*C208000,240300,778300                                           A42413 00411010
+*A216000,304000,794000                                          SA52951 00412010
+*C204000-210000,422000-440000,480000-484000,694000,697000-698000SA52951 00413010
+*A506700                                                        SA58451 00413110
+*D356000                                                       @SA70674 00443110
+*A218000,774000                                                @XA05298 00473110
+*D778000                                                       @XA05298 00503110
+*D428000                                                       @SA71082 00533110
+*A420000                                                       @SA74853 00563110
+*D421000                                                       @OY13275 00573110
+         SPACE 3                                                        00600010
+*********************************************************************** 00800010
+*                                                                     * 01000010
+*TITLE:'IEDQNQ'-CHECKPOINT NOTIFICATION AND DISPOSITION ROUTINE       * 01200010
+*                                                                     * 01400010
+*  MODULE NAME = IEDQNQ                                               * 01600010
+*                                                                     * 01620010
+*  DESCRIPTIVE NAME = CHECKPOINT NOTIFICATION & DISPOSITION           * 01640010
+*                                                                     * 01660010
+*  COPYRIGHT = ' NONE '                                               * 01680010
+*                                                                     * 01700010
+*  STATUS:  CHANGE LEVEL 6                                            * 01720010
+*                                                                     * 01800010
+*FUNCTION:THIS MODULE GET CONTROL AFTER A DISK WRITE OPERATION        * 02000010
+*   CONPLETES OR AFTER A CHECKPOINT COULD NOT BE SATISFIED.IT         * 02200010
+*   REMOVES THE REQUEST ELEMNT(S) FROM THE QCB CHAIN AND QPOSTS       * 02400010
+*   THE ELEMENT(IF FROM AN NH MACRO) OR POSTS AN ECB(IF FROM          * 02600010
+*   OPERATOR CONTROL OR AN APPLICATION PROGRAM).THE REQUEST ELEMENT   * 02800010
+*   IS NOT REMOVED IF THE REQUEST HAS NOT BEEN COMPLETELY SATISFIED   * 03000010
+*   (CKREQ, OPERATOR CONTROL INCIDENT, AND ENVIRONMENT CHECKPOINTS    * 03200010
+*   MAY REQUIRE MULTIPLE SEGMENTS), OR IF A DISK ERROR OCCURRED ON    * 03400010
+*   WRITE. IF THE LAST SEGMENT OF AN ENVIRONMENT CHECKPOINT WAS       * 03600010
+*   JUST WRITTEN WITH AN INCIDENT OVERFLOW CONDITION(INDICATED IN     * 03800010
+*   THE ENVIRONMENT REQUEST ELEMENT),SEVERAL INCIDENT REQUEST         * 04000010
+*   ELEMENTS MAY BE REMOVED FORM THE QCB CHAIN; THE INCIDENT OVER-    * 04200010
+*   FLOW BIT IN EACH INCIDENT REQUEST ELEMENT(BIT 0 OF KEY) AND IN    * 04400010
+*   THE ENVIRONMENT REQUEST ELEMENT IS TURNED OFF. IF THE LAST        * 04600010
+*   SEGMENT OF A CHECKPOINT WAS JUST WRITTEN,A FREEMAIN IS ISSUED     * 04800010
+*   FOR THE RECORD. IF THE LAST SEGMENT OF AN ENVIRONMENT CHECK-      * 05000010
+*   POINT WAS JUST WRITTEN A BIT IS TURNED ON IN EACH PCB(BIT 2 OF    * 05200010
+*   PCBOFLG) TO INDICATE TO THE APPLICATION PROGRAM(S) THAT THE       * 05400010
+*   CHECKPOINT WAS TAKEN,AND AN ELEMENT IS QPOSTED TO THE READY       * 05600010
+*   QUEUE. IF THE REQUEST WAS FROM MCPCLOSE,THE ELEMENT IS THE        * 05800010
+*   CLOSEDOWN COMPLETION QCB;OTHERWISE,IT IS THE ENVIRONMENT          * 06000010
+*   REQUEST ELEMENT(TO BE PUT ON THE TIME DELAY QCB).                 * 06200010
+*                                                                     * 06400010
+*ENTRY POINT:                                                         * 06600010
+*                                                                     * 06800010
+*        IEDQNQ                                                       * 07000010
+*                                                                     * 07200010
+*INPUT:REGISTERS 2,9,12,14,15 CONTAIN THE FOLLOWING VALUES:           * 07400010
+*                                                                     * 07600010
+*   2-ADDRESS OF CHECKPOINT WORK AREA                                 * 07800010
+*   9-ADDRESS OF AVT                                                  * 08000010
+*   12-BASE REG FOR CHECKPOINT EXECUTOR-IEDQNF                        * 08200010
+*   14-RETURN ADDRESS-IN IEDQNF                                       * 08400010
+*   15-ENTRY POINT OF THIS MODULE                                     * 08600010
+*                                                                     * 08800010
+*OUTPUT:AN ELEMENT MAY BE QPOSTED TO THE READY QUEUE. SEE FUNCTION    * 09000010
+*   FOR THE SITUATIONS.                                               * 09200010
+*                                                                     * 09400010
+*   A BIT IS SET FOR EACH APPLICATION PROGRAM                         * 09600010
+*                                                                     * 09800010
+*EXTERNAL ROUTINES:                                                   * 10000010
+*                                                                     * 10200010
+*        AQCTL SVC ROUTINE-QPOSTS ELEMENTS TO READY QUEUE             * 10400010
+*        OS POST - CROSS MEMORY POST OF APPLICATION PROGRAM ECB       * 10600010
+*        SVC 5 (FREEMAIN)                                             * 10650010
+*        SVC 35 (WTO)                                                 * 10700010
+*                                                                     * 10750010
+*EXITS-NORMAL:IF A REQUEST WAS NOT COMPLETLY SATISFIED THE OFFSET     * 10800010
+*   OF THE MODULE TO BUILD A RECORD FOR CKREQ,ICHNG,OR ENVIRONMENT    * 11000010
+*   REQUESTS IS RETURNED IN R15,AND THIS MODULE BRANCHES TO THE       * 11200010
+*   ADDRESS IN R14. OTHERWISE, IT BRANCHES TO 4 PLUS THE ADDRESS IN   X 11400010
+*   R14.                                                              * 11600010
+*                                                                     * 11800010
+*EXITS-ERROR:THIS MODULE ISSUES AN ERROR MESSAGE VIA WTO. IF THE      * 12000010
+*   RECORD WITH THE DISK ERROR IS CKREQ OR ENVIRONMENT,THE RECORD     * 12200010
+*   IS FLAGGED IN THE CHECKPOINT WORK AREA. IT THEN BRANCHES TO THE   * 12400010
+*   ADDRESS IN R14 WITH THE OFFSET OF THE DISK I/O ROUTINE,SO THAT    * 12600010
+*   THE SAME RECORD CAN BE WRITTEN AT ANOTHER LOCATION.               * 12800010
+*                                                                     * 13000010
+*TABLES/WORK AREAS:                                                   * 13200010
+*                                                                     * 13400010
+*   AVT(AVTCKLE,AVTCKPTB,AVTCLOSB,AVTDELYB,AVTHA3,AVTOPCOB,           * 13600010
+*       AVTPROPT)                                                     * 13800010
+*   CHECKPOINT WORK AREA                                              * 14000010
+*                                                                     * 14200010
+*ATTRIBUTES:REENTERABLE                                               * 14400010
+*                                                                     * 14600010
+*NOTES:THE OPERATION OF THIS MODULE DEPENDS UPON AN INTERNAL REPRE-   * 14800010
+*   SENTATION OF THE EXTERNAL CHARACTER SET WHICH IS EQUIVALENT TO    * 15000010
+*   THE ONE USED AT ASSEMBLY TIME. THE CODING HAS BEEN ARRANGED SO    * 15200010
+*   THAT REDEFINITION OF 'CHARACTER' CONSTANTS,BY REASSEMBLY, WILL    * 15400010
+*   RESULT IN A CORRECT MODULE FOR THE NEW DEFINITIONS.               * 15600010
+*                                                                     * 15800010
+*********************************************************************** 16000010
+         EJECT                                                          16100010
+         SPACE 3                                                        16200010
+*REGISTER ASSIGNMENTS                                                   16400010
+         SPACE                                                          16600010
+R0       EQU   0                                                        16800010
+R1       EQU   1                                                        17000010
+R2       EQU   2                        ADDRESS OF CKPT WORK AREA       17200010
+R3       EQU   3                        ADDRESS OF REQUEST ELEMENT      17400010
+R4       EQU   4                        ADDRESS OF DISK RECORD          17600010
+R5       EQU   5                                                        17800010
+R6       EQU   6                        ADDRESS OF PREVIOUS REQ ELM     18000010
+R7       EQU   7                                                        18200010
+R8       EQU   8                                                        18400010
+RAVT     EQU   9                        ADDRESS OF AVT                  18600010
+R10      EQU   10                       LENGTH FOR FREEMAIN             18800010
+R11      EQU   11                       BRANCH REG                      19000010
+R12      EQU   12                       BASE FOR CKPT EXECUTOR          19200010
+R13      EQU   13                       BRANCH REG                      19400010
+R14      EQU   14                       RETURN ADDR-IN CKPT EXECUTR     19600010
+R15      EQU   15                       ENTRY POINT FOR THIS MODULE     19800010
+         SPACE 3                                                        20000010
+         USING *,R15                    BASE REG                        20200010
+IEDQNQ   IEDHJN QNQ00                                            S99240 20400010
+         USING IEDQAVTD,RAVT            BASE FOR AVT                    21200010
+         USING IEDQCKPD,R2              BASE FOR CKPT WORK AREA         21400010
+         USING IEDQCRED,R3              BASE FOR REQUEST ELEMENT        21600010
+         USING IEDQCDRD,R4              BASE FOR DISK RECORD    SA52951 21700010
+         L     R3,AVTCKPTB              GET QCB ELEMENT CHAIN           21800010
+         CLI   CREKEY,CREREMVE          THIS CHECKPOINT REMOVAL@XA05298 21820010
+*                                         ELEMENT              @XA05298 21840010
+         BNE   QNQ02                    NO, BRANCH             @XA05298 21860010
+         BAL   R6,QNQ78                 REMOVE THIS ELEMENT    @XA05298 21880010
+         L     R3,AVTCKPTB              GET NEXT ELEMENT       @XA05298 21900010
+QNQ02    EQU   *                                               @XA05298 21920010
+         TM    CKPLREB,CKPNDRB          CHECK FOR UNSATISFIED REQ       22000010
+         BZ    QNQ60                    BRANCH IF NOT UNSATISFIED       22200010
+         SPACE 3                                                        22400010
+*A CHECKPOINT REQUEST COULD NOT BE SATISFIED.REMOVE REQUEST ELEMENT     22600010
+*FROM CKPT QCB CHAIN AND NOTIFY REQUESTOR.                              22800010
+         SPACE                                                          23000010
+         L     R6,CKPLREB               LAST REQ EL.-DISK RCD BUILT     23200010
+         NC    CKPLREB+1(3),CKPLREB+1   CHECK FOR PREVIOUS ELEMENT      23400010
+         BNZ   QNQ05                    BRANCH NOT ZERO                 23600010
+         LA    R6,AVTCKPTB-4            GET DUMMY PREVIOUS ELEMENT      23800010
+QNQ05    EQU   *                                                        24000010
+         BAL   R13,GETLOCK              SET MODE AND GET LOCK    Y02027 24030010
+         L     R3,4(0,R6)               NEXT REQ EL.IN CHAIN-RCD       X24200010
+                                        NOT BUILD FOR IT                24400010
+         MVC   5(3,R6),5(R3)            REMOVE REQ EL.FROM CHAIN        24600010
+         BAL   R13,RELLOCK              SET MODE AND RELEASE LOCK|02027 24700010
+         TM    CREKEY,B'01010000'       CHECK FOR ENVIRONMENT REQ       24800010
+         BNO   QNQ80                    BRANCH IF NOT FOR ENV           25000010
+         SPACE 3                                                        25200010
+*THIS IS AN ENVIRONMENT REQUEST TO DISPOSE OF.                          25400010
+         SPACE                                                          25600010
+QNQ07    EQU   *                                                        25800010
+         TM    AVTCKELF,AVTCINCN        CHECK FOR INCIDENT OVERFLOW     26000010
+         BZ    QNQ30                    BRANCH IF NO INC OVERFLOW       26200010
+         L     R3,AVTCKPTB              GET ELEMENT CHAIN FROM QCB      26400010
+         LA    R6,AVTCKPTB-4            DUMMY PREVIOUS ELEMENT          26600010
+         NI    AVTCKELF,X'FF'-AVTCINCN  TURN OFF INCIDENT OVERFLOW      26800010
+         SPACE 3                                                        27000010
+*THIS ENVIRONMENT CKPT IS A RESULT OF AN INCIDENT OVERFLOW. ALL         27200010
+*INCIDENT REQUEST ELEMENTS WHICH HAVE AN OVERFLOW INDICATOR ON(HIGH     27400010
+*ORDER BIT OF KEY FIELD) MUST BE REMOVED AND THE REQUESTORS             27600010
+*NOTIFIED.                                                              27800010
+         SPACE 3                                                        28000010
+*BEGINNING OF LOOP THROUGH QCB CHAIN                                    28200010
+         SPACE                                                          28400010
+QNQ10    EQU   *                                                        28600010
+         CLC   5(3,R6),AVTDELAD+1       CHECK FOR END OF ELMNT CHAI     28800010
+         BE    QNQ30                    BRANCH IF END                   29000010
+         SPACE                                                          29200010
+         TM    CREKEY,CREINCOF          CHECK INCIDENT OVERFLOW BIT     29400010
+         BZ    QNQ20                    BRANCH IF NOT ON                29600010
+         SPACE                                                          29800010
+         NI    CREKEY,X'FF'-CREINCOF    TURN OFF INCIDENT OVERFLOW      30000010
+         BAL   R13,GETLOCK              SET MODE AND GET LOCK    Y02027 30100010
+         MVC   5(3,R6),5(R3)            MOVE LINK FIELD TO PREVIOUS     30200010
+         BAL   R13,RELLOCK              SET MODE AND RELEASE LOCKY02027 30300010
+         BAL   R13,QNQ90                DETERMINE REQUESTOR,POST        30400010
+         L     R3,AVTECD4(,R6)          GET NEXT ELE IN CHAIN   SA52951 30460010
+         B     QNQ10                    CHECK FOR END OF CHAIN  SA52951 30520010
+         SPACE                                                          30600010
+QNQ20    EQU   *                                                        30800010
+         LR    R6,R3                    SAVE PREVIOUS REQUEST ELEMT     31000010
+         L     R3,4(0,R3)               GET NEXT ELEMENT IN CHAIN       31200010
+         B     QNQ10                    GO CHECK FOR END OF CHAINS99240 31400010
+         SPACE                                                          31600010
+*END OF LOOP THROUGH QCB CHAIN                                          31800010
+         SPACE 3                                                        32000010
+*THERE IS NO INCIDENT OVERFLOW                                          32200010
+         SPACE                                                          32400010
+QNQ30    EQU   *                                                        32600010
+         TM    AVTCKELF,AVTCMCPN        CHECK FOR MCPCLOSE REQUEST      32800010
+         BZ    QNQ35                    BRANCH IF NOT MCPCLOSE REQ      33000010
+         SPACE                                                          33200010
+         LA    R1,AVTCLOSB              ADDR OF CLOSEDOWN COMPL QCB     33400010
+         MVI   4(R1),PRICLSDN           SET LOW PRIOITY                 33600010
+         LR    R0,R1                    QCB IS POSTED TO ITSELF         33800010
+         NI    AVTCKELF,X'FF'-AVTCMCPN  TURN OFF REQUEST BITS           34000010
+         B     QNQ40                    QPOST QCB TO READY QUEUE        34200010
+QNQ35    EQU   *                                                        34400010
+         MVC   AVTCKTIM,AVTCKELV        RESET CKPT TIME INTERVAL        34600010
+         LA    R1,AVTCKELE              ADDRESS OF CKPT REQ ELEMENT     34800010
+         LA    R0,AVTDELYB              ADDRESS TIME DELAY QCB          35000010
+QNQ40    EQU   *                                                        35200010
+         BAL   R11,QNQ85                QPOST                           35400010
+         SPACE 3                                                        35800010
+*TURN ON CHECKPOINT BIT IN EACH PCB.                                    36000010
+         SPACE                                                          36200010
+QNQ45    EQU   *                                                        36400010
+         USING IEDQPCB,R10              BASE FOR PCB                    36600010
+         LA    R10,AVTPCBPT-X'18'       DUMMY LAST PCB IN CHAIN         36800010
+         SPACE 3                                                        37000010
+*BEGINNING OF LOOP THROUGH ALL PCBS                                     37200010
+         SPACE                                                          37400010
+QNQ46    EQU   *                                                        37600010
+         NC    PCBLINK(3),PCBLINK       CHECK FOR END OF CHAIN          37800010
+         BZ    QNQ47                    BRANCH IF END                   38000010
+         L     R10,PCBLINK-1            GET NEXT IN CHAIN               38200010
+         OI    PCBOFLG,PCBCKPTN         TURN ON CKPT BIT                38400010
+         B     QNQ46                    BRANCH TO LOOP                  38600010
+         SPACE                                                          38800010
+*END OF LOOP THROUGH PCBS                                               39000010
+         SPACE 3                                                        39200010
+QNQ47    EQU   *                                                        39400010
+         LH    R10,CKPBPERR             LENGTH FOR ENV.DISK RCD         39600010
+         SPACE 3                                                        39800010
+*ISSUE FREEMAIN FOR CURRENT EXCP RECORD                                 40000010
+         SPACE                                                          40200010
+QNQ50    EQU   *                                                        40400010
+         TM    CKPLREB,CKPNDRB          IS THIS UNSATISFIED REQUEST     40600010
+         BO    QNQ55                    BRANCH IF UNSATISFIED           40800010
+         SPACE                                                          41000010
+         LA    R11,CKPEXCP              ADDRESS OF RCD TO FREE          41200010
+         FREEMAIN E,LV=(R10),A=(R11),MF=(E,CKPGETML)                    41400010
+         SPACE                                                          41600010
+         XC    CKPEXCP,CKPEXCP          CLEAR CURRENT EXCP SLOT         41800010
+QNQ55    EQU   *                                                        42000010
+         NI    CKPLREB,AVTEFF-CKPNDRB   TURN OFF UNSATISFIED BITSA52951 42200010
+         B     AVTECD4(R14)             RETURN TO CKPT EXECUTOR SA52951 43400010
+         SPACE 3                                                        44200010
+*THE DISK RECORD IN THE CURRENT EXCP SLOT HAS BEEN WRITTEN. DISPOSE     44400010
+*OF IT. DETERMINE IF REQUEST IS COMPLETED.                              44600010
+         SPACE                                                          44800010
+QNQ60    EQU   *                                                        45000010
+         L     R4,CKPEXCP               ADDR OF DISK RCD JUST WRITN     45200010
+         MVI   CKPECB,0                 CLEAR ECB COMPLETION CODE       45400010
+         TM    CKPIOECB,X'7F'           CHECK FOR DISK ERROR            45600010
+         BNO   QNQ82                    BRANCH IF DISK ERROR            45800010
+         CLI   CDRKEY,CDRTOTLC          CHECK FOR TOTAL(NOT LASTSEG     46000010
+         BNE   QNQ65                    BRANCH NOT TOTAL-LAST SEG       46200010
+QNQ63    EQU   *                                                        46400010
+         LA    R15,CKPENV               OFFSET FOR MODULE TO BUILD     X46600010
+                                        NEXT SEGMENT OF ENV CKPT        46800010
+         BR    R14                      RETURN TO EXECUTOR              47000010
+         SPACE                                                          47200010
+QNQ65    EQU   *                                                        47400010
+         CLI   CDRKEY,CDRTOTAL          CHECK FOR ENV-LAST SEGMENT      47600010
+         BNE   QNQ67                    BRANCH IF NOT ENV RCD           47800010
+         LA    R6,AVTCKPTB-AVTECD4      DUMMY PREVIOUS ELEMENT  SA52951 48000010
+         LA    R13,AVTCKELE             ADDR OF CKPT ELEMENT    SA52951 48010010
+         ST    R13,CKPTRMAD             SAVE ADDR FOR COMPARE   SA52951 48020010
+QNQ66    EQU   *                                                SA52951 48030010
+         CLC   OFFST5(L3,R6),CKPTRMAD+ONE IS THIS THE CKPT ELE  SA52951 48040010
+         BE    QNQ6605                  IF SO,REMOVE FROM CHAIN SA52951 48050010
+         SPACE 1                                                        48060010
+         L     R6,AVTECD4(,R6)          NEXT ELEMENT IN CHAIN   SA52951 48070010
+         B     QNQ66                    TEST FOR CKPT ELEMENT   SA52951 48080010
+         SPACE 1                                                        48090010
+QNQ6605  EQU   *                                                SA52951 48100010
+         BAL   R13,GETLOCK              SET MODE AND GET LOCK    Y02027 48110010
+         MVC   OFFST5(L3,R6),AVTCKELE+OFFST5 REMOVE CKPT ELE    SA52951 48240010
+         CLC   CKPLREB+ONE(L3),CKPTRMAD+ONE WAS LAST DISK RCD   SA52951 48250010
+*                                       BUILT FOR CKPT ELEMENT  SA52951 48260010
+         BNE   QNQ6609                  IF NOT, BYPASS CLEAR    SA52951 48270010
+         XC    CKPLREB,CKPLREB          CLEAR ELEMENT POINTER   SA52951 48280010
+         SPACE 1                                                        48290010
+QNQ6609  EQU   *                                                SA52951 48300010
+         BAL   R13,RELLOCK              SET MODE AND RELEASE LOCKY02027 48310010
+         B     QNQ07                    DISPOSE OF ENVIRON. REQ. S99240 48600010
+         SPACE                                                          48800010
+QNQ67    EQU   *                                                        49000010
+         TM    CDRCKFLG,CDRCKRNC        CHECK FOR REQ NOT COMPLETED     49200010
+         BZ    QNQ75                    BRANCH NOT CKREQ CONTINUED      49400010
+         CLI   CDRKEY,CDRCKREQ          CHECK FOR CKREQ RECORD          49600010
+         BNE   QNQ75                    BRANCH IF NOT CKREQ             49800010
+         LA    R15,CKPCKREQ             OFFSET FOR CKREQ RTN            50000010
+         BR    R14                      RETURN TO EXECUTOR              50200010
+         SPACE                                                          50400010
+QNQ75    EQU   *                                                        50600010
+         LA    R6,QNQ80                 LOAD BR REG            @XA05298 50610010
+         CLI   CDRKEY,CDROPC            WAS OPERATOR CONTROL     S99240 50620010
+*                                        INCIDENT RECORD WRITTEN S99240 50640010
+         BNE   QNQ78                    NO, REMOVE REQ ELEMENT   S99240 50660010
+         LH    R10,CKPINCLN             FREEMAIN LNGTH FOR INCIDSA58451 50670010
+         TM    CDRTTRLI+2,2             IS THIS THE LAST SEGMENT S99240 50680010
+         BZ    QNQ50                    NO, FREE THIS RECORD AND S99240 50700010
+*                                        RETURN TO WRITE NEXT    S99240 50720010
+QNQ78    EQU   *                                                 S99240 50740010
+         BAL   R13,GETLOCK              SET MODE AND GET LOCK    Y02027 50800010
+         CLC   AVTCKPTB+1(3),CKPLREB+1  CHK PREVIOUS ELEMENT     Y02027 50820010
+         BNE   QNQ79                    BR IF NOT EQUAL TO FIRST Y02027 50840010
+         XC    CKPLREB,CKPLREB          CLEAR ADDR OF ELEMENT    Y02027 50860010
+QNQ79    EQU   *                                                 Y02027 50880010
+         MVC   AVTCKPTB+1(3),5(R3)      DELINK ELEMENT           Y02027 50900010
+         BAL   R13,RELLOCK              SET MODE AND RELEASE LOCKY02027 50920010
+         BR    R6                       RETURN                 @XA05298 50960010
+QNQ80    EQU   *                                                        51000010
+         BAL   R13,QNQ90                DETERMINE REQUESTOR,POST        51200010
+         B     QNQ50                    FREEMAIN                        51400010
+         SPACE 3                                                        51600010
+*THERE WAS A DISK ERROR IN THE LAST RECORD WRITTEN                      51800010
+         SPACE                                                          52000010
+QNQ82    EQU   *                                                        52200010
+         CLI   CDRKEY,CDRCKREQ          CHECK RECORD TYPE               52600010
+         BL    QNQ84                    INCIDENT                        52800010
+         BH    QNQ83                    ENV                             53000010
+         SPACE 3                                                        53200010
+*CKREQ RECORD                                                           53400010
+         SPACE                                                          53600010
+         L     R8,CKPCTTRB              ADDRESS OF CKREQ TTR RABLE      53800010
+         SPACE 3                                                        54000010
+*BEGINNING OF LOOP THROUGH CKREQ-TTR TABLE                              54200010
+         SPACE                                                          54400010
+QNQ825   EQU   *                                                        54600010
+         TM    CKPCTFLG(R8),CKPCTDER    CHECK FOR DISK ERROR            54800010
+         BO    QNQ827                   BRANCH IF ERROR                 55000010
+         CLC   CDRCKOFF,CKPCTOFF(R8)    COMPARE OFFSETS                 55200010
+         BE    QNQ829                   BRANCH IF EQUAL                 55400010
+QNQ827   EQU   *                                                        55600010
+         LA    R8,CKPCTTRL(0,R8)        MOVE TO NEXT ENTRU              55800010
+         B     QNQ825                   LOOP TO NEXT ENTRY              56000010
+         SPACE                                                          56200010
+*END OF LOOP THROUGH CKREQ-TTR TABLE                                    56400010
+         SPACE 3                                                        56600010
+QNQ829   EQU   *                                                        56800010
+         OI    CKPCTFLG(R8),CKPCTDER    TURN ON DISK ERROR FLAG         57000010
+         B     QNQ84                    WRITE ERROR MESSAGE             57200010
+         SPACE 3                                                        57400010
+*ENVIRONMENT SEGMENT                                                    57600010
+         SPACE                                                          57800010
+QNQ83    EQU   *                                                        58000010
+         CLC   CKPRW+6(2),CKPCRLEN      CHECK FOR CONTROL RECORD        58200010
+         BNE   QNQ835                   BRANCH IF NOT CONTROL RCD  0217 58300010
+         WTO   'IED087I CHECKPOINT DISK ERROR-CONTROL RECORD',     0217X58400010
+               ROUTCDE=11,DESC=4                                        58500010
+         B     QNQ845                   BRANCH TO EXIT CODE        0217 58600010
+QNQ835   EQU   *                                                   0217 58700010
+         SR    R7,R7                    CLEAR FOR IC             Y02027 58750010
+         IC    R7,CKPTTRCT              CORRENT ENV TTR                 58800010
+         MH    R7,AVTHA3                MULTIPLY BY 3                   59000010
+         LA    R7,CKPTTRT1-3(R7)        ADDRESS OF TTR             0217 59200010
+         XC    0(3,R7),0(R7)            CLEAR TTR                       59400010
+         SPACE 3                                                        59600010
+*INCIDENT RECORD                                                        59800010
+         SPACE                                                          60000010
+QNQ84    EQU   *                                                        60200010
+         WTO   'IED084I CHECKPOINT DISK ERROR-RECOVERED',          0217X60300010
+               ROUTCDE=11,DESC=4                                        60400010
+QNQ845   EQU   *                                                        60600010
+         LA    R15,CKPDIOR              OFFSET FOR DISK I/O ROUTINE     61800010
+         BR    R14                      RETURN TO EXICUTOR              62000010
+         SPACE 3                                                        62200010
+*SUBROUTINE TO SET UP REGISTERS FOR DISPATCHER TO QPOST ELEMENT TO      62400010
+*THE READY QUENE. REGISTER 11 IS THE BRANCH REG.                        62600010
+         SPACE                                                          62800010
+QNQ85    EQU   *                                                        63000010
+         ST    R0,CKPTRMAD              ADDR OF QCB                     63200010
+         MVC   1(3,R1),CKPTRMAD+1       PUT QCB ADDR IN REQ ELEMENT     63400010
+QNQ86    EQU   *                                                   1016 63500010
+         XC    5(3,R1),5(R1)             CLEAR LINK FIELD               63600010
+         LR    R0,R1                    DUPLICATE ADDRESS               63800010
+         STM   R0,R1,CKPSAVE2           PUT INTO PARM LIST              64000010
+         MVI   CKPSAVE2,X'0C'           PUT IN 1ST BYTE                 64200010
+QNQ87    EQU   *                                                        64400010
+         LA    R1,CKPSAVE2              ADDRESS OF PARM LIST            64600010
+         LR    R5,R15                   SAVE REG                        64800010
+         AQCTL                          POST ELEMENT TO READY Q         65000010
+         LR    R15,R5                   RESTORE REG                     65200010
+         SPACE                                                          65400010
+         BR    R11                      RETURN                          65600010
+         SPACE                                                          65800010
+*END OF SUBROUTINE                                                      66000010
+         SPACE 3                                                        66200010
+*SUBROUTINE TO DETERMINE CKPT REQUESTOR AND POST IT COMPLETE            66400010
+*REGISTER 13 IS BRANCH REG                                              66600010
+QNQ90    EQU   *                                                        66800010
+         SPACE                                                          67000010
+         LH    R10,CKPINCLN             FREEMAIN LENGTH FOR INCIDNT     67200010
+         LR    R1,R3                    ADDR OF ELEMENT FOR READY Q1016 67300010
+         CLI   CREKEY,CREOPC            CHECK FOR OPERATOR CONTROL      67400010
+         BNE   QNQ92                    BRANCH IF NOT OP CONTROL        67600010
+         SPACE                                                          67800010
+         LA    R0,AVTOPCOB              ADDR OPC QCB               1013 67900010
+         BAL   R11,QNQ85                POST ELEMENT TO READY QUEUE1016 68000010
+         BR    R13                      RETURN                     1016 68200010
+         SPACE                                                          68400010
+QNQ92    EQU   *                                                        68600010
+         CLI   CREKEY,CRELCB            CHECK FOR LCB FROM MH           68800010
+         BNE   QNQ94                    BRANCH IF NOT LCB               69000010
+         SPACE                                                          69200010
+         USING IEDQLCB,R3                                               69400010
+         LA    R11,LCBERB-IEDQLCB       OFFSET FOR ERB INTO LCB    1016 69600010
+         SR    R3,R11                   ADDR OF LCB BEGINNING      1016 69700010
+         LR    R1,R3                    COPY LCB ADDR FOR POST     1021 69800010
+         L     R11,LCBSCBA-1            ADDRESS OF SCB                  70000010
+         USING IEDQSCB,R11                                              70200010
+         NI    SCBSTATE,X'FF'-SCBCKPT   TURN OFF CHECKPT BIT            70400010
+         BAL   R11,QNQ86                POST ELEMENT TO READY QUEUE1016 70900010
+         BR    R13                      RETURN FROM SUBROUTINE          71400010
+         SPACE                                                          71600010
+QNQ94    EQU   *                                                        71800010
+         LR    R11,R3                   ADDRESS OF CRE - IT IS   Y02027 72000010
+*                                       LOCATED IN AIB           Y02027 72090010
+         SH    R11,AVTHA16              BACK UP TO AIB           Y02027 72180010
+         USING IEDQAIB,R11              ADDRESSABILITY OF AIB    Y02027 72270010
+         MVC   AIBCMPTC(4),AIBCKECB     STORE ECB IN LIST        Y02027 72360010
+         L     R1,AIBPCBAD              GET PCB ADDRESS          Y02027 72450010
+         L     R1,PCBPEBAD-IEDQPCB(R1)  GET PEB ADDRESS          Y02027 72540010
+         LTR   R1,R1                    TEST IF AP IS ACTIVE     Y02027 72630010
+         BZ    BYPASS                   BRANCH IF NO TO AVOID    Y02027 72720010
+*                                       XMPOST                   Y02027 72810010
+         L     R1,PEBASCB-IEDQPEB(R1)   GET ASCB ADDRESS         Y02027 72900010
+         LTR   R1,R1                    TEST IF FLAG HAS         Y02027 72990010
+*                                       INVALIDATED ASCB ADDRESS Y02027 73080010
+         BM    BYPASS                   BRANCH IF NEGATIVE - FLAGY02027 73170010
+*                                       ON - AVOID XMPOST        Y02027 73260010
+         ST    R1,AIBCMPTC+FOUR         STORE IN LIST            Y02027 73350010
+         L     R1,CVTPTR                ADDRESS OF CVT           Y02027 73440010
+         LA    R1,CVTBRET(R1)           GET ERROR ADDRESS -BR 14 Y02027 73530010
+         ST    R1,AIBCMPTC+EIGHT        STORE IN LIST            Y02027 73620010
+         LA    R1,AIBCMPTC              GET ADDR OF LIST         Y02027 73710010
+         LR    R5,R15                   SAVE REG                 Y02027 73800010
+         SR    R0,R0                    ZERO COMPLETION CODE     Y02027 73890010
+         POST  ,(0),MF=(E,(1))                                   Y02027 73980010
+         LR    R15,R5                   RESTORE REGISTER         Y02027 74070010
+BYPASS   EQU   *                                                 Y02027 74160010
+         CLI   CDRKEY,CDRCKREQ          CHECK FOR CKREQ                 74400010
+         BCR   7,R13                    BRANCH IF NOT CKREQ             74600010
+         LH    R10,CKPCKRLN             LENGTH OF CKREQ RCD             74800010
+         BR    R13                      RETURN FROM SUBROUTINE          75000010
+         SPACE 3                                                        75200010
+GETLOCK  EQU   *                                                 Y02027 76800010
+         LR    R5,R15                   SAVE REG                 Y02027 76900010
+         LR    R7,R14                   SAVE REG                 Y02027 77000010
+         MODESET MODE=SUP               SET TO SUPERVISOR STATE  Y02027 77100010
+         MODESET EXTKEY=SUPR            SET TO KEY ZERO          Y02027 77200010
+SETATSK  EQU   *                                                 Y02027 77300010
+         SETLOCK OBTAIN,TYPE=LOCAL,MODE=UNCOND,REGS=USE,               C77400010
+               RELATED=ATTACHED-TASKS-IGG019RO/IGG019RB(SETATSK) Y02027 77500010
+         LR    R15,R5                   RESTORE REG              Y02027 77600010
+         LR    R14,R7                   RESTORE REG              Y02027 77700010
+         BR    R13                      RETURN                   Y02027 77800010
+         SPACE 3                                                 Y02027 77900010
+RELLOCK  EQU   *                                                 Y02027 78000010
+         LR    R7,R14                   SAVE REG                 Y02027 78100010
+         LR    R5,R15                   SAVE REG                 Y02027 78200010
+         SETLOCK RELEASE,TYPE=LOCAL,REGS=USE,                          C78300010
+               RELATED=ATTACHED-TASKS-IEDQNQ(SETATSK)            Y02027 78400010
+         MODESET EXTKEY=TCAM            SET TO TCAM KEY          Y02027 78500010
+         LR    R15,R5                   RESTORE BASE REG         Y02027 78600010
+         MODESET MODE=PROB              SET TO PROBLEM STATE     Y02027 78700010
+         LR    R14,R7                   RESTORE REG              Y02027 78800010
+         LR    R15,R5                   RESTORE REG              Y02027 78900010
+         BR    R13                      RETURN                   Y02027 79000010
+* EQUATED SYMBOLS                                               SA52951 79420010
+         SPACE 1                                                        79430010
+ONE      EQU   1                        CONSTANT ONE            SA52951 79440010
+L3       EQU   3                        LENGTH OF THREE         SA52951 79450010
+OFFST5   EQU   5                        OFFSET OF FIVE          SA52951 79460010
+FOUR     EQU   4                        DISPLACEMENT             Y02027 79462010
+EIGHT    EQU   8                        DISPLACEMENT             Y02027 79464010
+CVTPTR   EQU   16                       PTR TO CVT               Y02027 79466010
+CVTBRET  EQU   X'52'                    OFFSET IN CVT TO BR 14   Y02027 79468010
+         EJECT                                                  SA52951 79470010
+         IHAPSA                         DSECT FOR SETLOCK        Y02027 79500010
+         SPACE 3                                                        79600010
+         SPACE 3                                                        80600010
+         TCKPD 3330                     MERLIN VERSION      0512 S21101 80800010
+         TAVTD                                                          81200010
+         TDISPD                                                         81400010
+         TPCBD                                                          81600010
+         TLCBD                                                          81800010
+         TSCBD                                                          82000010
+         TPRIOR                                                         82200010
+         TAIBD EXT=(CKREQ)                                       Y02027 82260010
+         TPEBD                                                   Y02027 82320010
+         END                                                            82400010

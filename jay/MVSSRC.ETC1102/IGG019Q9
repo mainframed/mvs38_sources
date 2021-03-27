@@ -1,0 +1,743 @@
+         TITLE 'IGG019Q9 -- CONCENTRATOR SEND SCHEDULER'                00100010
+IGG019Q9 CSECT                                                          00200010
+*A-000000-999999                                               @X31X8I0 00205010
+         SPACE 3                                                        00210010
+*CHANGE-ACTIVITY = AS FOLLOWS:                                          00220010
+******************** MICROFICHE FLAGS *********************** SUPT CODE 00230010
+*A178810-178950                                                 SA58993 00250010
+*D484000-486000,A484000-486100                                  SA56606 00250110
+*A601030-601810                                                  Y05331 00250210
+*A002000,624000                                                @Z30X8IM 00250310
+*C005000,194000,287000,298000,405000,452000                    @Z30X8IM 00250410
+*D195000-196000,288000-289000,299000-300000,406000-407000      @Z30X8IM 00250510
+*D453000-454000                                                @Z30X8IM 00250610
+*********************************************************************** 00300010
+*                                                                     * 00400010
+*  MODULE NAME = IGG019Q9                                               00410010
+*                                                                       00420010
+*  DECSRIPTIVE NAME = CONCENSTRATOR SEND SCHEDULER                      00430010
+*                                                                       00440010
+*        COPYRIGHT='NONE'                                               00450010
+*                                                                       00460010
+* STATUS -- CHANGE LEVEL 8                                     @Z30X8IM 00500010
+*                                                                     * 00600010
+* FUNCTION -- TO SCHEDULE A SENDING OPERATION AND TO EFFECT READING   * 00700010
+*    FROM MULTIPLE QCBS FOR CONCENTRATOR OUTPUT.                      * 00800010
+*                                                                     * 00900010
+* ENTRY POINTS --                                                     * 01000010
+*         FIRST EXECUTALBE INSTRUCTION                                * 01100010
+*         'DESTENT' WHEN BRANCHED TO BY DESTINATION ASSIGNMENT        * 01200010
+*                                                                     * 01300010
+* INPUT --                                                            * 01400010
+*    WHEN ACTIVATED BY THE DISPATCHER -                               * 01500010
+*    R1 POINTS TO A BUFFER, LCB OR ERB                                * 01600010
+*    R3 ADDRESS OF STCB                                               * 01700010
+*    R7 ADDRESS OF QCB                                                * 01800010
+*    R11 DISPATCHER BASE                                              * 01900010
+*    R13 ADDRESS OF AVTSAVE2                                          * 02000010
+*    R15 ENTRY POINT ADDRESS                                          * 02100010
+*                                                                     * 02200010
+*    'DESTENT' -                                                      * 02300010
+*    R7 ADDRESS OF QCB                                                * 02400010
+*    R13 ADDRESS OF AVTSAVE2                                          * 02500010
+*    R14 RETURN ADDRESS                                               * 02600010
+*    R15 ENTRY POINT ADDRESS                                          * 02700010
+*                                                                     * 02800010
+* OUTPUT --                                                           * 02900010
+*    R1 POINTS TO A BUFFER, LCB OR ERB                                * 03000010
+*    R3 ADDRESS OF STCB                                               * 03100010
+*    R11 DISPATCHER BASE                                              * 03200010
+*    R13 ADDRESS OF AVTSAVE2                                          * 03300010
+*                                                                     * 03400010
+* EXTERNAL REFERENCES --                                              * 03500010
+*         DSPPOSTR                                                    * 03600010
+*         DSPUNAVR                                                    * 03700010
+*         DSPPRIOR                                                    * 03800010
+*                                                                     * 03900010
+* EXITS,NORMAL --                                                     * 04000010
+*         DSPDISP                                                     * 04100010
+*         DSPBYPAS                                                    * 04200010
+*         DSPPOST                                                     * 04300010
+*         BR 14 RETURN TO DESTINATION ASSIGMENT                       * 04400010
+*                                                                     * 04500010
+* EXITS,ERROR --                                                      * 04600010
+*         NONE                                                        * 04700010
+*                                                                     * 04800010
+* TABLES/WORK AREAS --                                                * 04900010
+*    AVT                                                              * 05000010
+*    LCB                                                              * 05100010
+*    QCB                                                              * 05200010
+*    QCBE                                                             * 05300010
+*    SCB                                                              * 05400010
+*    DCB                                                              * 05500010
+*    DEB                                                              * 05600010
+*    TERMINAL ENTRY                                                   * 05700010
+*    DRQ                                                              * 05800010
+*                                                                     * 05900010
+* ATTRIBUTES --                                                       * 06000010
+*    RE-ENTRANT, REFRESHABLE, PROBLEM PROGRAM MODE                    * 06100010
+*                                                                     * 06200010
+* CHARACTER CODE DEPENDENCY --                                          06300010
+*    THE OPERATION OF THIS MODULE DOES NOT DEPEND UPON A PARTICULAR   * 06400010
+*    INTERNAL REPRESENTATION OF THE EXTERNAL CHARACTER SET.           * 06500010
+*                                                                     * 06600010
+* NOTES --                                                            * 06700010
+*    STANDARD TCAM LINKAGES AND DEVIATIONS FROM STANDARDS.            * 06800010
+*    THE ADDRESS OF THE SCHEDULER IS STORED BY OPEN IN THE AVT.       * 06900010
+*    DESTINATION ASSIGNMENT EXPECTS THE OFFSET TO 'DESTENT' TO BE     * 07000010
+*    THE FIRST TWO BYTES OF THIS MODULE.                              * 07100010
+*                                                                     * 07200010
+*********************************************************************** 07300010
+         EJECT                                                          07400010
+*********************************************************************** 07500010
+*        SYMBOLIC REGISTERS                                           * 07600010
+*********************************************************************** 07700010
+         SPACE 1                                                        07800010
+RZERO    EQU   0                         WORK REGISTER                  07900010
+RPARM    EQU   1                         PARAMETER REGISTER             08000010
+RWORKA   EQU   2                        WORK REG                        08100010
+RQCBE    EQU   3                        QCBE REG                        08200010
+RSTCB    EQU   3                         STCB                           08300010
+RLCB     EQU   4                         LCB                            08400010
+RWORKB   EQU   5                        WORK REG                        08500010
+RPQCB    EQU   5                         PPIORTY LEVEL QCB              08600010
+RDRQ     EQU   6                         DRQ                            08700010
+RQCB     EQU   7                         QCB                            08800010
+RWORKC   EQU   8                        WORK REG                        08900010
+RTERM    EQU   8                         TERMINAL ENTRY                 09000010
+RSCB     EQU   9                         SCB                            09100010
+RDCB     EQU   10                        DCB                            09200010
+RDISP    EQU   11                        DISPATCHER BASE                09300010
+RBASE    EQU   12                        CSECT BASE                     09400010
+RAVT     EQU   13                        AVT BASE                       09500010
+RRETURN  EQU   14                        RETURN REGISTER                09600010
+RENTRY   EQU   15                        ENTRY POINT ADDRESS            09700010
+         SPACE 1                                                        09800010
+*********************************************************************** 09900010
+*        ESTABLISH CSECT AND CONTROL BLOCK ADDRESSABILITY             * 10000010
+*********************************************************************** 10100010
+         SPACE 2                                                        10200010
+         USING IEDQDISP,RDISP           DISP                            10300010
+         USING AVTSAVE2,RAVT            AVT                             10400010
+         USING IEDQQCB,RQCB             QCB                             10500010
+         USING IEDQSCB,RSCB             SCB                             10600010
+         USING IEDQLCB,RLCB             LCB                             10700010
+         USING IEDQTRM,RTERM            TERMINAL ENTRY                  10800010
+         USING IHADCB,RDCB              DCB                             10900010
+         USING IEDQSTCB,RSTCB           STCB                            11000010
+         USING IEDQDRQ,RDRQ             DRQ                             11100010
+         SPACE 2                                                        11200010
+         DC    AL2(DESTENT-IGG019Q9)     OFFSET TO DESTENT              11300010
+         SPACE 2                                                        11400010
+         USING *,RENTRY                                                 11500010
+         B     SETBASE                  BRANCH/DUMMY QCB                11600010
+         DC    H'0'                     FILLER                          11700010
+         DC    AL1(DSPMCPL6)            STCB                            11800010
+         DC    AL3(*-1)                 STCB ADDR                       11900010
+         DC    H'0'                     FILLER                          12000010
+SETBASE  BALR  RBASE,0                  SET BASE REG                    12100010
+         DROP  RENTRY                                                   12200010
+         USING *,RBASE                                                  12300010
+         LR    RLCB,RPARM               ASSUME LCB                      12400010
+         CLI   LCBRSKEY-IEDQLCB(RPARM),RSVTO                            12500010
+*                                       ELEMENT A LCB                   12600010
+         BE    SETREGS                  BRANCH IF YES                   12700010
+         TM    PRFTIC-IEDQPRF(RPARM),CCWTIC                             12800010
+*                                       ELEMENT A BUFFER                12900010
+         BZ    SETERB                   BRANCH IF NO                    13000010
+         SPACE 1                                                        13100010
+**********************************************************************  13200010
+*        ELEMENT IS A BUFFER                                          * 13300010
+**********************************************************************  13400010
+         SPACE 1                                                        13500010
+         L     RSTCB,QCBSLINK-1          ADDRESS OF DEST SCH STCB       14300010
+         B     DSPBYPAS                  ACTIVATE DEST SCH              14400010
+         DC    CL8'IGG019Q9'            MODULE ID                       14500010
+         IEDHJN                                                         14600010
+SETERB   EQU   *                                                        14700010
+         LA    RWORKA,LCBERB-IEDQLCB    ERB OFFSET INTO LCB             14800010
+         SR    RLCB,RWORKA              COMPUTE LCB                     14900010
+SETREGS  EQU   *                                                        15000010
+         L     RSCB,LCBSCBA-1           SCB                             15100010
+         L     RDCB,LCBDCBPT            DCB                             15200010
+         L     RDRQ,LCBSTCBA-1          STCB ADDR                       15300010
+         LA    RWORKA,DRQSTVTO-IEDQDRQ  STCB OFFSET IN DRQ              15400010
+         SR    RDRQ,RWORKA              OF DRQ                          15500010
+         CLI   LCBRSKEY-IEDQLCB(RPARM),RSVTO                            15600010
+*                                       ELEMENT A LCB                   15700010
+         BE    LCB                      BRANCH IF YES                   15800010
+         SPACE 1                                                        15900010
+*********************************************************************** 16000010
+*        ELEMENT IS AN ERB                                            * 16100010
+*********************************************************************** 16200010
+         SPACE 1                                                        16300010
+         NI    LCBERBST,255-LCBDLNKN    MARK ERB UNAVAILABLE            16350010
+         L     RWORKC,LCBSCBDA-1        LINE SCB ADDR                   16400010
+         TM    SCBSTAT1-IEDQSCB(RWORKC),SCBCEND                         16500010
+*                                       CONC END OF MSG                 16600010
+         BO    RELERB                   BRANCH IF YES                   16700010
+         L     RQCB,SCBDESTQ-1          QCB ADDR                        16800010
+         LH    RQCBE,QCBEXTO            EXTENSION OFFSET                16900010
+         AR    RQCBE,RQCB               QCBE                            17000010
+         USING IEDQQCBE,RQCBE                                           17100010
+         L     RDRQ,QCBECONC-1          CONC TERM ENTRY                 17200010
+         L     RDRQ,TRMDESTQ-1-IEDQTRM(RDRQ)                            17300010
+*                                       DRQ ADDR                        17400010
+         TM    LCBSTAT1,LCBRCLLN        ERB FROM RECALL                 17500010
+         BNO   GETNXTQ                  BRANCH IF NO                    17600010
+         NI    DRQFLAG3,AVTEFF-DRQERBAV MARK ERB AVAILABLE FOR  SA56908 17630010
+*                                       PCI                     SA56908 17660010
+         NI    LCBSTAT1,255-LCBRCLLN    RESET RECALL                    17700010
+         L     RPARM,LCBERBCH-1         RECALLED BUFFER ADDR            17800010
+         TM    LCBERBST,LCBERROR        LINE ERROR                      17805010
+         BZ    CHKEOB                   BRANCH IF NO                    17810010
+         LA    RWORKA,AVTBFRTB          BUFFER RET QUEUE                17815010
+         ST    RWORKA,PRFQCBA-1-IEDQPRF(RPARM)                          17820010
+*                                       SET QCB ADDR                    17825010
+         LA    RWORKA,LCBERB            ERB ADDR                        17830010
+         ST    RWORKA,PRFLINK-1-IEDQPRF(RPARM)                          17835010
+*                                       LINK ERB TO BUFFER              17840010
+         MVI   PRFPRI-IEDQPRF(RPARM),PRIBFRTB                           17845010
+*                                       SET BUFFER PRIORITY             17850010
+         L     RWORKA,LCBRCQCB          RETURN QCB ADDR                 17855010
+         ST    RWORKA,LCBERB            SET QCB ADDR                    17860010
+         XC    LCBERBLK,LCBERBLK        ZERO LINK FIELD                 17865010
+         MVI   LCBERBPY,PRIDSPLB-1      SET ERROR PRIORITY              17870010
+         B     DSPCHAIN                 POST ERB AND BUFFER             17875010
+CHKEOB   EQU   *                                                        17880010
+         LTR   RPARM,RPARM              IS THERE A BUFFER       SA58993 17881010
+         BNZ   NORDERR                  YES,CONT PROCESSING     SA58993 17882010
+         SPACE 1                                                        17883010
+**********************************************************************  17884010
+*                                                                    *  17885010
+* IF NO BUFFER HAS BEEN RETURNED, ISSUE 045-3 ABEND AS IEDQFA WOULD  *  17886010
+*  HAVE DONE HAD LCBRCLLN NOT BEEN SET                               *  17887010
+*                                                                    *  17888010
+**********************************************************************  17889010
+         SPACE 1                                                        17890010
+         LA    RENTRY,ABCODE3           SET ABEND CODE IN RG 15 SA58993 17891010
+         BAL   RRETURN,AVTABEND         BRANCH TO ABEND IN AVT  SA58993 17892010
+ABCODE3  EQU   X'03'                    ABEND CODE              SA58993 17893010
+         SPACE 3                                                        17894010
+NORDERR  EQU   *                                                        17895010
+         NC    SCBEOB,SCBEOB            BUFFER BEEN USED                17900010
+         BZ    NOCNCL                   BRANCH IF NO                    18000010
+         OI    PRFSTAT1-IEDQPRF(RPARM),PRFCNCLN                         18100010
+*                                       SET CANCEL MSG                  18200010
+NOCNCL   EQU   *                                                        18300010
+         MVC   LCBISZE,PRFSCAN+1-IEDQPRF(RPARM)                         18400010
+*                                       SET IDLE COUNT                  18500010
+         LH    RWORKB,PRFSIZE-IEDQPRF(RPARM)                            18600010
+*                                       GET DATA AMOUNT                 18700010
+         SH    RWORKB,SCBEOB            REMAINING DATA                  18800010
+         LTR   RWORKB,RWORKB            CAN AMOUNT BE CALCULATED        18900010
+         BP    AMTVALID                 BRANCH IF YES                   19000010
+         SR    RWORKB,RWORKB            ZERO REG                        19100010
+AMTVALID EQU   *                                                        19200010
+         LA    RWORKA,AVTINOUT          INMSG/OUTMSG DELIMITER          19300010
+         STCM  RWORKA,ADR,SCBMACR       RESET MACRO ADDRESS    @Z30X8IM 19400010
+         NI    SCBHBFNO,CLRQPTR         RESET QTYPE FROM WHERE          19700010
+*                                       IEDQBD SAVES IT                 19800010
+         MVC   SCBUNTCT,SCBDEOB                                         19900010
+         MVC   SCBDEOB,SCBCPBNO-IEDQSCB(RWORKC)                         20000010
+*                                       RESTORE AFTER RECALL            20100010
+         LA    RZERO,ONE                SET REG TO ONE                  20200010
+         LA    RWORKA,AVTACTIB          ACTIVATE QCB ADDR               20300010
+         MVI   LCBERBPY,PRIINTRQ        SET INITIAL PRTY                20400010
+         TM    LCBERBST,LCBEOMSG        EOM IN RECALLED BUFFER          20500010
+         BO    CHKCBGN                  BRANCH IF YES                   20600010
+         LNR   RWORKB,RWORKB            SET REG NEG                     20700010
+         AH    RWORKB,SCBCTBSZ          SET REMAINING SIZE              20800010
+         BC    3,BLDERB                 BRANCH IF MORE THAN ONE BUF     20900010
+*                                       NEEDED TO FILL CTB              21000010
+CHKCBGN  EQU   *                                                        21100010
+         OI    LCBERBST,LCBDLNKN        RELEASE ERB                     21200010
+         TM    SCBSTAT1-IEDQSCB(RWORKC),SCBCBGN                         21300010
+*                                       CONC MSG BEGIN                  21400010
+         BO    SETEDATA                 BRANCH IF YES                   21500010
+         XC    LCBERBCH,LCBERBCH        CLEAR BUFFER ADDR               21600010
+         MVC   PRFQCBA-IEDQPRF(THREE,RPARM),DCBMH                       21800010
+*                                       SET POST QCB                    21900010
+         MVI   PRFPRI-IEDQPRF(RPARM),PRIMHBFR                           22000010
+*                                       POST PRTY                       22100010
+         B     DSPPOST                  POST BUFFER TO MH               22200010
+         SPACE 1                                                        22300010
+*********************************************************************** 22400010
+*        ELEMENT IS A LCB                                             * 22500010
+*********************************************************************** 22600010
+         SPACE 1                                                        22700010
+LCB      EQU   *                                                        22800010
+         TM    LCBSTAT1,LCBOCNI         STOPLINE                        22900010
+         BO    STOPLINE                 BRANCH IF YES                   23000010
+         TM    AVTBIT1,AVTCLOSN+AVTQUCKN                                23100010
+*                                       QUICK CLOSE                     23200010
+         BO    NOSEND                   BRANCH IF YES                   23300010
+         TM    DRQSTAT,DRQTRMHO         CONC HELD                       23400010
+         BO    RMVDRQST                 BRANCH IF YES                   23500010
+         SR    RZERO,RZERO              INDICATE DRQ STCB SHOULD        23600010
+*                                       BE REMOVED IF NO STCBS          23700010
+*                                       IN DRQ CHAIN                    23800010
+         LR    RWORKA,RDRQ              DRQ ADDR                        23900010
+         SH    RWORKA,AVTHA4            SUB FOUR                        24000010
+DRQLPA   EQU   *                                                        24100010
+         L     RWORKA,FOUR(RWORKA)      FIRST/NEXT STCB                 24200010
+         CLI   FOUR(RWORKA),ZERO        LAST ELEMENT                    24300010
+         BE    DRQLPAND                 BRANCH IF YES                   24400010
+         LR    RQCB,RWORKA              STCB ADDR                       24500010
+         LA    RZERO,QCBSTVTO-IEDQQCB   STCB OFFSET INTO QCB            24600010
+         SR    RQCB,RZERO               QCB ADDR                        24700010
+         LH    RQCBE,QCBEXTO            QCB EXTENSION OFFSET            24800010
+         AR    RQCBE,RQCB               QCBE ADDR                       24900010
+         USING IEDQQCBE,RQCBE                                           25000010
+         NI    QCBEFLG,255-QCBESRVC     RESET SERVICED                  25100010
+         TM    QCBEFLG,QCBEOPL          PROIRITY QUEUEING               25200010
+         BNO   DRQLPA                   BRANCH IF NO                    25300010
+         SR    RWORKC,RWORKC            ZERO REG                        25400010
+         IC    RWORKC,QCBENPLV          NUMBER OF PRTY LEVLES           25500010
+QCBELPA  EQU   *                                                        25600010
+         SR    RWORKB,RWORKB            ZERO REG                        25700010
+         IC    RWORKB,QCBELGTH          QCBE ENTRY LENGTH               25800010
+         AR    RQCBE,RWORKB             NEXT ENTRY                      25900010
+         NI    QCBEFLG,255-QCBESRVC     RESET SERVICED                  26000010
+         BCT   RWORKC,QCBELPA           LAST LEVEL                      26100010
+         B     DRQLPA                   BRANCH IF YES                   26200010
+DRQLPAND EQU   *                                                        26300010
+         LTR   RZERO,RZERO              ANY STCBS                       26400010
+         BZ    RMVDRQST                 BRANCH IF NO                    26500010
+         L     RSCB,LCBSCBDA-1          LINE SCB ADDRESS                26550010
+         MVI   SCBSTAT1,SCBCBGN         SET CONC MSG BEGIN              26600010
+         MVI   LCBSTAT1,LCBSENDN        SET SENDING                     26700010
+         XC    LCBRECAD,LCBRECAD        ZERO FIELDS                     26800010
+         XC    LCBRECOF,LCBRECOF                                        26900010
+         MVI   DRQBUFCT,ZERO            CLEAR BUFCT                     27000010
+         MVN   DRQBUFCT,DCBBUFOU        SET BUFOUT                      27100010
+         OI    DRQFLAG3,DRQFSPCI        SET FIRST PCI                   27200010
+CLRCURQ  EQU   *                                                        27300010
+         XC    DRQCURQ,DRQCURQ          CLEAR CURRENT QCB POINTER       27400010
+GETNXTQ  EQU   *                                                        27500010
+         L     RQCB,DRQCURQ-1           GET CURRENT QCB                 27600010
+         LA    RQCB,ZERO(RQCB)          CLEAR HI-ORDER BYTE             27700010
+         LTR   RQCB,RQCB                CURRENT QCB                     27800010
+         BNZ   DRQLPBND                 BRANCH IF YES                   27900010
+         LA    RZERO,QCBSTVTO-IEDQQCB  STCB OFFSET INTO QCB             28000010
+         LR    RWORKA,RDRQ              DRQ ADDR                        28100010
+         SH    RWORKA,AVTHA4            SUB FOUR                        28200010
+DRQLPB   EQU   *                                                        28300010
+         L     RQCB,FOUR(RWORKA)        FIRST/NEXT STCB                 28400010
+         CLI   FOUR(RQCB),ZERO          ANY STCBS                       28500010
+         BE    RMVDRQST                 BRANCH IF NO                    28600010
+         STCM  RWORKA,ADR,DRQPRVLK      SAVE PREV LINK FIELD   @Z30X8IM 28700010
+         LR    RWORKA,RQCB              UPDATE LOOP REG                 29000010
+         SR    RQCB,RZERO               QCB ADDR                        29100010
+DRQLPBND EQU   *                                                        29200010
+         LH    RQCBE,QCBEXTO            QCB EXTENSION OFFSET            29300010
+         AR    RQCBE,RQCB               QCBE ADDR                       29400010
+         TM    QCBEFLG,QCBESRVC+QCBEHELD                                29500010
+*                                       SERVICED OR TEMP HOLD           29600010
+         BNZ   DRQLPB                   BRANCH IF EITHER                29700010
+         STCM  RQCB,ADR,DRQCURQ         UPDATE CURRENT QUEUE   @Z30X8IM 29800010
+         SR    RWORKA,RWORKA            ZERO REG                        30100010
+         SR    RSCB,RSCB                ZERO REG                        30200010
+         IC    RSCB,QCBSCBOF            QCB OFFSET TO SCB               30300010
+         IC    RWORKA,AVTSCBSZ          SIZE OF SCB                     30400010
+         MR    RSCB-1,RWORKA            COMPUTE DISP OF SCB             30500010
+         AL    RSCB,LCBSCBDA-ONE        COMPUTE SCB ADDRESS             30600010
+         LH    RWORKB,SCBCTBSZ          SET REG                         30700010
+         LR    RPARM,RQCBE              SET REG TO QCBE                 30800010
+         TM    SCBQTYPE,SCBBFMM         MIDDLE OF MSG                   30900010
+         BNO   INITIAL                  BRANCH IF NO                    31000010
+         MVI   LCBERBPY,PRISBPCI        SET NOT INITIAL PRTY            31100010
+         TM    QCBEFLG,QCBEOPL          PRTY QUEUEING                   31200010
+         BZ    NOTPRTYQ                 BRANCH IF NO                    31300010
+         IC    RWORKA,SCBPRI            PRTY QUE INDEX                  31400010
+         BAL   RRETURN,FINDQCBE         GET CORRECT QCBE                31500010
+NOTPRTYQ EQU   *                                                        31600010
+         MVC   LCBTTCIN,QCBETCIN-IEDQQCBE(RPARM)                        31700010
+*                                       SET TTCIN                       31800010
+         MVC   LCBTTBIN,LCBTTCIN        SET TTBIN FOR KA                31900010
+         NC    SCBDEOB,SCBDEOB          EMBEDDED RS                     32000010
+         BZ    BUILDERB                 BRANCH IF NO                    32100010
+         TM    SCBQTYPE,SCBCOREQ        CORE QUEUEING                   32200010
+         BO    COREONLY                 BRANCH IF YES                   32300010
+         TM    SCBSTAT1,PRFNLSTN        EOM BUFFER                      32400010
+         BO    NOTLAST                  BRANCH IF NO                    32500010
+         CLC   SCBDEOB+1(THREE),SCBCRCD SENDING LAST SEG                32600010
+         BNL   COREONLY                                         SA60792 32700010
+         NC    SCBXTRA(THREE),SCBXTRA                           SA60792 32710010
+         BZ    RSET                                             SA60792 32720010
+         CLC   SCBDEOB+ONE(THREE),SCBXTRA                       SA60792 32730010
+         BNL   COREONLY                                         SA60792 32740010
+RSET     EQU   *                                                SA60792 32750010
+         OI    SCBSTAT1,PRFNLSTN        SET NOT LAST                    32800010
+NOTLAST  EQU   *                                                        32900010
+         XC    SCBXTRA,SCBXTRA          CLEAR FOR RECALL                33000010
+         XC    SCBNTXT,SCBNTXT          CLEAR FOR RECALL                33100010
+COREONLY EQU   *                                                        33200010
+         MVZ   SCBHBFNO,SCBQTYPE        SET QTYPE FLGS FOR FA   SA52971 33250010
+         L     RWORKC,LCBSCBDA-1        LINE SCB ADDR                   33300010
+         MVC   SCBCPBNO-IEDQSCB(FOUR,RWORKC),SCBDEOB                    33400010
+*                                       SAVE OVER RECALL                33500010
+         OI    LCBSTAT1,LCBRCLLN        SET RECALL BIT                  33600010
+         OI    DRQFLAG3,DRQERBAV        MARK ERB NOT AVAILABLE  SA56908 33630010
+*                                       FOR PCI                 SA56908 33660010
+         L     RWORKA,AVTCSCH           CONC SCH ADDR                   33700010
+         SH    RWORKA,AVTHA2            SUB TWO                         33800010
+         ST    RWORKA,LCBRCQCB          SET RETURN ADDR                 33900010
+         LA    RZERO,ONE                SET REG                         34100010
+         B     SETQCBAD                 GO POST THE ERB TO RECALL       34200010
+INITIAL  EQU   *                                                        34300010
+         MVI   LCBERBPY,PRIINTRQ        INITIAL REQUEST PRI             34400010
+         TM    QCBDSFLG,QCBHELD         REUSABILITY RUNNING             34500010
+         BO    RMVSTCB                  BRANCH IF YES                   34600010
+         TM    QCBSTAT,QCBTRMHO         TERMINAL HELD                   34700010
+         BO    RMVSTCB                  BRANCH IF YES                   34800010
+         NC    SCBCTBSZ,SCBCTBSZ        CTBSZ ZERO                      34900010
+         BNZ   CTBSZOK                  BRANCH IF NO                    35000010
+         MVC   SCBCTBSZ,QCBEDAMT        SET DATA AMOUNT                 35100010
+CTBSZOK  EQU   *                                                        35200010
+         SR    RRETURN,RRETURN          INDICATE STCB SHOULD BE         35300010
+*                                       REMOVED IF NO DATA              35400010
+PQCBLP   EQU   *                                                        35500010
+         LA    RWORKA,ONE               SET REG TO ONE                  35600010
+         LNR   RWORKA,RWORKA            SET NEG                         35700010
+         LA    RPQCB,QCBMSIZE-QCBPSIZE(RQCB)                            35800010
+*                                       SET REG INITIALLY               35900010
+         USING IEDQPQCB,RPQCB                                           36000010
+NXTPQCB  EQU   *                                                        36100010
+         LA    RPQCB,QCBPSIZE(RPQCB)    FIRST/NEXT PQCB                 36200010
+         LA    RWORKA,ONE(RWORKA)       SET REG TO PQCB INDEX           36300010
+         TM    QCBEFLG,QCBEOPL          LEVEL QUEUEING                  36309010
+         BZ    CHKFEFO                  BRANCH IF NO                    36318010
+         LTR   RRETURN,RRETURN          PREVIOUS LEVEL SERVICED OR HELD 36327010
+         BNZ   CHKFEFO                  BRANCH IF YES                   36336010
+         BAL   RRETURN,FINDQCBE         GET CORRECT QCBE                36345010
+         TM    QCBEFLG-IEDQQCBE(RPARM),QCBEHELD+QCBESRVC                36354010
+*                                       LEVEL SERVICED OR HELD          36363010
+         BNZ   CHKLAST                  BRANCH IF YES                   36372010
+         SR    RRETURN,RRETURN          ZERO FLAG REG                   36381010
+CHKFEFO  EQU   *                                                        36390010
+         NC    QCBFFEFO,QCBFFEFO        UNSENT MESSAGE                  36400010
+         BZ    CHKLAST                  BRANCH IF NO                    36500010
+         TM    QCBEFLG,QCBEOPL          LEVEL QUEUEING                  36600010
+         BNO   BUILDSCB                 BRANCH IF NO                    36700010
+         BAL   RRETURN,FINDQCBE         GET CORRECT QCBE                36800010
+         TM    QCBEFLG-IEDQQCBE(RPARM),QCBESRVC+QCBEHELD                36900010
+*                                       LEVEL SERVICED OR HELD          37000010
+         BNZ   CHKLAST                  BRANCH IF EITHER                37100010
+         OI    QCBEFLG-IEDQQCBE(RPARM),QCBEDATA                         37200010
+*                                       SET DATA IN MSG                 37300010
+         B     BUILDSCB                 BRANCH                          37400010
+CHKLAST  EQU   *                                                        37500010
+         CLI   QCBPRIPQ,ZERO            LAST PRTY LEVEL                 37600010
+         BNE   NXTPQCB                  BRANCH IF NO                    37700010
+         LA    RWORKA,QCBSTVTO-IEDQQCB(RQCB)                            37800010
+*                                       SET RWORKA                      37900010
+         XC    DRQCURQ,DRQCURQ          CLEAR CURRENT QUEUE             38000010
+         LA    RZERO,QCBSTVTO-IEDQQCB   SET REG                         38100010
+         LTR   RRETURN,RRETURN          REMOVE STCB FROM DRQ            38200010
+         BNZ   DRQLPB                   BRANCH IF NO                    38300010
+RMVSTCB  EQU   *                                                        38400010
+         L     RWORKA,DRQPRVLK-1        GET PREVIOUS LINK FIELD         38500010
+         MVC   FIVE(THREE,RWORKA),QCBSLINK                              38600010
+*                                       DE-LINK STCB FROM DRQ           38700010
+         MVC   QCBSLINK,QCBSTCHN        MOVE DEST SCH TO LAST           38800010
+         LA    RWORKA,QCBSTVTO          ADDR OF CONC STCB               38900010
+         ST    RWORKA,QCBSTCHN-1        STORE IN QCB                    39000010
+         MVI   QCBSTVTO,CSVTO           RESTORE CONC SCH VTO            39100010
+         NI    QCBEFLG-IEDQQCBE(RPARM),255-QCBEHELD                     39200010
+*                                       RESET TEMPORARY HOLD            39300010
+         B     CLRCURQ                  GET NEXT STCB                   39400010
+BUILDSCB EQU   *                                                        39500010
+         OI    QCBFLAG,QCBSDFFO         SET FIRST FFEFO                 39600010
+         MVI   LCBTTCIN+ONE,ONE                                 SA60792 39650010
+         MVC   SCBSCHDR,QCBFFEFO        MOVE REL REC NO                 39700010
+         MVC   SCBSCSEG,QCBFFEFO        MOVE REL REC NO                 39800010
+         STC   RWORKA,SCBPRI            PRTY LEVEL                      39900010
+         XC    SCBFEFO(THREE),SCBFEFO   ZERO FIELD                      40000010
+         NI    SCBQTYPE,255-SCBNREUS-SCBREUS-SCBCOREQ-SCBNORCL          40100010
+*                                       RESET QTYPE                     40200010
+         LA    RZERO,AVTINOUT           ADDR OF 0100                    40300010
+         ST    RZERO,SCBMACR-1          SET SCBMACR                     40400010
+         STCM  RQCB,ADR,SCBDESTQ        QCB ADDRESS            @Z30X8IM 40500010
+         LH    RWORKB,SCBCTBSZ          SET REG                         40800010
+BUILDERB EQU   *                                                        40900010
+         SR    RZERO,RZERO              ZERO REG                        40920010
+         IC    RZERO,DRQBUFCT           GET BUFFER COUNT                40940010
+         LTR   RZERO,RZERO              BUFFER COUNT ZERO               40960010
+         BNZ   BUFCTSET                 BRANCH IF NO                    40980010
+         LA    RZERO,ONE                SET TO ONE                      41000010
+BUFCTSET EQU   *                                                        41020010
+         TM    QCBEFLG,QCBECNT          QCNTRL EQUAL SIZE               41100010
+         BNO   SETQCBAD                 BRANCH IF NO                    41200010
+         SR    RZERO,RZERO              ZERO REG                        41300010
+BLDERB   EQU   *                                                        41400010
+         L     RTERM,QCBECONC-1         CONC TERM ADDR                  41500010
+         LA    RWORKA,DCBBUFSI          DCB BUF SIZE                    41600010
+         TM    TRMDEVFL,X'80'           BUF SZ SPECIFIED                41700010
+         BNO   GETBUFSZ                 BRANCH IF NO                    41800010
+         LA    RWORKA,TRMOPNO+1         LOC OF BUF SZ IF NO OPT         41900010
+         TM    TRMSTATE,TRMOPTFN        OPT FIELDS                      42000010
+         BNO   GETBUFSZ                 BRANCH IF NO                    42100010
+         SR    RWORKA,RWORKA            ZERO REG                        42200010
+         IC    RWORKA,TRMOPNO           NO OF OPT FIELDS                42300010
+         LA    RWORKA,TRMOPT+1(RWORKA)  LOC OF BUF SIZE                 42400010
+GETBUFSZ EQU   *                                                        42500010
+         SR    RPARM,RPARM              ZERO REG                        42600010
+         IC    RPARM,ZERO(RWORKA)       FIRST BYTE                      42700010
+         SLL   RPARM,EIGHT              SHIFT                           42800010
+         IC    RPARM,ONE(RWORKA)        SECOND BYTE                     42900010
+         SR    RWORKA,RWORKA            ZERO REG                        43000010
+         IC    RWORKA,DCBRESER          HDR RESERVE CHARS               43100010
+         LA    RWORKA,AVTHDRSZ(RWORKA)  AVAIL BUF SIZE                  43200010
+         TM    SCBQTYPE,SCBBFMM         MID-MESSAGE                     43300010
+         BNO   USEHDR                   BRANCH IF NO                    43400010
+BUFCTLP  EQU   *                                                        43500010
+         LA    RWORKA,AVTTXTSZ          AVAIL BUFF SIZE                 43600010
+USEHDR   EQU   *                                                        43700010
+         LNR   RWORKA,RWORKA            SET REG NEG                     43800010
+         AR    RWORKA,RPARM             DATA AMOUNT                     43900010
+         AH    RZERO,HALFONE            COUNT BUFFER                    44000010
+         SR    RWORKB,RWORKA            SUB DATA AMOUNT                 44100010
+         BP    BUFCTLP                  BRANCH IF NOT ENOUGH BUFFERS    44200010
+SETQCBAD EQU   *                                                        44300010
+         LA    RWORKA,AVTDSIOB          DISK I/O QCB ADDR               44400010
+SETEDATA EQU   *                                                        44500010
+         OI    QCBEFLG,QCBEDATA         SET DATA IN MSG                 44600010
+         OI    SCBQTYPE,SCBBFMM         SET MID-MESSAGE                 44700010
+SETERBCT EQU   *                                                        44800010
+         STC   RZERO,DRQERBCT           SAVE ERB COUNT                  44900010
+         CLC   DRQBUFCT,DRQERBCT        BUF COUNT EQUAL OR HIGH         44920010
+         BNL   BUFCTOK                  BRANCH IF YES                   44940010
+         MVC   DRQBUFCT,DRQERBCT        SET BUFFER COUNT                44960010
+BUFCTOK  EQU   *                                                        44980010
+         NC    LCBERBCH,LCBERBCH        RECALLED BUFFER THERE           44984010
+         BZ    ERBCTOK                  BRANCH IF NO                    44988010
+         BCTR  RZERO,ZERO               SUBTRACT ONE                    44992010
+ERBCTOK  EQU   *                                                        44996010
+         STC   RZERO,LCBERBCT           SET ERB COUNT                   45000010
+         MVI   LCBERBCT+1,ZERO          ZERO DISABLED COUNT             45100010
+         STCM  RSCB,ADR,LCBSCBA         STORE ADDR OF CURR SCB @Z30X8IM 45200010
+         NI    LCBERBST,255-LCBEOMSG    RESET EOM READ                  45500010
+POSTERB  EQU   *                                                        45600010
+         ST    RWORKA,LCBERB            QCB ADDR IN ERB                 45700010
+         XC    LCBERBLK,LCBERBLK        ZERO LINK                       45800010
+         LA    RPARM,LCBERB             ERB ADDR                        45900010
+         B     DSPPOST                  POST                            46000010
+RMVDRQST EQU   *                                                        46100010
+         L     RSCB,LCBSCBDA-1          LINE SCB ADDR                   46200010
+         SR    RWORKB,RWORKB            CLEAR REG                       46300010
+         IC    RWORKB,AVTCSCH           IEDQGH OFFSET INTO VCON TAB     46400010
+         L     RWORKA,AVTMSGS-1         VCON TAB ADDR                   46500010
+         L     RWORKA,ZERO(RWORKB,RWORKA)                               46600010
+*                                       IEDQGH ADDRESS                  46700010
+         CR    RPARM,RLCB               ELEMENT A LCB                   46800010
+         BE    RMVST                    BRANCH IF YES                   46900010
+         TM    SCBSTAT1,SCBCBGN         CONC MSG BEGIN                  47000010
+         BZ    POSTERB                  BRANCH IF NO                    47100010
+RMVST    EQU   *                                                        47200010
+         LR    RQCB,RLCB                SET REGS                        47300010
+         LR    RSTCB,RDRQ               FOR UNAVR                       47400010
+         ST    RLCB,LCBQCBA-1           SET QCB ADDR                    47500010
+         XC    LCBLINK,LCBLINK          ZERO LINK FIELD                 47600010
+         NI    LCBSTAT1,LCBOCNI         RESET ALL EXCEPT STOPLINE       47700010
+         OI    LCBSTAT1,LCBRECVN        SET LINE RECVN                  47800010
+         MVC   LCBSCBA,LCBSCBDA         RESET SCB ADDR                  47900010
+         BAL   RRETURN,DSPUNAVR         MOVE CONC STCB FROM LCB TO DRQ  48000010
+         LR    RPARM,RLCB               SET REG                         48100010
+         B     DSPPOST                  POST LCB TO LCB                 48200010
+STOPLINE EQU   *                                                        48300010
+         L     RSTCB,STCBLINK-1-IEDQSTCB(RSTCB)  NEXT STCB      SA56606 48400010
+         LR    RPARM,RLCB               ELEMENT ADDR            SA56606 48470010
+         LR    RQCB,RLCB                QCB ADDR                SA56606 48540010
+         B     DSPBYPAS                 EXIT-NEXT STCB          SA56606 48610010
+NOSEND   EQU   *                                                        48700010
+         MVI   LCBSTAT1,LCBFREEN        SET LCB FREE                    48800010
+         LA    RPARM,AVTOPCOB+FOUR      OP CNTRL ECB                    48900010
+         POST  (1)                      POST OPCTL                      49000010
+RELERB   EQU   *                                                        49100010
+         OI    LCBERBST,LCBEOMSG+LCBDLNKN                               49200010
+*                                       RELEASE ERB                     49300010
+         B     DSPDISP                  RETURN                          49400010
+         SPACE 1                                                        49500010
+*********************************************************************** 49600010
+*        ROUTINE TO FIND CORRECT QCBE FOR LEVEL QUEUEING              * 49700010
+*        INPUT     RWORKA - INDEX TO PRIORTY QUEUE                    * 49800010
+*        WORK      RWORKC RZERO                                       * 49900010
+*        OUTPUT    RPARM - CORRECT QCBE                               * 50000010
+*********************************************************************** 50100010
+         SPACE 1                                                        50200010
+FINDQCBE EQU   *                                                        50300010
+         SR    RPARM,RPARM              ZERO REG                        50400010
+         SR    RWORKC,RWORKC            ZERO REG                        50500010
+         IC    RWORKC,QCBELGTH          EXTENSION LENGTH                50600010
+         AR    RWORKC,RQCBE             NEXT ENTRY                      50700010
+         IC    RPARM,QCBELGTH-IEDQQCBE(RWORKC)                          50800010
+*                                       NEXT ENTRY LENGTH               50900010
+         MR    RPARM-1,RWORKA           COMPUTE QCBE ADDR               51000010
+         AR    RPARM,RWORKC             QCBE ADDR                       51100010
+         BR    RRETURN                  RETURN                          51200010
+         EJECT                                                          51300010
+*********************************************************************** 51400010
+*        THIS LOGIC IS ACTIVATED BY THE DESTINATION SCHEDULER         * 51500010
+*        WHEN A EOM BUFFER IS POSTED TO A DESTINATION QCB             * 51600010
+*********************************************************************** 51700010
+         SPACE 1                                                        51800010
+DESTENT  EQU   *                                                        51900010
+         USING *,RENTRY                  ESTABLISH ADDRESSIBILITY       52000010
+         L     RDCB,QCBDCBAD-1           DCB                            52100010
+         TM    DCBOFLGS,OPEN             DCB OPEN                       52200010
+         BCR   8,RRETURN                 BRANCH IF NO                   52300010
+         L     RPARM,DCBDEBAD            DEB                            52400010
+         TM    DEBOPATB-DEBNMSUB(RPARM),OUTPUT                          52500010
+*                                        OPEN FOR OUTPUT                52600010
+         BCR   8,RRETURN                 BRANCH IF NO                   52700010
+         SR    RWORKA,RWORKA            ZERO REG                        52800010
+         IC    RWORKA,DEBNMEXT-DEBNMSUB(RPARM)                          52900010
+*                                        NUMBER OF LCBS                 53000010
+         SR    RPARM,RPARM               ZERO REG                       53100010
+         IC    RPARM,QCBRELLN            QCB STARTING RLN               53200010
+         LR    RLCB,RPARM                SAVE RLN                       53300010
+         BCTR  RLCB,RZERO                SUB  1                         53400010
+         SR    RWORKA,RLCB              COUNT OF LCBS TO SCAN           53500010
+         BCR   13,RRETURN                BRANCH IF RLN < DRBNMEXT       53600010
+         SR    RWORKA,RWORKA            ZERO REG                        53700010
+         IC    RWORKA,DCBEIOBX          LCB SIZE                        53800010
+         MR    RPARM-1,RWORKA           STARTING LCB OFFSET             53900010
+         AL    RPARM,DCBIOBAD            POINT TO 1OB                   54000010
+         LA    RWORKA,LCBFLAG1-IEDQLCB  IOB OFFSET                      54100010
+         SR    RPARM,RWORKA             ADJUST TO START OF LCB          54200010
+         LR    RLCB,RPARM                LCB                            54300010
+         LR    RZERO,RRETURN            SAVE RRETURN                    54400010
+         SPACE 1                                                        54500010
+*********************************************************************** 54600010
+*        WHEN ENTERED WITH THE DRQ A CONCENTRATOR OR A QACTION        * 54700010
+*        RELEASE WAS DONE                                             * 54800010
+*********************************************************************** 54900010
+         SPACE 1                                                        55000010
+         LR    RWORKA,RQCB              SAVE DRQ REG                    55100010
+         TM    QCBDSFLG,QCBDRQQ         DRQ                             55200010
+         BO    RELDRQ                   BRANCH IF YES                   55300010
+         SPACE 1                                                        55400010
+*********************************************************************** 55500010
+*        LOCATE DATA READY Q                                          * 55600010
+*********************************************************************** 55700010
+         SPACE 1                                                        55800010
+         LH    RQCBE,QCBEXTO            EXTENSION OFFSET                55900010
+         AR    RQCBE,RQCB               QCBE ADDR                       56000010
+         L     RTERM,QCBECONC-IEDQQCBE-1(RQCBE)                         56100010
+         LA    RPARM,QCBSTCHN-1         ADDRESS OF STCB                 56200010
+         MVC   QCBSTCHN,QCBSLINK         REMOVE STCB                    56300010
+         L     RQCB,TRMDESTQ-1           DRQ                            56400010
+         LR    RWORKA,RQCB              SAVE DRQ ADDR                   56500010
+         BAL   RRETURN,DSPPRIOR          ENQ STCB                       56600010
+         LR    RRETURN,RZERO             RESTORE RRETURN                56700010
+         LR    RQCB,RWORKA              RESTORE DRQ REG                 56800010
+RELDRQ   EQU   *                                                        56900010
+         TM    DRQSTAT-IEDQDRQ(RQCB),DRQTRMHO                           57000010
+*                                       CONC HELD                       57100010
+         BCR   ONE,RRETURN              BRANCH IF YES                   57200010
+         L     RSTCB,DRQSTCHN-IEDQDRQ-1(RQCB)                           57300010
+*                                        GET FIRST STCB                 57400010
+         LA    RSTCB,ZERO(RSTCB)        ZERO HI-ORDER BYTE              57500010
+         LA    RPARM,DRQSTCHN-IEDQDRQ-1(RQCB)                           57600010
+*                                        ADDRESS OF MAIN STCB           57700010
+         CLR   RSTCB,RPARM               MAIN STCB FIRST                57800010
+         BCR   7,RRETURN                 BRANCH IF NO                   57900010
+         TM    LCBSTAT1,LCBFREEN         LINE FREE                      58000010
+         BNO   LINKSTCB                  BRANCH IF NO                   58100010
+         CLI   LCBPRI,PRILCBDL           SYSTEM INTERVAL                58200010
+         BE    LINKSTCB                  BRANCH IF YES                  58300010
+         NI    LCBSTAT1,LCBOCNI          PRESERVE STOPLINE FLAG         58400010
+         OI    LCBSTAT1,LCBSENDN         SET SENDING                    58500010
+         ST    RLCB,LCBQCBA-1            PREPARE TO POST LCB TO LCB     58600010
+         XC    LCBLINK,LCBLINK           ZERO LINK FIELD                58700010
+         LR    RPARM,RLCB               SET POST REG                    58800010
+         BAL   RRETURN,DSPPOSTR          POST LCB                       58900010
+         LR    RQCB,RWORKA              RESTORE DRQ REG                 59000010
+LINKSTCB EQU   *                                                        59100010
+         LR    RSTCB,RLCB                SET UNAVL REG                  59200010
+         L     RDCB,LCBDCBPT             DCB ADDRESS                    59300010
+         TM    DCBCPRI,EQPRI            EQUAL PRIORITY                  59400010
+         BO    PRIEQ                    BRANCH IF YES                   59500010
+         OI    LCBSTAT2,LCBSNDPR         SET SEND PRIORITY              59600010
+PRIEQ    EQU   *                                                        59700010
+         BAL   RRETURN,DSPUNAVR          MOVE STCB TO LCB               59800010
+         LR    RRETURN,RZERO             RESTORE REG                    59900010
+         CLI   LCBCPA+24,CCWPOLL         LINE IN AUTOPOLL               60000010
+         BCR   7,RRETURN                 BRANCH IF NO                   60100010
+         L     RWORKA,16(0)             ADDRESS OF CVT           Y05331 60103010
+         L     RWORKA,AVTCVTPT(,RWORKA) ADDRESS OF AVT PTR       Y05331 60106010
+         L     RWORKA,0(0,RWORKA)       ADDRESS OF AVT           Y05331 60109010
+         ST    RLCB,AVTSAVE2-IEDQAVTD(0,RWORKA)  SAVE LCB PTR    Y05331 60112010
+         L     RWORKA,AVTSAVTP-IEDQAVTD(0,RWORKA) SEC AVT PTR    Y05331 60115010
+         USING IEDNSVTD,RWORKA                                   Y05331 60118010
+         TM    SAVTDIAF,SAVTVIRT        IN VIRTUAL ENVIRONMENT ? Y05331 60121010
+         BNO   NOVIRT   **** BNO NOVIRT ***NO,BRANCH             Y05331 60124010
+         ST    RENTRY,AVTSAVE2+28       SAVE BASE                Y05331 60127010
+         L     RENTRY,SAVTDIAG          VIRTUAL DIAGNOSE ROUTINE Y05331 60130010
+         LR    RDCB,RRETURN             SAVE RETURN ADDRESS      Y05331 60133010
+         LA    RZERO,LCBCPA+32          TIC ADDRESS              Y05331 60136010
+         MVI   LCBCPA+32,CCWNOP         NOP VIRTUAL TIC          Y05331 60139010
+         BAL   RRETURN,4(,RENTRY)       NOP REAL TIC,STOP AUTOPOLY05331 60142010
+         L     RWORKA,16(0)             ADDRESS OF CVT           Y05331 60145010
+         L     RWORKA,AVTCVTPT(,RWORKA) ADDRESS OF AVT PTR       Y05331 60148010
+         L     RWORKA,0(0,RWORKA)       ADDRESS OF AVT           Y05331 60151010
+         L     RWORKA,AVTSAVTP-IEDQAVTD(0,RWORKA) SEC AVT PTR    Y05331 60154010
+         L     RENTRY,SAVTDIAG          VIRTUAL DIAGNOSE ROUTINE Y05331 60157010
+         DROP  RWORKA                                            Y05331 60160010
+         LA    RZERO,LCBCPA+56          TIC ADDRESS              Y05331 60163010
+         MVI   LCBCPA+56,CCWNOP         NOP VIRTUAL TIC          Y05331 60166010
+         BAL   RRETURN,4(,RENTRY)       NOP REAL TIC,STOP AUTOPOLY05331 60169010
+         LR    RRETURN,RDCB             RESTORE RETURN ADDRESS   Y05331 60172010
+         L     RENTRY,AVTSAVE2+28       RESTORE BASE             Y05331 60175010
+         BR    RRETURN                  RETURN                   Y05331 60178010
+NOVIRT   EQU   *                        NON VIRTUAL ENVIRONMENT  Y05331 60181010
+         MVI   LCBCPA+32,CCWNOP         NOP TICS                        60200010
+         MVI   LCBCPA+56,CCWNOP         AFTER POLLS                     60300010
+         BR    RRETURN                  RETURN                          60400010
+         EJECT                                                          60500010
+*********************************************************************** 60600010
+*        EQUATES                                                      * 60700010
+*********************************************************************** 60800010
+ZERO     EQU   0                        ZERO                            60900010
+ONE      EQU   1                        ONE                             61000010
+TWO      EQU   2                        TWO                             61100010
+THREE    EQU   3                        THREE                           61200010
+FOUR     EQU   4                        FOUR                            61300010
+FIVE     EQU   5                        FIVE                            61400010
+SIX      EQU   6                        SIX                             61500010
+SEVEN    EQU   7                        SEVEN                           61600010
+EIGHT    EQU   8                        EIGHT                           61700010
+NINE     EQU   9                        NINE                            61800010
+EQPRI    EQU   X'02'                    PRIORITY                        61900010
+OPEN     EQU   X'10'                    OPEN FLAGS                      62000010
+OUTPUT   EQU   X'01'                    DCB FLAGS                       62100010
+CSVTO    EQU   X'20'                    CONC VTO                        62200010
+RSVTO    EQU   X'0C'                    RCV VTO                         62300010
+CLRQPTR  EQU   X'0F'                    QUEUEING MASK                   62400010
+ADR      EQU   7                        MASK FOR ADDR STORE    @Z30X8IM 62450010
+         EJECT                                                          62500010
+*********************************************************************** 62600010
+*        CONSTANTS                                                    * 62700010
+*********************************************************************** 62800010
+HALFONE  DC    H'1'                     ONE                             62900010
+         EJECT                                                          63000010
+*********************************************************************** 63100010
+*        DSECTS                                                       * 63200010
+*********************************************************************** 63300010
+         TPRIOR                                                         63400010
+         TAVTD                                                          63500010
+         TQCBD                                                          63600010
+         TLCBD                                                          63700010
+         TSCBD                                                          63800010
+         TDEBD                                                          63900010
+         DCBD  DSORG=TX                                                 64000010
+         TDISPD                                                         64100010
+         TTRMD                                                          64200010
+         TRECBD                                                         64300010
+         TSTCBD                                                         64400010
+         TPRFD                                                          64500010
+         TCCWD                                                          64600010
+         TDRQD                                                          64700010
+         TQCBED                                                         64800010
+         END                                                            64900010

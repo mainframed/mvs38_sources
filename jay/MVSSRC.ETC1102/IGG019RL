@@ -1,0 +1,272 @@
+19RL     TITLE '''IGG019RL'' - TAM CHECK ROUTINE'                       00400010
+IGG019RL CSECT                                                          00800010
+         SPACE 3                                                SA64702 00801010
+*  CHANGE ACTIVITY AS FOLLOWS                                           00802010
+********************MICROFICHE FLAGS ************************ SUPT CODE 00802110
+*C212000,256000,280000,288000,436000-448000,508000-512000,540000 Y02027 00802310
+*C584000,588000,816000                                           Y02027 00802410
+*A779070-779210,779700-779900,826000                             Y02027 00802510
+*D260000,284000,292000,456000,832000                             Y02027 00802610
+*D376400-379200                                                @ZA02620 00802810
+********************MICROFICHE FLAGS ************************ SUPT CODE 00803010
+*A504000                                                        SA52955 00803110
+*A778000                                                        SA52483 00803210
+*C236000,568000                                                 SA52483 00803310
+*C772000                                                        SA64702 00803410
+*A532000,564000,596000,655000,779000                            SA63961 00803510
+*A216000,264000,376000,779000,832000                            SA60797 00803610
+*A496000                                                       @SA75438 01003610
+*D565000-566000,597000-598000                                  @SA75438 01203610
+*                                       PECB DSECT CHG         @OZ07830 01203710
+         SPACE 3                                                SA64702 01500010
+*********************************************************************** 01600010
+*                                                                     * 01800010
+*TITLE: 'IGG019RL' CHECK ROUTINE                                      * 02000010
+*                                                                     * 02050010
+*MODULE NAME = IGG019RL                                               * 02100010
+*                                                                     * 02150010
+*DESCRIPTIVE NAME = CHECK ROUTINE                                     * 02200010
+*                                                                     * 02250010
+*COPYRIGHT = 'NONE'                                                   * 02300010
+*                                                                     * 02350010
+*STATUS:  CHANGE LEVEL 5                                              * 02400010
+*                                                                     * 02450010
+*FUNCTION:  THIS ROUTINE TESTS THE DECB COMPLETION AND TAKES          * 02800010
+*   APPROPRIATE ACTION.  FOR NORMAL COMPLETION(X'7F'), CONTROL IS     * 03200010
+*   IMMEDIATELY RETURN TO THE USER.  IF DATA HAS APPEARED ON THE      * 03600010
+*   READ-AHEAD QUEUE SINCE THE READ ROUTINE LOOKED AT IT(X'40'),      * 04000010
+*   THE READ ROUTINE IS INVOKED VIA BALR.  THE DECB COMPLETION CODE   * 04400010
+*   IS RECHECKED WHEN THE READ ROUTINE RETURNS.  FOR SETEOF, THE      * 04800010
+*   EODAD EXIT, IF SPECIFIED, IS TAKEN.  OTHERWISE, THE USER GETS A   * 05200010
+*   RETURN CODE.  IF A READ OR WRITE ERROR IS DETECTED, THE SYNAD     * 05600010
+*   EXIT, IF SPECIFIED, IS TAKEN.  OTHERWISE, THE USER GETS A RETURN  * 06000010
+*   CODE.  IF NONE OF THE ABOVE CODES IS FOUND, CHECK WAITS FOR A     * 06400010
+*   MESSAGE ON THE READ-AHEAD QUEUE.                                  * 06800010
+*ENTRY POINT:                                                         * 07200010
+*        IGG019RL                                                     * 07600010
+*INPUT:                                                               * 08000010
+*   1-   DATA EXTENT BLOCK ADDRESS                                    * 08400010
+*   13-  REGISTER SAVE AREA ADDRESS                                   * 08800010
+*   14-  RETURN ADDRESS                                               * 09200010
+*   15-  ENTRY POINT ADDRESS                                          * 09600010
+*OUTPUT: RETURN CODE IN REG 15                                        * 10000010
+*EXTERNAL ROUTINES:                                                   * 10400010
+*        IGG019RG (GET/READ)                                          * 10800010
+*EXITS-NORMAL: RETURN CODE OF X'00'                                   * 11200010
+*EXITS-ERROR:  RETURN CODE OF X'04' FOR SETEOF WITHOUT EODAD          * 11600010
+*              RETURN CODE OF X'08' FOR WORKAREA OVERFLOW(READ)       * 12000010
+*              RETURN CODE OF X'0C' FOR INVALID DESTINATION           * 12400010
+*              RETURN CODE OF X'04' FOR SEQUENCE ERROR (WRITE)        * 12800010
+*              RETURN CODE OF X'10' FOR THRESHOLD REACHED             * 12900010
+*              RETURN CODE OF X'04' FOR QUICK CLOSE                   * 13000010
+*TABLES/WORK AREAS:                                                   * 13200010
+*   DECB                                                              * 13600010
+*   DCB                                                               * 14000010
+*   DEB                                                               * 14400010
+*   PECB                                                              * 14800010
+*ATTRIBUTES -- SERIALLY REUSABLE,REENTERANT,PROBLEM PROGRAM MODE      * 15200010
+*                                                                     * 15600010
+*NOTES: THE OPERATION OF THIS MODULE DEPENDS UPON AN INTERNAL         * 16000010
+*   REPRESENTATION OF THE EXTERNAL CHARACTER SET WHICH IS EQUIVALENT  * 16400010
+*   TO THE ONE USED AT ASSEMBLY TIME.  THE CODING HAS BEEN ARRANGED   * 16800010
+*   SO THAT REDEFINITION OF 'CHARACTER' CONSTANTS, BY REASSEMBLY,     * 17200010
+*   WILL RESULT IN A CORRECT MODULE FOR THE NEW DEFINITIONS.          * 17600010
+*                                                                     * 18000010
+*********************************************************************** 18400010
+         EJECT                                                          18800010
+RZERO    EQU   0                                                        19200010
+RPARM    EQU   1                        ADDRESS OF DECB OR ECB          19600010
+RDCB     EQU   2                        ADDRESS OF DCB                  20000010
+RDEB     EQU   3                        DATA EXTENT BLOCK               20400010
+RDECB    EQU   4                        ADDRESS OF DECB                 20800010
+RPECB    EQU   5                        PECB BASE                Y02027 21200010
+RTEMP    EQU   6                        GENERAL WORK REGISTER           21600010
+RAVT     EQU   7                        AVT BASE REGISTER       SA60797 21800010
+RBASE    EQU   12                       MODULE BASE REGISTER            22000010
+RSAVE    EQU   13                       REGISTER SAVEAREA POINTER       22400010
+RETURN   EQU   14                       RETURN POINT REGISTER           22800010
+RENTRY   EQU   15                       ENTRY POINT REGISTER            23200010
+         USING IGG019RL,RENTRY          TEMPORARY BASE          SA52483 23600010
+IGG019RL IEDHJN INIT19RL                MODULE NAME AND DATE    SA52483 23700010
+         STM   RETURN,RBASE,12(RSAVE)   SAVE REGISTERS          SA52483 23800010
+         DROP  RENTRY                   DROP TEMPORARY BASE     SA52483 23900010
+         BALR  RBASE,RZERO              ESTABLISH ADDRESSABILITY        24000010
+START    EQU   *                                                        24400010
+         USING *,RBASE                  CSECT BASE REGISTER             24800010
+ EJECT                                                                  25200010
+         USING IEDQPECB,RPECB           PECB ADDRESSABILITY      Y02027 25600010
+         USING IHADECB,RDECB            DECB BASE REGISTER              26400010
+         USING IEDQAVTD,RAVT            AVT BASE                SA60797 26600010
+         LR    RDECB,RPARM              ADDRESS OF DECB                 26800010
+         USING IHADCB,RDCB              DCB BASE REGISTER               27200010
+         L     RDCB,DECDCBAD            GET DCB ADDRESS FROM DECB       27600010
+         L     RPECB,DCBPECB            GET PECB ADDRESS         Y02027 28000010
+         STCM  RETURN,SEVEN,PECBRET     SAVE USERS RETURN ADDRY02027    28800010
+RCODE    EQU   *                                                        29600010
+         CLI   DECSDECB,COMP            ECB POSTED COMPLETE,I.E.,      X30000010
+                                        READ OR WRITE OPERATION        X30400010
+                                        COMPLETED                       30800010
+         BE    NORMAL                   BRANCH IF POSTED                31200010
+         SPACE 3                                                        31600010
+         CLI   DECSDECB,RDAHDC          DATA ON READ-AHEAD QUEUE        32000010
+*                                       SINCE READ ROUTINE LOOKED       32400010
+*                                       AT IT                           32800010
+         BE    READX                    BRANCH IF YES                   33200010
+         CLI   DECSDECB,EODAD           SETEOF ISSUED IN MCP            33600010
+         BE    EODTST                   BRANCH IF YES                   34000010
+ EJECT                                                                  34400010
+EXITTST  EQU   *                                                        34800010
+         CLI   DECSDECB,RETERR          MESSAGE NOT FOUND               35200010
+         BE    RETOUT                   BRANCH IF YES                   35600010
+         TM    DECSDECB,ERR             LOGICAL READ OR WRITE ERROR     36000010
+         BO    SYNEXIT                  BRANCH IF YES TO PREPARE        36400010
+*                                       FOR EXIT TO SYNAD               36800010
+ EJECT                                                                  37200010
+READ     EQU   *                                                        37600010
+         LA    RPARM,DECSDECB           ADDRESS OF ECB                  38000010
+         WAIT  ECB=(1)                  WAIT FOR TAM SCHEDULER         X38400010
+                                        TO TERMINATE                    38800010
+READX    EQU   *                                                        39200010
+         L     RENTRY,DCBREAD           ADDRESS OF READ ROUTINE         39600010
+         LM    RZERO,RBASE,20(RSAVE)    RESTORE USER'S REGISTERS        40000010
+         BALR  RETURN,RENTRY            INVOKE READ ROUTINE             40400010
+OFFSET   EQU   *                                                        40800010
+         LR    RBASE,RETURN             PREPARE TO RESET BASE REG       41200010
+         LA    RBASE,0(0,RBASE)         CLEAR HIGH-ORDER BYTE           41600010
+         LA    RENTRY,OFFSET-START      OFFSET BACK TO BALR/USING       42000010
+         SR    RBASE,RENTRY             RESET BASE REGISTER             42400010
+         LR    RDECB,RPARM              DECB ADDRESS                    42800010
+         L    RDCB,DECDCBAD             DCB ADDRESS                     43200010
+         L     RPECB,DCBPECB            GET PECB ADDRESS         Y02027 43600010
+         MVC   REG14(4,RSAVE),PECBRET   RESTORE USERS RETURN ADDRY02027 44000010
+         MVC   REG14+ONE(THREE,RSAVE),PECBRET RESTORE USERS      Y02027 44100010
+*                                       RETURN ADDRESS           Y02027 44200010
+         B     RCODE                    GO CHECK ECB CODE        Y02027 44800010
+ EJECT                                                                  45200010
+EODTST   EQU   *                                                        46000010
+         TM    DCBEODAD+3,ODD           EODAD EXIT SPECIFIED            46400010
+         BO    ABORTE                   BRANCH IF NO                    46800010
+         MVC   16(4,RSAVE),DCBEODAD     SET UP BRANCH REGISTER         X47200010
+                                        FIELD IN SAVEAREA               47600010
+UEXIT    EQU   *                                                        48000010
+         LM    RETURN,RBASE,12(RSAVE)   RESTORE USER'S REGISTERS        48400010
+         BR    RENTRY                   TAKE USER EXIT                  48800010
+ EJECT                                                                  49200010
+SYNEXIT  EQU   *                                                        49600010
+         CLI   DECSDECB,STOPQCC         DISABLED TPROCESS      @SA75438 49700010
+         BE    STOPQX                   BR YES                 @SA75438 49800010
+         TM    DCBSYNAD+3,ODD           SYNAD EXIT SPECIFIED            50000010
+         BO    ABORT                    BRANCH IF NO                    50400010
+         CLI   DECSDECB,NOBUF           THRESHOLD CONDITION     SA52955 50500010
+         BE    CUTOFF                   BRANCH IF YES           SA52955 50600010
+         XC    PECBSTAT(14),PECBSTAT    CLEAR FIELD              Y02027 50800010
+         LA    RTEMP,PECBSTAT           GET ADDRESS OF STATUS    Y02027 51000010
+         ST    RTEMP,DECIOBPT           INDICATORS AND STORE     Y02027 51200010
+         LA    RDECB,0(0,RDECB)         CLEAR HIGH-ORDER BYTE           51600010
+         ST    RDECB,20(RSAVE)          ADDR OF DECB IN REG 0 SLOT     X52000010
+                                        IN USER'S SAVEAREA              52400010
+         CLI   DECSDECB,INERR           READ ERROR                      52800010
+         BNE   WRITERR                  BRANCH IF NO                    53200010
+STOPQ    EQU   *                                                SA63961 53400010
+         MVI   24(RSAVE),BITON          INPUT ERROR FLAG                53600010
+         MVI   PECBSTAT+THIRTEEN,BIT    WORKAREA OVERFLOW        Y02027 54000010
+CLEANUP  EQU   *                                                        54400010
+         MVC   25(3,RSAVE),DECDCBAD+1   ADDRESS OF DCB TO REG 1         54800010
+*                                       SLOT IN REGISTER SAVEAREA       55200010
+         MVC   16(4,RSAVE),DCBSYNAD     ADDR OF SYNAD ROUTINE           55600010
+         B     UEXIT                    GO TO SYNAD                     56000010
+WRITERR  EQU   *                                                        56400010
+         MVI   24(RSAVE),DSTERFLG       ASSUME INVALID DEST     SA52483 56800010
+         CLI   DECSDECB,DESTERR         INVALID DESTINATION             57200010
+         BE    CLEANUP                  BRANCH IF YES                   57600010
+         MVI   24(RSAVE),SEQERR         SEQUENCE ERROR FLAG             58000010
+         MVI   PECBSTAT+TWO,BITON       SEQUENCE ERROR                  58400010
+         B     CLEANUP                  RETURN                          58800010
+ EJECT                                                                  59200010
+ABORT    EQU   *                                                        59600010
+         CLI   DECSDECB,INERR           WORKAREA OVERFLOW               60000010
+         BNE   WRTERR                   BRANCH IF NO                    60400010
+OFLOFLG  EQU   *                                                        60800010
+         LA    RENTRY,OFLO              ERROR CODE FOR OFLO             61200010
+         B     EXIT                     RETURN TO USER                  61600010
+WRTERR   EQU   *                                                        62000010
+         CLI   DECSDECB,DESTERR         INVALID DESTINATION             62400010
+         BNE   SERR                     BRANCH IF NO                    62800010
+RETOUT   EQU   *                                                        63200010
+         LA    RENTRY,DESTINV           ERROR CODE                      63600010
+         B     EXIT                     RETURN TO USER                  64000010
+SERR     EQU   *                                                        64400010
+         CLI   DECSDECB,NOBUF           THRESHOLD CONDITION             64500010
+         BE    CUTOFF                   BRANCH IF YES                   64600010
+         LA    RENTRY,SEQ               SEQUENCE ERROR                  64800010
+         B     EXIT                     RETURN TO CALLER                65200010
+CUTOFF   EQU   *                                                        65300010
+         LA    RENTRY,BOUT              ERROR RETURN CODE               65400010
+         B     EXIT                     RETURN TO USER                  65500010
+STOPQX   EQU   *                                                SA63961 65520010
+         LA    RENTRY,STOPQRC           DISABLED ENTRY CODE     SA63961 65540010
+         B     EXIT                     RETURN TO USER          SA63961 65560010
+ EJECT                                                                  65600010
+NORMAL   EQU   *                                                        66000010
+         LA    RENTRY,GOODRC            PUT NORMAL COMPLETION CODE     X66400010
+                                        IN RETURN-CODE REGISTER        X66800010
+                                        WORD IN USER'S SAVEAREA         67200010
+EXIT     EQU   *                                                        67600010
+         RETURN (14,12),T,RC=(15)       RESTORE USER'S REGISTERS       X68000010
+                                        AND RETURN CONTROL TO HIM      X68400010
+                                        AT NSI FOLLOWING CHECK          68800010
+ABORTE   EQU   *                                                        69200010
+         LA    RENTRY,NEOD              SET RETURN CODE FOR USER        69600010
+*                                       WITHOUT AN EODAD EXIT           70000010
+         B     EXIT                     RETURN TO USER                  70400010
+ EJECT                                                                  70800010
+COMP     EQU   X'7F'                    NORMAL COMPLETION CODE          71200010
+BIT      EQU   X'40'                    OUTPUT ERROR BIT                71600010
+BITON    EQU   X'80'                    INPUT ERROR BIT                 72000010
+EODFLG   EQU   X'41'                    SETEOF INDICATOR IN ECB         72400010
+DESTINV  EQU   12                                                       72800010
+OFLO     EQU   8                                                        73200010
+GOODRC   EQU   0                                                        73600010
+NEOD     EQU   4                                                        74000010
+DESTERR  EQU   X'54'                                                    74400010
+SEQERR   EQU   X'58'                                                    74800010
+EODAD    EQU   X'70'                                                    75200010
+RDAHDC   EQU   X'40'                                                    75600010
+INERR    EQU   X'52'                    READ ERROR FLAG(WRKA OFLO)      76000010
+ERR      EQU   X'50'                    GENERAL SYNAD INDICATOR         76400010
+ODD      EQU   X'01'                                                    76800010
+SEQ      EQU   8                        SEQUENCE ERROR CODE     SA64702 77200010
+RETERR   EQU   X'50'                                                    77600010
+BOUT     EQU   16                                                       77700010
+NOBUF    EQU   X'5C'                                                    77800010
+DSTERFLG EQU   X'48'                    INVALID DEST FLAGS      SA52483 77900010
+CVT      EQU   16                       CVT ADDRESS             SA60797 77907010
+REG14    EQU   12                       REG 14 IN SAVE AREA      Y02027 77907110
+C1       EQU   1                        CONSTANT                SA60797 77914010
+TWO      EQU   2                        DISPLACEMENT             Y02027 77914110
+C3       EQU   3                        CONSTANT                SA60797 77921010
+THIRTEEN EQU   13                       DISPLACEMENT             Y02027 77921110
+STOPQCC  EQU   X'51'                    DISABLED QUEUE C.C.     SA63961 77930010
+STOPQRC  EQU   20                       DISABLED QUEUE R.C.     SA63961 77960010
+ONE      EQU   1                        OFFSET FOR MOVE          Y02027 77970010
+THREE    EQU   3                        LEN FOR ADDR MOVE        Y02027 77980010
+SEVEN    EQU   7                        MASK FOR STCM INST       Y02027 77990010
+ EJECT                                                                  78000010
+IHADECB  DSECT                          DATA EXTENT CONTROL BLOCK       78400010
+DECSDECB DS    F                        EVENT CONTROL BLOCK             78800010
+DECTYPE  DS    H                        OPTION BYTES                    79200010
+DECLNGTH DS    H                        LENGTH OF WORKAREA              79600010
+DECDCBAD DS    F                        ADDR OF DATA CONTROL BLOCK      80000010
+DECAREA  DS    F                        ADDR OF USER'S WORKAREA         80400010
+DECIOBPT DS    F                        ADDR OF IOB                     80800010
+ EJECT                                                                  81200010
+         TPECBD                                                         81600010
+         TPEWAD                                                  Y02027 81800010
+ EJECT                                                                  82000010
+         DCBD  DSORG=PS                                                 82400010
+         TDEBAPD                        APPL PROG DEB            Y02027 82500010
+DCBPECB  EQU   DCBIOBAD                 TCAM FIELD               Y02027 82600010
+         EJECT                                                          82800010
+         EJECT                                                          83300010
+         TAVTD                                                          83400010
+         END                                                            83600010
